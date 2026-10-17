@@ -2,12 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useAlertsState } from "@/components/AlertsProvider";
 import { countAlerts } from "@/lib/alerts";
+
+const LINKS = [
+  { href: "/", label: "Dashboard" },
+  { href: "/alerts", label: "Alerts" },
+  { href: "/crew", label: "Crew view" },
+  { href: "/report", label: "Report hazard" },
+  { href: "/reports", label: "Reports" },
+  { href: "/briefings", label: "Briefings" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/about", label: "About" },
+];
 
 export default function TopNavigation() {
   const { alerts, status } = useAlertsState();
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const nav = useRef<HTMLElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") { setOpen(false); toggle.current?.focus(); }
+    }
+    function onOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !nav.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onOutside);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onOutside); };
+  }, [open]);
   const counts = countAlerts(alerts ?? []);
   const count = (value: number) => alerts === null ? "—" : `${value}${status === "stale" ? "?" : ""}`;
   const breakdown = `${count(counts.lightning)} stop work · ${count(counts.flood)} flood risk${counts.other ? ` · ${count(counts.other)} other` : ""}`;
@@ -23,20 +51,21 @@ export default function TopNavigation() {
     };
 
   return (
-    <nav aria-label="Main navigation" className="h-(--pc-nav-height) border-b border-border bg-surface">
-      <div className="mx-auto flex h-full max-w-5xl items-center justify-between gap-2 px-4">
-        <Link href="/" className="flex min-h-11 items-center font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">
+    <nav ref={nav} aria-label="Main navigation" className="relative z-50 h-(--pc-nav-height) border-b border-border bg-surface">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-4">
+        <Link href="/" className="flex min-h-12 shrink-0 items-center gap-2 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand" aria-label="PlanIT Control dashboard">
+          <img src="/icon.svg" width={28} height={28} alt="" />
           <span className="sm:hidden">PlanIT</span><span className="hidden sm:inline">PlanIT Control</span>
         </Link>
+        <div className="hidden items-center gap-1 xl:flex">
+          {LINKS.filter((link) => link.href !== "/alerts").map((link) => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} className={`flex min-h-12 items-center rounded-card px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-brand ${pathname === link.href ? "bg-bg text-brand" : "text-text"}`}>{link.label}</Link>)}
+        </div>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-        <Link href="/crew" aria-current={pathname === "/crew" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2"><span className="sm:hidden">Crew</span><span className="hidden sm:inline">Crew view</span></Link>
-        <Link href="/briefings" aria-current={pathname === "/briefings" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Briefings</Link>
-        <Link href="/reports" className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Reports</Link>
-        {/* Desktop only: a sixth link on a phone pushes the Alerts label out of the bar. */}
-        <Link href="/how-it-works" aria-current={pathname === "/how-it-works" ? "page" : undefined} className="hidden min-h-11 items-center px-2 text-sm font-semibold text-brand sm:flex">How it works</Link>
         <Link
           href="/alerts"
-          className="flex min-h-11 min-w-0 flex-col justify-center rounded-card px-1.5 text-sm font-semibold text-text sm:px-2 focus-visible:outline-2 focus-visible:outline-brand"
+          onClick={() => setOpen(false)}
+          aria-current={pathname === "/alerts" ? "page" : undefined}
+          className="flex min-h-12 min-w-0 max-w-44 flex-col justify-center rounded-card px-1 text-sm font-semibold text-text sm:px-2 focus-visible:outline-2 focus-visible:outline-brand"
           aria-label={`${badge.label}, ${breakdown}`}
         >
           <span className="flex flex-wrap items-center gap-x-1">
@@ -53,9 +82,15 @@ export default function TopNavigation() {
           </span>
           <span aria-hidden="true" className="text-[10px] font-normal text-muted sm:text-xs">{breakdown}</span>
         </Link>
-        <Link href="/report" className={`min-h-12 items-center justify-center rounded-card bg-brand px-4 font-semibold text-surface shadow-card sm:static sm:flex sm:min-h-11 sm:text-sm ${pathname === "/report" || pathname === "/crew" ? "hidden" : "fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex"}`}>Report hazard</Link>
+        <button ref={toggle} type="button" aria-expanded={open} aria-controls="main-menu" onClick={() => setOpen((value) => !value)} className="flex min-h-12 shrink-0 items-center justify-center rounded-card border border-border px-3 text-sm font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand xl:hidden">{open ? "Close" : "Menu"}</button>
         </div>
       </div>
+      {open && <div id="main-menu" className="absolute inset-x-0 top-full max-h-[calc(100dvh-var(--pc-nav-height))] overflow-y-auto border-b border-border bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-card xl:hidden">
+        <ul className="mx-auto max-w-5xl space-y-1">
+          {LINKS.map((link) => <li key={link.href}><Link href={link.href} onClick={() => setOpen(false)} aria-current={pathname === link.href ? "page" : undefined} className={`flex min-h-14 items-center rounded-card px-4 text-base font-semibold focus-visible:outline-2 focus-visible:outline-brand ${link.href === "/report" ? "bg-brand text-surface" : pathname === link.href ? "bg-bg text-brand" : "text-text"}`}>{link.label}</Link></li>)}
+        </ul>
+      </div>}
+      {!open && pathname !== "/report" && pathname !== "/crew" && <Link href="/report" className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex min-h-12 items-center justify-center rounded-card bg-brand px-4 font-semibold text-surface shadow-card focus-visible:outline-2 focus-visible:outline-brand sm:hidden">Report hazard</Link>}
     </nav>
   );
 }

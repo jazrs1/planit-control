@@ -1,9 +1,12 @@
+import { pageMetadata } from "@/lib/metadata";
 import BriefingsView from "@/components/BriefingsView";
 import { getSites, orNull } from "@/lib/api";
 import { loadBriefings } from "@/lib/loadBriefings";
 
 // Live safety data: always render per request, never prerender.
 export const dynamic = "force-dynamic";
+
+export const metadata = pageMetadata("Briefings", "Read next-day safety briefings for every utility site, generated at 6 PM site-local time.");
 
 export default async function BriefingsPage() {
   const sites = await orNull(getSites());

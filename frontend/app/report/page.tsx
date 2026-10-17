@@ -1,5 +1,8 @@
+import { pageMetadata } from "@/lib/metadata";
 import ReportEntry from "@/components/ReportEntry";
 import { getSites, orNull } from "@/lib/api";
+
+export const metadata = pageMetadata("Report hazard", "Share a crew hazard report with a photo, category, and map location.");
 
 export default async function ReportPage({ searchParams }: { searchParams: Promise<{ site?: string | string[] }> }) {
   const query = await searchParams;

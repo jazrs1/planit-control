@@ -1,5 +1,8 @@
+import { pageMetadata } from "@/lib/metadata";
 import ReportsView from "@/components/ReportsView";
 import { getReports, getSites, orNull } from "@/lib/api";
+
+export const metadata = pageMetadata("Reports", "Explore crew hazard reports, photos, and locations on the map, newest first.");
 
 export default async function ReportsPage() {
   const [reports, sites] = await Promise.all([orNull(getReports()), orNull(getSites())]);
