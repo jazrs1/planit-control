@@ -77,3 +77,14 @@ test("the outage starts 2 minutes after the last success (or page load if none)"
   assert.equal(conn.outageStartsAt({ lastSuccessAt: 1_000, failingSince: 5_000 }, 0), 1_000 + 120_000);
   assert.equal(conn.outageStartsAt({ lastSuccessAt: null, failingSince: 5_000 }, 500), 500 + 120_000);
 });
+
+test("score history uses the encoded site path and errors never turn into sample history", async () => {
+  let status = 200, url;
+  const history = { site_id: "big-bend", points: [] };
+  const { api } = load(async (path) => { url = path; return json(status, status === 200 ? history : { detail: "History unavailable" }); });
+  assert.deepEqual(await api.getScoreHistory("a/b"), history);
+  assert.equal(url, "http://api.test/sites/a%2Fb/score-history");
+  status = 503;
+  await assert.rejects(api.getScoreHistory("big-bend"), /History unavailable/);
+  assert.equal(api.DEMO_DATA.scoreHistory.site_id, "big-bend");
+});

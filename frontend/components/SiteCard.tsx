@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { Alert, FloodConditions, Site } from "@shared/types";
 import AlertBanner from "@/components/AlertBanner";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
@@ -20,11 +21,12 @@ type SiteCardProps = {
   alerts?: Alert[];
   flood?: FloodConditions;
   alertsUnconfirmed?: boolean;
+  history?: ReactNode;
   selected?: boolean;
   onSelect?: () => void;
 };
 
-export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, selected, onSelect }: SiteCardProps) {
+export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, history, selected, onSelect }: SiteCardProps) {
   const risk = RISK_STYLES[riskLevel(site.hazard_index)];
 
   return (
@@ -49,6 +51,8 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
         <span className="text-muted">Top hazard: </span>
         <span className="font-medium">{HAZARD_LABEL[site.top_hazard]}</span>
       </p>
+
+      {history}
 
       <Link href={`/sites/${site.id}`} className="rounded-card border border-border px-3 py-2 text-sm font-medium text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">
         Site details →
