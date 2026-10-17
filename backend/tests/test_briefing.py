@@ -62,12 +62,22 @@ def test_template_busy_day_has_timed_risks_and_concrete_actions():
     assert writer.THUNDERSTORM_ACTION in w.actions                            # plan shelter; no stop-work order
 
 
+def verdict(inputs: dict) -> str:
+    """go_status from the same rules briefing/inputs.py applies (hard stops first)."""
+    from briefing.inputs import hard_stops
+    i = {**inputs, "wildfire": {"nearest_detection_mi": None, **(inputs.get("wildfire") or {})}}
+    return go_status({**i, "hard_stops": hard_stops(i)})
+
+
 def test_go_status_rules():
-    assert go_status(2.0, 0, []) == "go"
-    assert go_status(2.0, 30, []) == "caution"                     # likely storms raise go
-    assert go_status(2.0, 0, ["Flood Watch"]) == "caution"
-    assert go_status(2.0, 0, ["Rip Current Statement"]) == "go"
-    assert go_status(5.0, 0, []) == "caution" and go_status(7.0, 0, []) == "no_go"
+    def nws(event):
+        return [{"event": event, "until": "Fri 8 AM", "work_hours": None}]
+    assert verdict(CALM) == "go"
+    assert verdict({**CALM, "thunderstorm_chance_work_hours_pct": 30}) == "caution"     # likely storms
+    assert verdict({**CALM, "nws_alerts": nws("Flood Watch")}) == "caution"
+    assert verdict({**CALM, "nws_alerts": nws("Rip Current Statement")}) == "go"
+    assert verdict({**CALM, "hazard_index": 5.0}) == "caution"
+    assert verdict({**CALM, "hazard_index": 9.5}) == "caution"           # a high index alone is never NO-GO
 
 
 def test_key_numbers_flag_missing_data():
@@ -445,96 +455,173 @@ def test_review_request_shape(monkeypatch):
 
 # ---------- template: every risk line comes from a reading that crosses a threshold ----------
 
-# Orange Cogeneration's input on Oct 17, 2026 (trimmed): NO-GO from a fire 4 mi away. The first template
-# listed only moist ground and "Normal operations".
-FIRE_NO_GO = {**copy.deepcopy(CALM), "go_status": "no_go", "hazard_index": 8.0, "top_hazard": "wildfire",
-              "top_factors": [{"hazard": "wildfire", "label": "Fire detected 4 mi away"},
-                              {"hazard": "heat", "label": "Heat index peak 80°F tomorrow"},
-                              {"hazard": "soil_saturation", "label": "Moist soil expected"}],
-              "soil": {"level": "moist", "moisture_pct": 19, "crew_note": "Moist ground: soft spots possible off pavement"},
-              "wildfire": {"detections_within_25_mi": 10}}
-MODEL_ONLY = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 5.6, "top_hazard": "storm",
-              "wind": {"max_gust_mph": 24, "peak_time": "2 PM"},
-              "top_factors": [{"hazard": "storm", "label": "Wind gusts to 24 mph"},
-                              {"hazard": "flood", "label": "0.0 in of rain forecast"},
-                              {"hazard": "storm", "label": "Area with frequent past severe-weather reports"}]}
+def final(inputs: dict) -> dict:
+    """Inputs with hard_stops and go_status set by the real rules (briefing/inputs.py)."""
+    from briefing.inputs import hard_stops
+    i = copy.deepcopy(inputs)
+    i["wildfire"] = {"nearest_detection_mi": None, **(i.get("wildfire") or {})}
+    i["hard_stops"] = hard_stops(i)
+    i["go_status"] = go_status(i)
+    return i
+
+
+FIRE_NO_GO = final({**copy.deepcopy(CALM), "hazard_index": 8.0, "top_hazard": "wildfire",
+                    "top_factors": [{"hazard": "wildfire", "label": "Fire detected 4 mi away"},
+                                    {"hazard": "heat", "label": "Heat index peak 80°F tomorrow"},
+                                    {"hazard": "soil_saturation", "label": "Moist soil expected"}],
+                    "soil": {"level": "moist", "moisture_pct": 19, "crew_note": "Moist ground: soft spots possible off pavement"},
+                    "wildfire": {"detections_within_25_mi": 10, "nearest_detection_mi": 4.2,
+                                 "confirmed_within_5_mi": True}})
+MODEL_ONLY = final({**copy.deepcopy(CALM), "hazard_index": 5.6, "top_hazard": "storm",
+                    "wind": {"max_gust_mph": 24, "peak_time": "2 PM"},
+                    "top_factors": [{"hazard": "storm", "label": "Wind gusts to 24 mph"},
+                                    {"hazard": "flood", "label": "0.0 in of rain forecast"},
+                                    {"hazard": "storm", "label": "Area with frequent past severe-weather reports"}]})
+# Oct 2026: 2.3 in of rain, almost all 6 PM-12 AM, used to make a NO-GO through the index.
+EVENING_RAIN = final({**copy.deepcopy(CALM), "hazard_index": 7.6, "rain_total_in": 2.3, "rain_work_hours_in": 0.1,
+                      "top_factors": [{"hazard": "flood", "label": "2.3 in of rain forecast tomorrow"},
+                                      {"hazard": "heat", "label": "Heat index peak 94°F tomorrow"}],
+                      "heat": {"peak_heat_index_f": 94, "peak_time": "1 PM", "osha_risk_band": "moderate",
+                               "heat_index_91_or_higher": {"from": "11 AM", "until": "3 PM"},
+                               "work_hours_peak_heat_index_f": 94, "work_hours_peak_time": "1 PM",
+                               "work_hours_osha_risk_band": "moderate"},
+                      "periods": [{**p, "rain_in": 2.2 if p["period"] == "evening" else 0.0,
+                                   "rain_chance_pct": 80 if p["period"] == "evening" else 10} for p in CALM["periods"]]})
 GUST_ACTION = "Stop aerial lift and bucket work if gusts exceed the equipment's rated limit; secure loose materials."
 
 
 def _check(inputs):
     w = writer.template(inputs)
-    assert writer.problems(w.text, inputs) == []                  # grounded, no invented hazards, < 150 words
+    assert writer.problems(w.text, inputs) == []                  # grounded, names any hard stop, < 150 words
     assert writer.template_audit(inputs) == []                    # every risk line has a reading behind it
+    assert "hazard index" not in w.headline and "main factor" not in w.headline
     if inputs["go_status"] != "go":
         assert not any("Normal operations" in a for a in w.actions)
     return w
 
 
-def test_no_go_names_the_fire_that_caused_it():
+# ---------- NO-GO only for a named hard stop during work hours (7 AM-5 PM) ----------
+
+@pytest.mark.parametrize("event", ["Hurricane Warning", "Tropical Storm Warning", "Tornado Warning", "Flood Warning",
+                                   "Flash Flood Warning", "Excessive Heat Warning", "Extreme Heat Warning"])
+def test_nws_warning_during_work_hours_is_a_named_no_go(event):
+    i = final({**CALM, "nws_alerts": [{"event": event, "until": "Fri 3 PM", "work_hours": "7 AM-3 PM"}]})
+    w = _check(i)
+    assert i["go_status"] == "no_go" and w.headline.startswith(f"{event} 7 AM-3 PM")
+    assert w.text.startswith(f"NO-GO for Thursday, Jul 16: {event} 7 AM-3 PM")
+    after_work = final({**CALM, "nws_alerts": [{"event": event, "until": "Fri 11 PM", "work_hours": None}]})
+    assert after_work["go_status"] == "caution"                    # warnings outside work hours plan, not stop
+
+
+def test_red_flag_is_a_no_go_only_with_a_fire_within_10_mi():
+    red_flag = [{"event": "Red Flag Warning", "until": "Fri 7 PM", "work_hours": "10 AM-5 PM"}]
+    near = final({**CALM, "nws_alerts": red_flag, "wildfire": {"detections_within_25_mi": 2, "nearest_detection_mi": 8.0}})
+    w = _check(near)
+    assert near["go_status"] == "no_go" and w.headline.startswith("Red Flag Warning 10 AM-5 PM")
+    far = final({**CALM, "nws_alerts": red_flag, "wildfire": {"detections_within_25_mi": 2, "nearest_detection_mi": 14.0}})
+    assert far["go_status"] == "caution"
+    assert final({**CALM, "nws_alerts": red_flag})["go_status"] == "caution"
+
+
+def test_osha_very_high_heat_during_work_hours_is_a_no_go():
+    hot = final({**CALM, "heat": {"peak_heat_index_f": 118, "peak_time": "2 PM", "osha_risk_band": "very high",
+                                  "heat_index_91_or_higher": {"from": "9 AM", "until": "6 PM"},
+                                  "work_hours_peak_heat_index_f": 118, "work_hours_peak_time": "2 PM",
+                                  "work_hours_osha_risk_band": "very high"}})
+    w = _check(hot)
+    assert hot["go_status"] == "no_go" and w.headline.startswith("OSHA very high heat: heat index 118°F around 2 PM")
+    assert w.actions[0].startswith("Start at 6:41 AM")
+    high = final({**CALM, "heat": {**hot["heat"], "work_hours_osha_risk_band": "high", "osha_risk_band": "high"}})
+    assert high["go_status"] == "go"                               # OSHA high is a heat risk, not a hard stop
+
+
+def test_fire_within_5_mi_is_a_no_go_named_in_the_headline():
     w = _check(FIRE_NO_GO)
-    assert w.text.startswith("NO-GO") and "main factor: fire detected 4 mi away" in w.headline
-    assert w.risks[0].startswith("Fire detected 4 mi away") and "10 fire detection" in w.risks[0]
-    assert "escape route" in w.actions[0]
+    assert FIRE_NO_GO["go_status"] == "no_go" and w.headline.startswith("Fire detected 4.2 mi away")
+    assert w.risks[0].startswith("Fire detected 4.2 mi away") and "escape route" in w.actions[0]
     assert not any("Heat" in r for r in w.risks)                   # an OSHA "lower" heat factor is not a risk
+    six = final({**FIRE_NO_GO, "wildfire": {"detections_within_25_mi": 10, "nearest_detection_mi": 6.0,
+                                             "confirmed_within_5_mi": False}})
+    assert six["go_status"] == "caution"                           # the index (8.0) gives at most CAUTION
+    one_pass = final({**FIRE_NO_GO, "wildfire": {"detections_within_25_mi": 5, "nearest_detection_mi": 0.9,
+                                                 "confirmed_within_5_mi": False}})
+    assert one_pass["go_status"] == "caution"                      # one satellite pass: watch, not a hard stop
 
 
-def test_model_only_verdict_says_higher_than_normal_chance_of_severe_weather():
-    w = _check(MODEL_ONLY)
-    assert "main factor: Higher than normal chance of severe weather." in w.headline
+@pytest.mark.parametrize("category, what", [("Downed line", "a downed line"), ("Flooding or washout", "site flooding")])
+def test_crew_report_of_a_downed_line_or_site_flooding_is_a_no_go(category, what):
+    i = final({**CALM, "crew_reports_last_48_h_within_2_mi": [
+        {"category": category, "reported": "2 h ago", "reported_at": "1 PM", "distance_mi": 0.4}]})
+    w = _check(i)
+    assert i["go_status"] == "no_go" and w.headline.startswith(f"Crew reported {what} 2 h ago")
+    assert i["hard_stops"][0]["name"] in w.headline
+    assert w.risks[0].startswith("Crew reported")
+
+
+# ---------- a high index or hazards outside work hours: at most CAUTION, with a plan-ahead action ----------
+
+def test_evening_only_rain_gives_caution_not_no_go():
+    w = _check(EVENING_RAIN)
+    assert EVENING_RAIN["go_status"] == "caution"
+    assert w.headline == "Heat peaks at 94°F around 1 PM; 2.3 in of rain, mostly 6 PM-12 AM."
+    assert writer.RAIN_PLAN_AHEAD in w.actions and not any("flooded roads" in a for a in w.actions)
+
+
+def test_a_high_index_alone_is_caution_with_a_plan_ahead_action():
+    i = final({**MODEL_ONLY, "hazard_index": 9.2})
+    w = _check(i)
+    assert i["go_status"] == "caution"
+    assert w.headline.startswith("Higher than normal chance of severe weather")
     assert w.actions == ["Check radar before starting and be ready to stop work."]
     assert w.risks == ["No reading crosses a hazard threshold on its own."]
-    # Model factors never become risk lines; the location factor is one short context sentence, no action.
     assert "0.0 in of rain" not in w.text and "Wind gusts to 24" not in w.text
     assert w.text.count("frequent past severe-weather reports") == 1
-    assert "This area has frequent past severe-weather reports." in w.headline
 
 
 def test_gusts_of_30_mph_or_more_are_a_storm_risk_with_the_equipment_action():
-    windy = {**copy.deepcopy(MODEL_ONLY), "wind": {"max_gust_mph": 36, "peak_time": "2 PM"},
-             "top_factors": [{"hazard": "storm", "label": "Wind gusts to 36 mph"}]}
+    windy = final({**MODEL_ONLY, "wind": {"max_gust_mph": 36, "peak_time": "2 PM"},
+                   "top_factors": [{"hazard": "storm", "label": "Wind gusts to 36 mph"}]})
     w = _check(windy)
-    assert "main factor: wind gusts up to 36 mph" in w.headline
-    assert w.risks[0] == "Wind gusts up to 36 mph around 2 PM." and w.actions[0] == GUST_ACTION
-    calm_wind = {**copy.deepcopy(CALM), "wind": {"max_gust_mph": 29, "peak_time": "2 PM"}}
+    assert w.headline == "Gusts to 36 mph around 2 PM." and w.actions[0] == GUST_ACTION
+    calm_wind = final({**CALM, "wind": {"max_gust_mph": 29, "peak_time": "2 PM"}})
     assert not any("gust" in r.lower() for r in _check(calm_wind).risks)
 
 
-def test_caution_from_the_index_leads_with_its_top_factor_reading():
-    w = _check(BUSY)
-    assert w.text.startswith("CAUTION") and "main factor: heat index up to 108°F (OSHA high risk)" in w.headline
+def test_caution_from_the_index_leads_with_its_work_hours_driver():
+    w = _check(final(BUSY))
+    assert w.text.startswith("CAUTION") and w.headline.startswith("Heat peaks at 108°F around 3 PM")
     assert w.risks[0].startswith("Heat index peaks at 108°F") and "NWS Heat Advisory" in w.risks[0]
-    assert "Thunderstorms likely from 2 PM" in w.risks[1] and w.actions[0].startswith("Start at 6:41 AM")
+    assert w.actions[0].startswith("Start at 6:41 AM")
 
 
-def test_caution_raised_by_storms_names_the_storms():
-    stormy = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 2.5,
-              "thunderstorms_likely_from": "2 PM", "thunderstorm_chance_work_hours_pct": 45}
+def test_caution_raised_by_storms_names_the_storms_and_plans_shelter():
+    stormy = {**copy.deepcopy(CALM), "hazard_index": 2.5, "thunderstorms_likely_from": "2 PM",
+              "thunderstorm_chance_work_hours_pct": 45}
     stormy["periods"][1]["thunderstorm_chance_pct"] = 45
+    stormy = final(stormy)
     w = _check(stormy)
-    assert "main factor: thunderstorms likely from 2 PM" in w.headline
-    assert w.risks[0].startswith("Thunderstorms likely from 2 PM")
-    assert w.actions[0] == ("Thunderstorms are likely during work hours. Plan shelter in a vehicle or building and "
-                            "schedule exposed work early.")
-    assert not any("stop work" in a.lower() for a in w.actions)               # stop-work only from the live engine
+    assert stormy["go_status"] == "caution" and w.headline.startswith("Thunderstorms likely from 2 PM")
+    assert w.actions[0] == writer.THUNDERSTORM_ACTION
+    assert not any("stop work" in a.lower() for a in w.actions)
 
 
 def test_caution_raised_by_an_nws_watch_names_the_watch():
-    watched = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 2.0,
-               "nws_alerts": [{"event": "Flood Watch", "until": "Fri 8 AM"}]}
+    watched = final({**copy.deepcopy(CALM), "hazard_index": 2.0,
+                     "nws_alerts": [{"event": "Flood Watch", "until": "Fri 8 AM", "work_hours": "7 AM-8 AM"}]})
     w = _check(watched)
-    assert "main factor: NWS Flood Watch until Fri 8 AM" in w.headline
-    assert "Flood Watch" in w.risks[0] and "flooded roads" in w.actions[0]
+    assert watched["go_status"] == "caution" and w.headline.startswith("NWS Flood Watch until Fri 8 AM")
+    assert "flooded roads" in w.actions[0]
 
 
 def test_go_says_normal_operations_only_when_nothing_needs_an_action():
-    w = _check(CALM)
-    assert w.text.startswith("GO") and "low overall risk" in w.headline
+    w = _check(final(CALM))
+    assert w.text.startswith("GO") and w.headline == "Low risk, no significant hazards in the forecast."
     assert w.actions == ["Normal operations; hold the standard tailboard safety briefing."]
-    moist = {**copy.deepcopy(CALM), "soil": {"level": "moist", "moisture_pct": 18, "crew_note": "Moist ground"},
-             "top_factors": [{"hazard": "soil_saturation", "label": "Moist soil expected"}]}
+    moist = final({**copy.deepcopy(CALM), "soil": {"level": "moist", "moisture_pct": 18, "crew_note": "Moist ground"},
+                   "top_factors": [{"hazard": "soil_saturation", "label": "Moist soil expected"}]})
     w = _check(moist)
-    assert w.text.startswith("GO") and "main factor: moist ground (soil moisture 18%)" in w.headline
-    assert w.risks[0].startswith("Moist ground") and any("mats" in a for a in w.actions)
+    assert w.text.startswith("GO") and w.headline == "Soft, wet ground."
+    assert any("mats" in a for a in w.actions)
 
 
 def test_every_crew_report_gets_a_line_downed_lines_and_heat_illness_first():
@@ -542,21 +629,64 @@ def test_every_crew_report_gets_a_line_downed_lines_and_heat_illness_first():
                {"category": "Wildlife (Cottonmouth)", "reported": "3 h ago", "reported_at": "11 AM", "distance_mi": 0.8},
                {"category": "Downed line", "reported": "2 h ago", "reported_at": "1 PM", "distance_mi": 0.4},
                {"category": "Other", "reported": "1 h ago", "reported_at": "2 PM", "distance_mi": 1.9}]
-    crowded = {**copy.deepcopy(BUSY), "go_status": "no_go", "hazard_index": 9.0,
-               "crew_reports_last_48_h_within_2_mi": reports}
+    crowded = final({**copy.deepcopy(BUSY), "hazard_index": 9.0, "crew_reports_last_48_h_within_2_mi": reports})
     w = _check(crowded)
+    assert crowded["go_status"] == "no_go"
     assert w.risks[0].startswith("Crew reported a downed line") and "energized" in w.actions[0]
     for what in ("flooding or washout", "wildlife (Cottonmouth)", "other"):
         assert any(r.startswith(f"Crew reported {what}") for r in w.risks), what
-    assert any(r.startswith("Heat index peaks") for r in w.risks)        # the verdict's own cause is still listed
 
 
 def test_template_never_lists_osha_lower_heat_or_rain_below_the_flood_threshold():
-    mild = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 4.4, "rain_total_in": 0.2,
-            "heat": {"peak_heat_index_f": 84, "peak_time": "2 PM", "osha_risk_band": "lower", "heat_index_91_or_higher": None},
-            "top_factors": [{"hazard": "heat", "label": "Heat index peak 84°F tomorrow"},
-                            {"hazard": "flood", "label": "0.2 in of rain forecast"}]}
+    mild = final({**copy.deepcopy(CALM), "hazard_index": 4.4, "rain_total_in": 0.2,
+                  "heat": {"peak_heat_index_f": 84, "peak_time": "2 PM", "osha_risk_band": "lower", "heat_index_91_or_higher": None},
+                  "top_factors": [{"hazard": "heat", "label": "Heat index peak 84°F tomorrow"},
+                                  {"hazard": "flood", "label": "0.2 in of rain forecast"}]})
     mild["periods"][1]["rain_in"] = 0.2
     w = _check(mild)
-    assert "main factor: Higher than normal chance of severe weather" in w.headline
+    assert w.headline.startswith("Higher than normal chance of severe weather")
     assert not any(("Heat" in r) or ("rain" in r) for r in w.risks)
+
+
+def test_claude_no_go_must_name_the_hard_stop(monkeypatch, claude_on):
+    flood = final({**CALM, "nws_alerts": [{"event": "Flood Warning", "until": "Fri 3 PM", "work_hours": "7 AM-3 PM"}]})
+    vague = {"headline": "A wet, risky day.", "risks": ["Flooding possible"], "actions": ["Stay off low ground"]}
+    named = {"headline": "Flood Warning 7 AM-3 PM; stay off low ground.", "risks": ["Flooding possible"],
+             "actions": ["Stay off low ground"]}
+    calls = fake_claude(monkeypatch, vague, named)
+    w = writer.write(flood)
+    assert w.generator == "claude" and "Flood Warning" in calls[1]          # the retry was told which hard stop
+    assert w.text.startswith("NO-GO for Thursday, Jul 16: Flood Warning 7 AM-3 PM")
+
+
+def test_briefing_inputs_round_rain_and_keep_evening_rain_out_of_no_go():
+    """End to end through briefing/inputs.site_inputs: 2.3 in of rain 6 PM-12 AM and a high model score."""
+    from datetime import timedelta as td
+    from briefing.inputs import site_inputs
+    from hazards.scoring import Inputs
+    from types import SimpleNamespace
+    tz = ZoneInfo("America/New_York")
+    site = {"id": "s", "name": "Test", "county": "Polk", "timezone": "America/New_York", "lat": 28.0, "lon": -82.0,
+            "fema_flood_zone": "X", "fema_sfha": False, "near_river": False, "river_name": None}
+    now = datetime(2026, 10, 17, 22, 0, tzinfo=timezone.utc)                     # 6 PM; tomorrow is Oct 18
+    hours = [datetime(2026, 10, 17, 0, 0, tzinfo=tz) + td(hours=k) for k in range(72)]
+    rain = [0.38 if h.date().day == 18 and 18 <= h.hour < 24 else 0.004 if h.date().day == 18 and 7 <= h.hour < 17 else 0.0
+            for h in hours]
+    forecast = {"hourly": {"time": [int(h.timestamp()) for h in hours], "temperature_2m": [82.0] * 72,
+                           "relative_humidity_2m": [60.0] * 72, "precipitation": rain,
+                           "precipitation_probability": [60] * 72, "wind_gusts_10m": [15.0] * 72},
+                "daily": {"sunrise": [], "sunset": []}}
+    ensemble = {"hourly": {"time": [int(h.timestamp()) for h in hours], "weather_code_member01": [3] * 72}}
+    inp = Inputs(site=site, readings={}, now=now,
+                 model={"2026-10-18": {"probability": 0.2, "score": 8.0,
+                                       "factors": [{"factor": "rain_in", "hazard": "flood", "label": "2.3 in of rain forecast",
+                                                    "weight": 1.0}]}})
+    snap = SimpleNamespace(inputs={"s": inp}, species_counts={"s": {}})
+    i, _ = site_inputs(site, forecast, ensemble, snap, now)
+    assert i["hazard_index"] >= 7                                   # the index alone would have been NO-GO
+    assert i["rain_total_in"] == 2.3 and i["rain_work_hours_in"] == 0.0
+    assert all(round(p["rain_in"], 1) == p["rain_in"] for p in i["periods"])  # one decimal everywhere
+    assert i["hard_stops"] == [] and i["go_status"] == "caution"
+    assert i["work_hours"] == "7 AM-5 PM"
+    w = writer.template(i)
+    assert writer.problems(w.text, i) == [] and writer.RAIN_PLAN_AHEAD in w.actions
