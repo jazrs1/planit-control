@@ -25,6 +25,7 @@ export default function TopNavigation() {
           <span className="sm:hidden">PlanIT</span><span className="hidden sm:inline">PlanIT Control</span>
         </Link>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+        <Link href="/crew" aria-current={pathname === "/crew" ? "page" : undefined} className="flex min-h-12 shrink-0 items-center rounded-card px-1 text-sm font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Crew view</Link>
         <Link href="/reports" className="flex min-h-11 items-center px-2 text-sm font-semibold text-brand">Reports</Link>
         <Link
           href="/alerts"
@@ -42,7 +43,7 @@ export default function TopNavigation() {
           )}
           {status === "demo" && <span aria-hidden="true" className="rounded-pill border border-border px-2 py-0.5 text-xs font-medium text-muted">Demo data</span>}
         </Link>
-        <Link href="/report" className={`min-h-12 items-center justify-center rounded-card bg-brand px-4 font-semibold text-surface shadow-card sm:static sm:flex sm:min-h-11 sm:text-sm ${pathname === "/report" ? "hidden" : "fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex"}`}>Report hazard</Link>
+        <Link href="/report" className={`min-h-12 items-center justify-center rounded-card bg-brand px-4 font-semibold text-surface shadow-card sm:static sm:flex sm:min-h-11 sm:text-sm ${pathname === "/report" || pathname === "/crew" ? "hidden" : "fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex"}`}>Report hazard</Link>
         </div>
       </div>
     </nav>

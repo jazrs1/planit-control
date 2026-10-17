@@ -7,7 +7,7 @@ import ReportForm from "@/components/ReportForm";
 import { getSites } from "@/lib/api";
 import { usePolling } from "@/lib/usePolling";
 
-export default function ReportEntry({ initialSites }: { initialSites: Site[] | null }) {
+export default function ReportEntry({ initialSites, initialSiteId = "" }: { initialSites: Site[] | null; initialSiteId?: string }) {
   const { status, replay, setDemo } = useAlertsState();
   const [sites, setSites] = useState(initialSites);
   const refreshSites = useCallback(async () => {
@@ -24,5 +24,5 @@ export default function ReportEntry({ initialSites }: { initialSites: Site[] | n
     </section>
   );
 
-  return <ReportForm sites={sites} />;
+  return <ReportForm key={initialSiteId} sites={sites} initialSiteId={initialSiteId} />;
 }

@@ -1,9 +1,11 @@
-import type { Alert, ApiError, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, StartReplayRequest } from "@shared/types";
+import type { Alert, ApiError, Briefing, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, SiteDetail, StartReplayRequest } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
 import mockSites from "@shared/mocks/sites.json";
 
 import mockReports from "@shared/mocks/reports.json";
+import mockSiteDetails from "@shared/mocks/site_details.json";
+import mockBriefings from "@shared/mocks/briefings.json";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -30,6 +32,8 @@ export async function orNull<T>(promise: Promise<T>): Promise<T | null> {
 
 export const getReports = () => request<HazardReport[]>("/reports");
 export const getSites = () => request<Site[]>("/sites");
+export const getSiteDetail = (id: Site["id"]) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
+export const getBriefing = (id: Site["id"]) => request<Briefing>(`/briefing/${encodeURIComponent(id)}`);
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
@@ -39,6 +43,8 @@ export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: 
 
 /** shared/mocks, for the explicit "Demo data" mode only. Anything showing these must say so. */
 export const DEMO_DATA = {
+  siteDetails: mockSiteDetails as Record<string, SiteDetail>,
+  briefings: mockBriefings as Record<string, Briefing>,
   reports: mockReports as HazardReport[],
   sites: mockSites as Site[],
   alerts: mockAlerts as Alert[],
