@@ -374,8 +374,21 @@ def outbox(monkeypatch, push_on):
 
 
 def subscribe(conn, name, site_ids=None):
+    # Keys are unique per subscription, as a browser makes them (migration 010 enforces it).
     row, _ = webpush.subscribe(conn, f"{FCM}{name}", {"p256dh": f"k-{name}", "auth": "a"}, site_ids, "crew", T0)
     return row["id"]
+
+
+@pytest.fixture
+def others(conn):
+    """Subscriptions that aren't the test's (real ones on a shared database look like these): one for
+    every site, one for test site A. Tests must pass with them there, so they only check their own."""
+    return {subscribe(conn, "someone-else-all"), subscribe(conn, "someone-else-a", ["test-push-a"])}
+
+
+def ours(got, *ids):
+    """The (subscription, title) sends to these subscriptions only."""
+    return sorted((s, t) for s, t in got if s in ids)
 
 
 def strike(site, miles, at):
@@ -386,7 +399,7 @@ def alerts_snapshot(conn):
     return conn.execute("SELECT * FROM alerts WHERE site_id LIKE 'test-push-%' ORDER BY id").fetchall()
 
 
-def test_stop_work_and_all_clear_push_once_to_the_right_subscriptions(conn, outbox):
+def test_stop_work_and_all_clear_push_once_to_the_right_subscriptions(conn, outbox, others):
     got, _ = outbox
     mine = subscribe(conn, "a", ["test-push-a"])
     other = subscribe(conn, "b", ["test-push-b"])
@@ -397,9 +410,10 @@ def test_stop_work_and_all_clear_push_once_to_the_right_subscriptions(conn, outb
     before = alerts_snapshot(conn)
     notify.dispatch_alerts(pool, T0, replay=True)
     title = "[REPLAY] STOP WORK: Test Push A, lightning 3.2 mi away"
-    assert sorted(got) == sorted([(mine, title), (everyone, title)])
-    assert other not in [s for s, _ in got]
+    assert ours(got, mine, other, everyone) == sorted([(mine, title), (everyone, title)])
+    assert others <= {s for s, _ in got}               # the other subscribers for site A got it too
     assert alerts_snapshot(conn) == before            # sending never touches alerts
+    stop_sends = len(got)
 
     got.clear()
     notify.dispatch_alerts(pool, T0 + MIN, replay=True)
@@ -407,12 +421,13 @@ def test_stop_work_and_all_clear_push_once_to_the_right_subscriptions(conn, outb
 
     engine.process(conn, [], T0 + 31 * MIN, TEST_SITES, replay=True)
     notify.dispatch_alerts(pool, T0 + 31 * MIN, replay=True)
-    assert sorted(t for _, t in got) == ["[REPLAY] All clear at Test Push A"] * 2
+    assert [t for _, t in ours(got, mine, other, everyone)] == ["[REPLAY] All clear at Test Push A"] * 2
     sent = conn.execute("SELECT kind, sent FROM push_log WHERE site_id = 'test-push-a' ORDER BY claimed_at, kind").fetchall()
-    assert sorted((r["kind"], r["sent"]) for r in sent) == [("all_clear", 2), ("stop_work", 2)]
+    # `sent` counts every subscription reached, ours and everyone else's.
+    assert sorted((r["kind"], r["sent"]) for r in sent) == [("all_clear", len(got)), ("stop_work", stop_sends)]
 
 
-def test_old_events_are_not_pushed(conn, outbox):
+def test_old_events_are_not_pushed(conn, outbox, others):
     got, _ = outbox
     subscribe(conn, "all")
     engine.process(conn, [strike(TEST_SITES[0], 2, T0)], T0, TEST_SITES, replay=True)
@@ -420,14 +435,16 @@ def test_old_events_are_not_pushed(conn, outbox):
     assert got == []
 
 
-def test_expired_subscriptions_are_removed_and_failures_counted(conn, outbox):
+def test_expired_subscriptions_are_removed_and_failures_counted(conn, outbox, others):
     got, answers = outbox
     gone, flaky = subscribe(conn, "gone"), subscribe(conn, "flaky")
     answers.update({gone: "gone", flaky: "failed"})
     engine.process(conn, [strike(TEST_SITES[1], 1, T0)], T0, TEST_SITES, replay=True)
     notify.dispatch_alerts(FakePool(conn), T0, replay=True)
-    rows = {r["id"]: r["failures"] for r in conn.execute("SELECT id, failures FROM push_subscriptions").fetchall()}
+    rows = {r["id"]: r["failures"] for r in conn.execute(
+        "SELECT id, failures FROM push_subscriptions WHERE id = ANY(%s)", ([gone, flaky, *others],)).fetchall()}
     assert gone not in rows and rows[flaky] == 1
+    assert all(rows[i] == 0 for i in others)           # everyone else's subscriptions are untouched
 
 
 def test_a_crashing_send_leaves_alerts_alone(conn, monkeypatch, push_on, caplog):
@@ -441,23 +458,23 @@ def test_a_crashing_send_leaves_alerts_alone(conn, monkeypatch, push_on, caplog)
     assert conn.execute("SELECT failures FROM push_subscriptions WHERE id = %s", (sub,)).fetchone()["failures"] == 1
 
 
-def test_flood_alert_pushes_live(conn, outbox):
+def test_flood_alert_pushes_live(conn, outbox, others):
     got, _ = outbox
-    subscribe(conn, "all")
+    everyone = subscribe(conn, "all")
     conn.execute(
         """WITH a AS (INSERT INTO alerts (site_id, type, status, started_at, all_clear_at, replay)
                       VALUES ('test-push-b', 'flood', 'active', %(t)s, NULL, false) RETURNING id)
            INSERT INTO alert_events (alert_id, event, at, recorded_at) SELECT id, 'created', %(t)s, %(t)s FROM a""",
         {"t": T0})
     notify.dispatch_alerts(FakePool(conn), T0, replay=False)
-    assert [t for _, t in got] == ["Flood alert: Test Push B"]
+    assert ours(got, everyone) == [(everyone, "Flood alert: Test Push B")]
 
 
-def test_approach_advisory_pushes_once(conn, outbox):
+def test_approach_advisory_pushes_once(conn, outbox, others):
     if conn.execute("SELECT to_regclass('lightning_advisories') AS t").fetchone()["t"] is None:
         pytest.skip("migration 008 not applied")
     got, _ = outbox
-    subscribe(conn, "all")
+    everyone = subscribe(conn, "all")
     for status in ("active", "superseded"):
         conn.execute(
             """INSERT INTO lightning_advisories (site_id, replay, status, started_at, updated_at, arrival_at, first_arrival_at,
@@ -466,10 +483,10 @@ def test_approach_advisory_pushes_once(conn, outbox):
             ("test-push-a" if status == "active" else "test-push-b", status, T0, T0, T0 + 40 * MIN, T0 + 40 * MIN))
     notify.dispatch_alerts(FakePool(conn), T0, replay=True)
     notify.dispatch_alerts(FakePool(conn), T0 + MIN, replay=True)
-    assert [t for _, t in got] == ["[REPLAY] Lightning possible within the hour at Test Push A"]
+    assert ours(got, everyone) == [(everyone, "[REPLAY] Lightning possible within the hour at Test Push A")]
 
 
-def test_briefing_summary_per_subscription(conn, outbox):
+def test_briefing_summary_per_subscription(conn, outbox, others):
     got, _ = outbox
     one, everyone = subscribe(conn, "one", ["test-push-a"]), subscribe(conn, "all")
     for site, go in (("test-push-a", "caution"), ("test-push-b", "go")):
@@ -478,8 +495,8 @@ def test_briefing_summary_per_subscription(conn, outbox):
     pool = FakePool(conn)
     notify.dispatch_briefings(pool, ["test-push-a", "test-push-b"], T0)
     notify.dispatch_briefings(pool, ["test-push-a", "test-push-b"], T0)   # same briefings: no repeat
-    by = dict(got)
-    assert len(got) == 2
+    by = dict(ours(got, one, everyone))
+    assert len(ours(got, one, everyone)) == 2          # one each, and no repeat
     assert by[one] == "Tomorrow at Test Push A: CAUTION"
     assert by[everyone] == "Tomorrow's safety briefings are ready"
 
@@ -497,7 +514,7 @@ def client(conn, push_on, outbox):
 
 
 def body(endpoint=FCM + "route", site_ids=None, role="supervisor"):
-    return {"subscription": {"endpoint": endpoint, "expirationTime": None, "keys": {"p256dh": "k", "auth": "a"}},
+    return {"subscription": {"endpoint": endpoint, "expirationTime": None, "keys": {"p256dh": "k-route", "auth": "a"}},
             "site_ids": site_ids, "role": role}
 
 
