@@ -349,12 +349,28 @@ export interface SendBriefingResponse {
 
 /** One GOES-19 GLM flash over Florida (+30 mi). */
 export interface LightningFlash {
+  /** Strike time. Real flashes are on real time; replay flashes on the replay's (historical) clock, so
+   * age a flash against real now or ReplayStatus.simulated_now depending on `replay`. */
   ts: string;
   lat: number;
   lon: number;
+  /** false: real lightning (always included, newest first). true: from the running replay, listed after
+   * the real ones, newest first. Without a replay every flash is real. */
+  replay: boolean;
 }
 
+/** GET /lightning/recent: real flashes always, plus replay flashes while a replay runs. Each layer is
+ * capped at 10,000; GET /lightning/recent/counts has the uncapped counts. */
 export type LightningRecentResponse = LightningFlash[];
+
+/** GET /lightning/recent/counts?minutes=15: flashes in the same windows as /lightning/recent, uncapped. */
+export interface LightningRecentCounts {
+  minutes: number;
+  /** Last `minutes` of real time. */
+  real: number;
+  /** Last `minutes` of the replay clock; 0 when no replay runs. */
+  replay: number;
+}
 
 // ---------- GET /lightning/cells ----------
 
