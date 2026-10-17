@@ -35,6 +35,7 @@ The arrival time is when that edge first comes within 10 miles of the site, if i
 
 - **Advisories can't touch stop-work alerts.** They live in their own table (`lightning_advisories`, migration 008), not in `alerts`. The forecast code only *reads* stop-work alerts, and a test checks it contains no statement that writes them. The DB tests show stop-work rows are identical before and after the forecast runs.
 - **It runs after the stop-work engine, in its own transaction and its own `try`.** A forecast crash is logged and stop-work keeps working.
+- **Ingestion never waits for it.** It runs on a background worker; if the previous forecast is still running, that cycle's is skipped. Live cycles are 20 s apart, so live gets one every cycle. A 30× replay cycles every 0.67 s while a forecast takes 0.3–0.45 s, so during a replay it runs every cycle or two instead of slowing the replay down.
 - **Same clock as stop-work.** It uses the hook's `now` (simulated during replay). Replay advisories are stored with `replay = true` and never mix with live ones. Replay start clears old replay advisories.
 
 ## Where you see it

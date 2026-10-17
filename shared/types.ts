@@ -217,6 +217,12 @@ export interface Alert {
   all_clear_at: string | null;
   /** Lightning only; null for other types. */
   last_strike_distance_mi: number | null;
+  /**
+   * true: from a lightning replay. Its times are simulated (count down on the replay clock) and it
+   * isn't real; label it REPLAY. false: a real alert, on real time. During a replay GET /alerts
+   * returns both, so real alerts never disappear.
+   */
+  replay: boolean;
 }
 
 export type AlertsResponse = Alert[];

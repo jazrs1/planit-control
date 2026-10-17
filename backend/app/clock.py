@@ -19,6 +19,11 @@ def now() -> datetime:
     return origin + timedelta(seconds=(time.monotonic() - real_origin) * speed)
 
 
+def real_now() -> datetime:
+    """Real UTC even during replay: for live lightning, which keeps running while a replay plays."""
+    return datetime.now(timezone.utc)
+
+
 def is_simulated() -> bool:
     return _sim is not None
 

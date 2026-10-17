@@ -87,6 +87,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const lightning = useMemo(() => new Map(alerts.filter((a) => a.type === "lightning").map((a) => [a.site_id, a])), [alerts]);
   // Active stop-work sites first: the hazard index doesn't reflect alerts yet.
   const sorted = useMemo(() => [...(sites ?? [])].sort((a, b) => Number(lightning.has(b.id)) - Number(lightning.has(a.id)) || b.hazard_index - a.hazard_index || a.name.localeCompare(b.name)), [sites, lightning]);
+  const highRisk = (sites ?? []).filter((s) => riskLevel(s.hazard_index) === "red").length;
+  const stopWork = (sites ?? []).filter((s) => lightning.has(s.id)).length;
   const selectFromMap = useCallback((id: string) => {
     setSelectedId(id);
     rows.current.get(id)?.scrollIntoView({ block: "nearest" });
@@ -148,13 +150,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                   Stop-work status unknown · can&apos;t load alerts · retrying…
                 </p>
               )}
-              {/* "Alerts" is every active alert (same number as the nav badge); "Stop work" is lightning stop-work sites. */}
+              {/* "Alerts" is every active alert (same number as the nav badge); "Stop work" is lightning stop-work sites.
+                  A known zero is neutral; a count is red / amber; unknown is muted. */}
               <dl className="grid grid-cols-5 gap-2 text-center">
                 <div><dt className="text-xs text-muted">Sites</dt><dd className="text-2xl font-bold">{sites.length}</dd></div>
-                <div><dt className="text-xs text-muted">High risk</dt><dd className="text-2xl font-bold text-risk-red">{sites.filter((s) => riskLevel(s.hazard_index) === "red").length}</dd></div>
+                <div><dt className="text-xs text-muted">High risk</dt><dd className={`text-2xl font-bold ${highRisk ? "text-risk-red" : ""}`}>{highRisk}</dd></div>
                 <div><dt className="text-xs text-muted">Alerts</dt><dd className={`text-2xl font-bold ${!alertsKnown || alertsStale ? "text-muted" : counts.lightning ? "text-risk-red" : alerts.length ? "text-risk-amber" : "text-risk-green"}`}>{alertsKnown ? `${alerts.length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
-                <div><dt className="text-xs text-muted">Stop work</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-red" : "text-muted"}`}>{alertsKnown ? `${sites.filter((s) => lightning.has(s.id)).length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
-                <div><dt className="text-xs text-muted">Flood risk</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-amber" : "text-muted"}`}>{alertsKnown ? `${counts.flood}${alertsStale ? "?" : ""}` : "—"}</dd></div>
+                <div><dt className="text-xs text-muted">Stop work</dt><dd className={`text-2xl font-bold ${!alertsKnown || alertsStale ? "text-muted" : stopWork ? "text-risk-red" : ""}`}>{alertsKnown ? `${stopWork}${alertsStale ? "?" : ""}` : "—"}</dd></div>
+                <div><dt className="text-xs text-muted">Flood risk</dt><dd className={`text-2xl font-bold ${!alertsKnown || alertsStale ? "text-muted" : counts.flood ? "text-risk-amber" : ""}`}>{alertsKnown ? `${counts.flood}${alertsStale ? "?" : ""}` : "—"}</dd></div>
               </dl>
               {alertsStale && <p role="status" className="mt-2 text-center text-xs font-medium text-muted">? = last known before the connection was lost</p>}
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>

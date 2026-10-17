@@ -13,7 +13,7 @@ The demo is built around one real storm: **Aug 4, 2025, 6–7 PM Eastern**, repl
 ## Before judging (30 minutes ahead)
 
 1. **Code.** `git pull` on `main`. Use the production build, not `npm run dev`, which shows Next's "N" badge.
-2. **Keys.** Check that `backend/.env` has these keys (count only, never print them): `grep -c '^ANTHROPIC_API_KEY=..*\|^DATABASE_URL=..*\|^FIRMS_MAP_KEY=..*' backend/.env` should print `3`.
+2. **Keys.** Check that `backend/.env` has these keys (count only, never print them): `grep -c '^ANTHROPIC_API_KEY=..*\|^DATABASE_URL=..*\|^FIRMS_MAP_KEY=..*\|^ADMIN_TOKEN=..*' backend/.env` should print `4`. `ADMIN_TOKEN` is the **demo code**: without it, Replay storm and Send briefings now are turned off.
 3. **Replay files.** `ls backend/data/replay/2025-08-04_2200-2300 | wc -l` should print `180`. They're gitignored; on a new laptop run `cd backend && python -m scripts.find_replay_window` (about 150 MB).
 4. **Backend.**
    ```bash
@@ -30,8 +30,8 @@ The demo is built around one real storm: **Aug 4, 2025, 6–7 PM Eastern**, repl
    - the header says "Updated … (just now)";
    - the wildfire card does *not* say "no FIRMS key".
 7. **No replay left running.** `curl localhost:8000/replay/status` should show `"running":false`. If it's true, press **Stop replay** on the dashboard.
-8. **Briefings.** `/briefings` shows 55 briefings. Only briefings written after the key was added came from Claude; the rest are from the Oct 16 Gemini/template run until tonight's 6 PM run. The "Written by Claude" label appears once PR #12 is merged. The 6 PM run makes tomorrow's; before 6 PM, last night's briefings are current, so crew view labels the card "Today's briefing". **Don't press "Send briefings now"** during the demo: it makes 55 paid Claude calls.
-9. **Real alerts.** Note any real alert on the badge (e.g. a live stop-work). It disappears while the replay runs (QA report item 1), so say so if someone asks.
+8. **Briefings.** `/briefings` shows 55 briefings, labeled "Written by Claude" (or Gemini / Template). Each Claude briefing passed the number and word checks and a second read by Claude Haiku against its data. The 6 PM run makes tomorrow's; before 6 PM, last night's briefings are current, so crew view labels the card "Today's briefing". **Don't press "Send briefings now"** during the demo: it makes 55 paid Claude calls (it needs the demo code and runs at most once per 15 minutes).
+9. **Demo code and real alerts.** On the desktop window press **⚡ Replay storm**, enter the demo code when asked (it's remembered on that browser), then press **Stop replay**. Real alerts stay on screen during a replay; replay ones are tagged **REPLAY**.
 10. **Desktop window.** Chrome at 1440 px wide, zoom 100%, on `http://localhost:3000/`.
 11. **Phone window.** A second Chrome window with DevTools device mode set to iPhone 12/13 (390×844) on `http://localhost:3000/crew`.
     - In **Your site**, choose **Okeechobee Clean Energy Center**; it's remembered.
@@ -45,7 +45,7 @@ The demo is built around one real storm: **Aug 4, 2025, 6–7 PM Eastern**, repl
 
 **0:00. Dashboard (desktop).** "Live hazards for 55 real Florida power plants: lightning, heat, flooding, soil, wildfire and wildlife, scored 0–10." Then press **⚡ Replay storm** (top right) right away.
 
-**0:10. Watch the storm come in.**
+**0:10. Watch the storm come in.** Replay alerts carry a **REPLAY** tag; any real alert stays on screen without one.
 - The replay bar shows **REPLAY RUNNING · Aug 4, 6:0x PM EDT simulated · 30×**.
 - Yellow flashes fill the map, red rings mark stop-work sites, and **Stop work** and the **Alerts** badge climb.
 - "This is a real satellite record of a real storm, going through the same code as live."

@@ -86,6 +86,24 @@ def no_model_keys(monkeypatch):
     monkeypatch.setattr(get_settings(), "gemini_api_key", "")
 
 
+REAL_CALL_REVIEW = writer._call_review
+
+
+@pytest.fixture(autouse=True)
+def reviews(monkeypatch):
+    """The second-check reviewer, faked: finds nothing unless a test queues problems with flag()."""
+    queued, seen = [], []
+
+    def call(inputs, text, key, model):
+        seen.append((text, model))
+        answer = queued.pop(0) if queued else []
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+    monkeypatch.setattr(writer, "_call_review", call)
+    return {"queue": queued, "seen": seen}
+
+
 @pytest.fixture
 def claude_on(monkeypatch):
     from app.config import get_settings
@@ -336,3 +354,90 @@ def test_each_briefing_gets_the_time_it_was_written(monkeypatch):
     service.generate(Pool(), now=batch_start)
     times = [p["now"] for p in stored]
     assert len(times) == 2 and times[0] < times[1] and batch_start not in times
+
+
+
+# ---------- second check: the reviewer ----------
+
+GARBLED = {**GOOD, "actions": ["Finish before sunset at 6:41 AM is not needed; wrap up by 8:22 PM",
+                               "Bring mats for vehicles"]}
+
+
+def test_review_runs_after_the_checks_pass_with_the_haiku_model(monkeypatch, claude_on, reviews):
+    fake_claude(monkeypatch, GOOD)
+    w = writer.write(BUSY)
+    assert w.generator == "claude"
+    assert reviews["seen"] == [(w.text, "claude-haiku-5-5")]
+
+
+def test_review_is_skipped_for_answers_that_fail_the_number_check(monkeypatch, claude_on, reviews):
+    bad = {**GOOD, "risks": ["Heat index 112°F at 3 PM"]}
+    fake_claude(monkeypatch, bad, GOOD)
+    writer.write(BUSY)
+    assert len(reviews["seen"]) == 1                    # only the grounded retry was reviewed
+
+
+def test_flagged_answer_is_regenerated_once_with_the_problems(monkeypatch, claude_on, reviews):
+    reviews["queue"].append(["'sunset at 6:41 AM': 6:41 AM is sunrise"])
+    calls = fake_claude(monkeypatch, GARBLED, GOOD)
+    w = writer.write(BUSY)
+    assert w.generator == "claude" and w.actions == GOOD["actions"]
+    assert "reviewer" in calls[1] and "sunset at 6:41 AM" in calls[1]
+
+
+def test_flagged_twice_uses_the_template_not_gemini(monkeypatch, claude_on, gemini_on, reviews):
+    reviews["queue"].extend([["garbled action"], ["still garbled"]])
+    fake_claude(monkeypatch, GARBLED, GARBLED)
+    gemini = fake(monkeypatch, GOOD)
+    assert writer.write(BUSY).generator == "template" and gemini == []
+
+
+def test_flagged_then_retry_fails_another_way_uses_the_template(monkeypatch, claude_on, gemini_on, reviews):
+    reviews["queue"].append(["garbled action"])
+    bad = {**GOOD, "risks": ["Heat index 112°F at 3 PM"]}
+    for retry in (bad, _api_error(529)):
+        fake_claude(monkeypatch, GARBLED, retry)
+        gemini = fake(monkeypatch, GOOD)
+        assert writer.write(BUSY).generator == "template" and gemini == [], retry
+        reviews["queue"].append(["garbled action"])
+
+
+def test_gemini_answers_are_reviewed_too(monkeypatch, gemini_on, reviews):
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "test-key")
+    fake_claude(monkeypatch, _api_error(529))
+    reviews["queue"].extend([["garbled"], ["garbled"]])
+    fake(monkeypatch, GARBLED, GARBLED)
+    assert writer.write(BUSY).generator == "template"
+    reviews["queue"].append(["garbled"])
+    calls = fake(monkeypatch, GARBLED, GOOD)
+    assert writer.write(BUSY).generator == "gemini" and "reviewer" in calls[1]
+
+
+def test_review_failure_or_no_key_keeps_the_checked_briefing(monkeypatch, claude_on, reviews):
+    reviews["queue"].append(_api_error(529))
+    fake_claude(monkeypatch, GOOD)
+    assert writer.write(BUSY).generator == "claude"
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "claude_review_model", "")
+    fake_claude(monkeypatch, GARBLED)
+    assert writer.write(BUSY).generator == "claude" and len(reviews["seen"]) == 1
+
+
+def test_review_request_shape(monkeypatch):
+    from types import SimpleNamespace as NS
+    sent = {}
+    reply = NS(stop_reason="end_turn", content=[NS(type="text", text=json.dumps({"problems": ["x is wrong", " "]}))])
+
+    class Client:
+        messages = NS(create=lambda **kw: sent.update(kw) or reply)
+    monkeypatch.setattr(writer, "_claude_client", lambda key: Client)
+    assert REAL_CALL_REVIEW(BUSY, "GO for Thursday: fine.", "k", "claude-haiku-5-5") == ["x is wrong"]
+    assert sent["model"] == "claude-haiku-5-5" and sent["system"] == writer.REVIEW_SYSTEM
+    assert sent["output_config"]["format"] == {"type": "json_schema", "schema": writer.REVIEW_SCHEMA}
+    assert "temperature" not in sent and "thinking" not in sent and "fallbacks" not in sent
+    content = sent["messages"][0]["content"]
+    assert "GO for Thursday: fine." in content and '"peak_heat_index_f": 108' in content
+    reply.stop_reason = "refusal"
+    with pytest.raises(ValueError):
+        REAL_CALL_REVIEW(BUSY, "text", "k", "claude-haiku-5-5")

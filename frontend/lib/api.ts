@@ -8,6 +8,7 @@ import mockSites from "@shared/mocks/sites.json";
 
 import mockReports from "@shared/mocks/reports.json";
 import { markFailure, markSuccess } from "@/lib/connection";
+import { demoCodeHeaders } from "@/lib/demoCode";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -60,13 +61,15 @@ export const getLightningCells = () => request<LightningCellsResponse>("/lightni
 export const getBriefings = () => request<BriefingsResponse>("/briefings");
 /** 404 means the site has no briefing yet (see ApiRequestError.status). */
 export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
-/** One site: generated right away. All sites (no site_id): queued in the background. */
+/** One site: generated right away. All sites (no site_id): queued in the background; needs the demo
+ *  code (a 401 without it). Protected requests send the demo code when one has been entered. */
 export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
-  request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
+/** Starting or stopping a replay needs the demo code (a 401 without it). */
 export const startReplay = (body: StartReplayRequest = {}) =>
-  request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: "POST" });
+  request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
+export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: "POST", headers: demoCodeHeaders() });
 
 /** shared/mocks, for the explicit "Demo data" mode only. Anything showing these must say so. */
 export const DEMO_DATA = {

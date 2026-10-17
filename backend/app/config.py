@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     auth0_client_id: str = ""
     auth0_client_secret: str = ""
     cors_origins: str = "http://localhost:3000"
+    # The "demo code": X-Admin-Token for replay start/stop and send-now for all sites (app/admin.py).
+    # Empty turns those actions off.
+    admin_token: str = ""
     # Optional regex for extra allowed origins, e.g. Vercel preview URLs (empty: none).
     cors_origin_regex: str = ""
     lightning_ingest_enabled: bool = True
@@ -32,6 +35,8 @@ class Settings(BaseSettings):
     briefing_hour: int = 18
     # Briefing writers, in order: Claude, then Gemini, then the template (briefing/writer.py).
     claude_model: str = "claude-sonnet-5-5"
+    # Rereads each model-written briefing against its input JSON (empty: no review).
+    claude_review_model: str = "claude-haiku-5-5"
     gemini_model: str = "gemini-3.8-flash"
     gemini_min_interval_seconds: float = 4.0   # ~15 requests/minute
     briefing_concurrency: int = 4              # briefings written at once (model calls are slow)
