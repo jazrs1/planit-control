@@ -112,10 +112,10 @@ def ungrounded_numbers(text: str, inputs: dict) -> list[str]:
     return sorted(n for n in _numbers(text) if n not in allowed)
 
 
-def compose(go_status: str, day: str, headline: str, risks: list[str], actions: list[str]) -> str:
+def compose(go_status: str, day: str, headline: str, risks: list[str], actions: list[str], max_risks: int = 3) -> str:
     lines = [f"{HEADLINE_WORD[go_status]} for {day}: {headline.strip()}"]
     if risks:
-        lines += ["Top risks:"] + [f"- {r.strip()}" for r in risks[:3]]
+        lines += ["Top risks:"] + [f"- {r.strip()}" for r in risks[:max_risks]]
     if actions:
         lines += ["Actions:"] + [f"- {a.strip()}" for a in actions[:4]]
     return "\n".join(lines)
@@ -163,84 +163,30 @@ def problems(text: str, inputs: dict) -> list[str]:
 
 
 # ---------- template ----------
+#
+# Every risk line comes from a reading in the input JSON that crosses a threshold (RISK_CHECKS); a model
+# factor never creates a risk line by itself. The verdict's main factor is the risk line behind it.
+
+RAIN_THRESHOLD_IN = 0.25           # the flood line: rain expected tomorrow
+GUST_THRESHOLD_MPH = 30            # the wind line: peak gust during work hours
+SEVERE_WEATHER = "Higher than normal chance of severe weather"
+SEVERE_WEATHER_ACTION = "Check radar before starting and be ready to stop work."
+LOCATION_LABEL = "Area with frequent past severe-weather reports"
+NO_RISKS = {True: "No significant weather or site hazards in the forecast.",    # GO
+            False: "No reading crosses a hazard threshold on its own."}         # CAUTION / NO-GO from the model
+NWS_ACTION = {   # an NWS alert with no reading of its own gets its hazard's usual action
+    "flood": "Stay off low ground and out of standing water; don't drive through flooded roads.",
+    "heat": "Schedule water and shade breaks through the afternoon.",
+    "storm": "Check radar before starting and be ready to stop work.",
+    "wildfire": "Check where the fire is and which way the smoke is moving before staging; keep an escape route "
+                "clear and stop work if smoke or flames reach the site.",
+}
+CREW_HAZARD = {"Downed line": None, "Heat illness": "heat", "Flooding or washout": "flood", "Unsafe ground": "soil_saturation",
+               "Fire or smoke": "wildfire", "Wildlife": "wildlife", "Other": None}
+
 
 def _band(index: float) -> str:
     return "no_go" if index >= 7 else "caution" if index >= 4 else "go"
-
-
-def verdict_cause(inputs: dict) -> tuple[str | None, str] | None:
-    """(hazard, plain-language reason) for the go / caution / no-go decision, using the same rules as
-    briefing/inputs.go_status: the index's top factor when the index sets the band, otherwise what
-    raised a green day to caution (a crew report, an NWS watch or warning, or likely thunderstorms).
-    None on a plain GO with nothing to name."""
-    factors = inputs["top_factors"]
-    if inputs["go_status"] != "go" and _band(inputs["hazard_index"]) == inputs["go_status"] and factors:
-        return factors[0]["hazard"], factors[0]["label"]
-    if inputs["go_status"] != "go":
-        for report in inputs.get("crew_reports_last_48_h_within_2_mi") or []:
-            if report["category"] in ("Downed line", "Heat illness"):
-                hazard = "heat" if report["category"] == "Heat illness" else None
-                return hazard, f"crew reported {report['category'].lower()} {report['reported']}"
-        for alert in inputs["nws_alerts"]:
-            if "Watch" in alert["event"] or "Warning" in alert["event"]:
-                return nws_hazard(alert["event"]), f"NWS {alert['event']} until {alert['until']}"
-        if inputs.get("thunderstorms_likely_from"):
-            return "lightning", f"thunderstorms likely from {inputs['thunderstorms_likely_from']}"
-    return (factors[0]["hazard"], factors[0]["label"]) if factors else None
-
-
-def _hazard_risks_and_actions(inputs: dict) -> tuple[dict, dict]:
-    """{hazard: risk sentence} and {hazard: action sentence} from the input JSON (numbers copied)."""
-    heat, soil, wild = inputs.get("heat"), inputs.get("soil"), inputs["wildlife"]
-    rules = inputs["rules"]
-    risks: dict[str, str] = {}
-    actions: dict[str, str] = {}
-    lightning_action = (f"stop work for strikes within {rules['lightning_stop_work_radius_mi']} mi and wait "
-                        f"{rules['lightning_all_clear_wait_min']} min after the last one.")
-
-    if inputs.get("thunderstorms_likely_from"):
-        pct = inputs["thunderstorm_chance_work_hours_pct"]
-        risks["lightning"] = (f"Thunderstorms likely from {inputs['thunderstorms_likely_from']} "
-                              f"({pct}% chance during work hours).")
-        actions["lightning"] = f"Expect lightning stops after {inputs['thunderstorms_likely_from']}: {lightning_action}"
-    else:
-        actions["lightning"] = f"Watch the sky and radar; {lightning_action}"
-    if heat and heat["osha_risk_band"] != "lower":
-        window = heat["heat_index_91_or_higher"]
-        when = f"from {window['from']} to {window['until']}" if window else f"around {heat['peak_time']}"
-        risks["heat"] = (f"Heat index peaks at {heat['peak_heat_index_f']}°F around {heat['peak_time']} "
-                         f"(OSHA {heat['osha_risk_band']} risk), 91°F or higher {when}.")
-        if window and (inputs.get("daylight") or {}).get("sunrise"):
-            actions["heat"] = (f"Start at {inputs['daylight']['sunrise']} and finish heavy work before {window['from']}; "
-                               "schedule water and shade breaks.")
-    actions.setdefault("heat", "Schedule water and shade breaks through the afternoon.")
-    wettest = max(inputs["periods"], key=lambda p: p["rain_in"])
-    if inputs["rain_total_in"] >= 0.25:
-        risks["flood"] = (f"{inputs['rain_total_in']} in of rain expected, most in the {wettest['period']} "
-                          f"({wettest['hours']}, {wettest['rain_chance_pct']}% chance).")
-    actions["flood"] = "Stay off low ground and out of standing water; don't drive through flooded roads."
-    if soil and soil["level"] != "dry":
-        risks["soil_saturation"] = f"{soil['crew_note']} (soil moisture {soil['moisture_pct']}%)."
-    actions["soil_saturation"] = "Bring mats for vehicles and stay on pavement or gravel where you can."
-    fires = (inputs.get("wildfire") or {}).get("detections_within_25_mi")
-    if isinstance(fires, int) and fires > 0:
-        risks["wildfire"] = f"{fires} fire detection(s) within 25 mi in the last day."
-    actions["wildfire"] = ("Check where the fire is and which way the smoke is moving before staging; keep an "
-                           "escape route clear and stop work if smoke or flames reach the site.")
-    if wild["sightings_last_30_days"] or wild["crew_reports_within_2_mi_last_30_days"]:
-        seen = ", ".join(f"{s['species']} ({s['count']})" for s in wild["sightings_last_30_days"])
-        crew = wild["crew_reports_within_2_mi_last_30_days"]
-        text = f"Wildlife seen nearby in the last 30 days: {seen}." if seen else ""
-        text += f" {crew} crew wildlife report(s) within 2 mi." if crew else ""
-        risks["wildlife"] = text.strip()
-    actions["wildlife"] = "Walk the work area before staging and watch for snakes and alligators near water and brush."
-    # An NWS alert joins its hazard's line (a Heat Advisory with the heat risk), or stands as that hazard's risk.
-    for alert in inputs["nws_alerts"]:
-        hazard = nws_hazard(alert["event"])
-        note = f"NWS {alert['event']} in effect until {alert['until']}"
-        risks[hazard] = f"{risks[hazard][:-1]}; {note}." if hazard in risks else f"{note}."
-        actions.setdefault(hazard, f"Follow the NWS {alert['event']} and recheck it before each shift.")
-    return risks, actions
 
 
 def nws_hazard(event: str) -> str:
@@ -252,72 +198,190 @@ def nws_hazard(event: str) -> str:
         return "flood"
     if "fire" in lowered or "red flag" in lowered:
         return "wildfire"
-    return "lightning"   # thunderstorm, tornado, tropical storm, hurricane
+    return "storm"   # thunderstorm, tornado, tropical storm, hurricane
 
 
-CREW_ACTIONS = {
-    "crew:downed": "Stay clear of the reported downed line and treat it as energized until it is confirmed safe.",
-    "crew:heat": "Check on every crew member; enforce water, shade and rest breaks from the start of the shift.",
-}
+@dataclass
+class Risk:
+    check: str            # the threshold check behind the line (RISK_CHECKS)
+    hazard: str | None    # HazardType it answers for (matched against the index's factors)
+    text: str             # the risk line
+    short: str            # the same fact as a main-factor phrase
+    action: str | None
+
+
+def _crew_category(report: dict) -> str:
+    return next((c for c in CREW_HAZARD if report["category"].startswith(c)), "Other")
+
+
+def threshold_risks(inputs: dict) -> list[Risk]:
+    """Every risk the input JSON supports, one per reading that crosses its threshold, in priority order:
+    crew reports of a downed line or heat illness, other crew reports, then the hazards."""
+    heat, soil, wild, wind = inputs.get("heat"), inputs.get("soil"), inputs["wildlife"], inputs.get("wind")
+    rules = inputs["rules"]
+    stop_rule = (f"stop work for strikes within {rules['lightning_stop_work_radius_mi']} mi and wait "
+                 f"{rules['lightning_all_clear_wait_min']} min after the last one.")
+    crew, hazards = [], []
+    for report in inputs.get("crew_reports_last_48_h_within_2_mi") or []:
+        category = _crew_category(report)
+        what = report["category"][0].lower() + report["category"][1:]
+        what = "a downed line" if category == "Downed line" else what
+        text = f"Crew reported {what} {report['distance_mi']} mi away, reported {report['reported']}."
+        action = {"Downed line": "Stay clear of the reported downed line and treat it as energized until it is confirmed safe.",
+                  "Heat illness": "Check on every crew member; enforce water, shade and rest breaks from the start of the shift."}.get(category)
+        crew.append((category in ("Downed line", "Heat illness"),
+                     Risk("crew", CREW_HAZARD[category], text, f"crew reported {what} {report['reported']}", action)))
+
+    if inputs.get("thunderstorms_likely_from"):
+        t, pct = inputs["thunderstorms_likely_from"], inputs["thunderstorm_chance_work_hours_pct"]
+        hazards.append(Risk("thunderstorms", "storm", f"Thunderstorms likely from {t} ({pct}% chance during work hours).",
+                            f"thunderstorms likely from {t}", f"Expect lightning stops after {t}: {stop_rule}"))
+    if wind and wind["max_gust_mph"] >= GUST_THRESHOLD_MPH:
+        hazards.append(Risk("gusts", "storm", f"Wind gusts up to {wind['max_gust_mph']} mph around {wind['peak_time']}.",
+                            f"wind gusts up to {wind['max_gust_mph']} mph",
+                            "Stop aerial lift and bucket work if gusts exceed the equipment's rated limit; secure loose materials."))
+    if heat and heat["osha_risk_band"] != "lower":
+        window = heat["heat_index_91_or_higher"]
+        when = f"from {window['from']} to {window['until']}" if window else f"around {heat['peak_time']}"
+        action = (f"Start at {inputs['daylight']['sunrise']} and finish heavy work before {window['from']}; schedule water and shade breaks."
+                  if window and (inputs.get("daylight") or {}).get("sunrise") else "Schedule water and shade breaks through the afternoon.")
+        hazards.append(Risk("heat", "heat", f"Heat index peaks at {heat['peak_heat_index_f']}°F around {heat['peak_time']} "
+                                            f"(OSHA {heat['osha_risk_band']} risk), 91°F or higher {when}.",
+                            f"heat index up to {heat['peak_heat_index_f']}°F (OSHA {heat['osha_risk_band']} risk)", action))
+    if inputs["rain_total_in"] >= RAIN_THRESHOLD_IN:
+        wettest = max(inputs["periods"], key=lambda p: p["rain_in"])
+        hazards.append(Risk("rain", "flood", f"{inputs['rain_total_in']} in of rain expected, most in the {wettest['period']} "
+                                             f"({wettest['hours']}, {wettest['rain_chance_pct']}% chance).",
+                            f"{inputs['rain_total_in']} in of rain expected",
+                            "Stay off low ground and out of standing water; don't drive through flooded roads."))
+    if soil and soil["level"] in ("moist", "saturated"):
+        hazards.append(Risk("soil", "soil_saturation", f"{soil['crew_note']} (soil moisture {soil['moisture_pct']}%).",
+                            f"{soil['level']} ground (soil moisture {soil['moisture_pct']}%)",
+                            "Bring mats for vehicles and stay on pavement or gravel where you can."))
+    fires = (inputs.get("wildfire") or {}).get("detections_within_25_mi")
+    if isinstance(fires, int) and fires > 0:
+        near = next((f["label"] for f in inputs["top_factors"] if f["label"].startswith("Fire detected")), None)
+        text = f"{near}; {fires} fire detection(s) within 25 mi in the last day." if near else \
+            f"{fires} fire detection(s) within 25 mi in the last day."
+        hazards.append(Risk("fire", "wildfire", text, near[0].lower() + near[1:] if near else f"{fires} fire detection(s) within 25 mi",
+                            "Check where the fire is and which way the smoke is moving before staging; keep an escape route "
+                            "clear and stop work if smoke or flames reach the site."))
+    if wild["sightings_last_30_days"] or wild["crew_reports_within_2_mi_last_30_days"]:
+        seen = ", ".join(f"{s['species']} ({s['count']})" for s in wild["sightings_last_30_days"])
+        crew_n = wild["crew_reports_within_2_mi_last_30_days"]
+        text = (f"Wildlife seen nearby in the last 30 days: {seen}." if seen else "") + \
+            (f" {crew_n} crew wildlife report(s) within 2 mi." if crew_n else "")
+        hazards.append(Risk("wildlife", "wildlife", text.strip(), "wildlife seen nearby",
+                            "Walk the work area before staging and watch for snakes and alligators near water and brush."))
+    # NWS alerts join their hazard's line (a Heat Advisory with the heat risk), or are their own line.
+    for alert in inputs["nws_alerts"]:
+        hazard, note = nws_hazard(alert["event"]), f"NWS {alert['event']} in effect until {alert['until']}"
+        same = next((r for r in hazards if r.hazard == hazard), None)
+        if same:
+            same.text, same.check = f"{same.text[:-1]}; {note}.", same.check + "+nws"
+        else:
+            hazards.append(Risk("nws", hazard, f"{note}.", f"NWS {alert['event']} until {alert['until']}",
+                                NWS_ACTION.get(hazard, f"Follow the NWS {alert['event']} and recheck it before each shift.")))
+    first = [r for urgent, r in crew if urgent]
+    return first + [r for urgent, r in crew if not urgent] + hazards
+
+
+def verdict_lead(inputs: dict, risks: list[Risk]) -> Risk | None:
+    """The risk behind the go / caution / no-go decision (same rules as briefing/inputs.go_status), or a
+    model-only risk when the model's score set a CAUTION or NO-GO and no reading crosses a threshold.
+    None on a GO with no risks."""
+    go = inputs["go_status"]
+    if go != "go" and _band(inputs["hazard_index"]) != go:     # a green index raised to caution
+        for r in risks:
+            if r.check == "crew" and r.action:                 # a downed line or heat illness
+                return r
+        for alert in inputs["nws_alerts"]:
+            if "Watch" in alert["event"] or "Warning" in alert["event"]:
+                return next(r for r in risks if r.hazard == nws_hazard(alert["event"]) and "nws" in r.check)
+        if inputs.get("thunderstorms_likely_from"):
+            return next(r for r in risks if r.check == "thunderstorms")
+    for f in inputs["top_factors"]:                            # the index's own drivers, in order
+        label = f["label"]
+        if label == LOCATION_LABEL or label.startswith(("Peak storm season", "Time of year")):
+            continue                                           # context, not a hazard
+        if label.startswith("Crew report"):               # "Crew report: Flooding or washout"
+            category = label.split(": ", 1)[-1].split(",")[0].lower()
+            match = next((r for r in risks if r.check == "crew" and category in r.short), None)
+        elif label.startswith("NWS"):
+            match = next((r for r in risks if "nws" in r.check and r.hazard == f["hazard"]), None)
+        else:
+            match = next((r for r in risks if r.hazard == f["hazard"] and r.check != "crew"), None)
+        if match:
+            return match
+    if go != "go":
+        return Risk("model", None, f"{SEVERE_WEATHER}.", SEVERE_WEATHER, SEVERE_WEATHER_ACTION)
+    return risks[0] if risks else None
 
 
 def template(inputs: dict) -> Written:
     """Briefing built only from the input JSON (every number is copied from it).
 
-    The verdict, its main factor, the risks and the actions come from the same facts. The verdict's
-    cause (verdict_cause) is the headline's main factor and the first risk (after a crew report of a
-    downed line or heat illness, which always leads), and every action belongs to a risk shown. So a
-    NO-GO always names the hazard that caused it, and "Normal operations" only appears on a GO."""
+    Risk lines come only from readings that cross a threshold (threshold_risks); a model factor never
+    adds one. The verdict's cause (verdict_lead) is the headline's main factor and its action comes first;
+    crew reports of a downed line or heat illness still lead the risks, and every crew report gets a line.
+    "Area with frequent past severe-weather reports" is context: one short sentence, no action.
+    "Normal operations" only appears on a GO with nothing to act on."""
     go = inputs["go_status"]
-    hazard_risks, hazard_actions = _hazard_risks_and_actions(inputs)
-    hazard_actions = {**hazard_actions, **CREW_ACTIONS}
-    cause = verdict_cause(inputs)
-    entries: list[tuple[str | None, str]] = []    # (hazard, risk sentence), one per hazard, in order
-
-    def add(hazard: str | None, text: str | None) -> None:
-        if text and all(h != hazard or hazard is None for h, _ in entries) and all(t != text for _, t in entries):
-            entries.append((hazard, text))
-
-    for report in inputs.get("crew_reports_last_48_h_within_2_mi") or []:
-        where = f"{report['distance_mi']} mi away, reported {report['reported']}"
-        if report["category"] == "Downed line":
-            add("crew:downed", f"Crew reported a downed line {where}.")
-        elif report["category"] == "Heat illness":
-            add("crew:heat", f"Crew reported heat illness {where}.")
-    if cause and not cause[1].startswith("crew reported"):
-        hazard, reason = cause
-        sentence = f"{reason[0].upper()}{reason[1:]}."
-        soil_worse = hazard == "soil_saturation" and "saturated" in reason.lower() \
-            and (inputs.get("soil") or {}).get("level") != "saturated"
-        if (hazard == "wildfire" or soil_worse) and hazard_risks.get(hazard):
-            # The index's reason (a fire 4 mi away; saturated soil expected) plus what the data shows now.
-            sentence = f"{sentence[:-1]}; {hazard_risks[hazard][0].lower()}{hazard_risks[hazard][1:]}"
-        elif hazard in hazard_risks:
-            sentence = hazard_risks[hazard]   # the same hazard, with its times and amounts
-        add(hazard, sentence)
-    for alert in inputs["nws_alerts"]:         # official alerts, then likely thunderstorms
-        add(nws_hazard(alert["event"]), hazard_risks.get(nws_hazard(alert["event"])))
-    if inputs.get("thunderstorms_likely_from"):
-        add("lightning", hazard_risks.get("lightning"))
-    for f in inputs["top_factors"]:            # the index's other drivers
-        add(f["hazard"], hazard_risks.get(f["hazard"]) or f"{f['label']}.")
-    for hazard in ("lightning", "heat", "flood", "soil_saturation", "wildfire", "wildlife"):
-        add(hazard, hazard_risks.get(hazard))
-    shown = entries[:3]
+    risks = threshold_risks(inputs)
+    lead = verdict_lead(inputs, risks)
+    crew = [r for r in risks if r.check == "crew"]
+    urgent = [r for r in crew if r.action]
+    order = urgent + ([lead] if lead and lead.check != "model" and lead not in urgent else []) + \
+        [r for r in crew if r not in urgent and r is not lead] + [r for r in risks if r.check != "crew" and r is not lead]
+    shown = order[:max(3, len(crew) + (1 if lead and lead.check != "crew" else 0))]
+    if lead and lead.check == "model" and len(shown) > 2 and not crew:
+        shown = shown[:2]                                     # room for the severe-weather context
 
     actions: list[str] = []
-    for hazard, _ in shown:
-        action = hazard_actions.get(hazard) if hazard else None
-        if action and action not in actions:
-            actions.append(action)
-    top = [text for _, text in shown] or ["No significant weather or site hazards in the forecast."]
+    for r in urgent + ([lead] if lead and go != "go" else []) + shown:   # downed line / heat illness first
+        if r.action and r.action not in actions:
+            actions.append(r.action)
+    actions = actions[:3]
     if not actions:
         actions = (["Normal operations; hold the standard tailboard safety briefing."] if go == "go"
-                   else ["Brief the crew on the main factor before starting work and recheck conditions at midday."])
-    headline = (f"hazard index {inputs['hazard_index']} of 10; main factor: {cause[1]}." if cause
-                else f"hazard index {inputs['hazard_index']} of 10; low overall risk.")
-    text = compose(go, inputs["day"], headline, top, actions)
+                   else [SEVERE_WEATHER_ACTION])
+
+    if lead:
+        headline = f"hazard index {inputs['hazard_index']} of 10; main factor: {lead.short}."
+    else:
+        headline = f"hazard index {inputs['hazard_index']} of 10; low overall risk."
+    if any(f["label"] == LOCATION_LABEL for f in inputs["top_factors"]):
+        headline += " This area has frequent past severe-weather reports."
+    top = [r.text for r in shown] or [NO_RISKS[go == "go"]]
+    text = compose(go, inputs["day"], headline, top, actions, max_risks=len(top))
     return Written(headline, top, actions, text, "template", None)
+
+
+def template_audit(inputs: dict) -> list[str]:
+    """Risk lines in the template briefing with no threshold-crossing reading behind them (should be [])."""
+    by_text = {r.text: r for r in threshold_risks(inputs)}
+    wind, heat, soil = inputs.get("wind") or {}, inputs.get("heat") or {}, inputs.get("soil") or {}
+    fires = (inputs.get("wildfire") or {}).get("detections_within_25_mi")
+    wild = inputs["wildlife"]
+    supported = {
+        "crew": bool(inputs.get("crew_reports_last_48_h_within_2_mi")),
+        "thunderstorms": bool(inputs.get("thunderstorms_likely_from")),
+        "gusts": (wind.get("max_gust_mph") or 0) >= GUST_THRESHOLD_MPH,
+        "heat": heat.get("osha_risk_band") not in (None, "lower"),
+        "rain": inputs["rain_total_in"] >= RAIN_THRESHOLD_IN,
+        "soil": soil.get("level") in ("moist", "saturated"),
+        "fire": isinstance(fires, int) and fires > 0,
+        "wildlife": bool(wild["sightings_last_30_days"] or wild["crew_reports_within_2_mi_last_30_days"]),
+        "nws": bool(inputs["nws_alerts"]),
+    }
+    problems_found = []
+    for line in template(inputs).risks:
+        risk = by_text.get(line)
+        if line in NO_RISKS.values():
+            continue
+        if risk is None or not all(supported.get(c, False) for c in risk.check.split("+")):
+            problems_found.append(line)
+    return problems_found
 
 
 def _prompt(inputs: dict, feedback: str | None) -> str:
