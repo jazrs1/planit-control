@@ -30,3 +30,22 @@ body {
   color: var(--pc-text);
   font-family: var(--pc-font-sans);
 }
+
+/* Three brief flashes make a new lightning strike visible without constant motion. */
+@keyframes stop-work-reset {
+  50% {
+    background-color: var(--pc-risk-red-bg);
+    box-shadow: 0 0 0 3px var(--pc-risk-red);
+  }
+}
+
+.stop-work-reset {
+  animation: stop-work-reset 400ms ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stop-work-reset {
+    animation: none;
+    outline: 2px solid var(--pc-risk-red);
+  }
+}
