@@ -41,6 +41,7 @@ app = FastAPI(title="PlanIT Control API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origin_list,
+    allow_origin_regex=get_settings().cors_origin_regex or None,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -54,7 +55,7 @@ app.include_router(uploads.router)
 app.include_router(lightning.router)
 app.include_router(replay.router)
 
-uploads.UPLOADS_DIR.mkdir(exist_ok=True)
+uploads.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads.UPLOADS_DIR), name="uploads")
 
 

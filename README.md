@@ -112,6 +112,10 @@ Other commands: `npm run typecheck`, `npm run build`.
 
 Shapes: [`shared/types.ts`](shared/types.ts).
 
+## Deploying
+
+The API runs on a Vultr Ubuntu server (systemd, one uvicorn worker, Caddy for HTTPS) and the frontend on Vercel. Step by step, DNS records, health checks, restart and rollback: [`docs/deploy.md`](docs/deploy.md). Scripts: [`deploy/`](deploy/). Once the server runs, set `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED` and `BRIEFING_ENABLED` to `false` in your local `backend/.env`.
+
 ## Contributing
 
 Branch from `main` as `<name>/<topic>`, keep PRs small, and don't add libraries without asking. See `CLAUDE.md`.
