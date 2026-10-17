@@ -9,6 +9,8 @@ import SiteMap, { LIGHTNING_WINDOW_MIN } from "@/components/SiteMap";
 import { DEMO_DATA, getLightningRecent, getSites } from "@/lib/api";
 import { riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
+import { countAlerts } from "@/lib/alerts";
+import { useFloodConditions } from "@/lib/useFloodConditions";
 
 // Refresh cadence. Alerts follow the same replay/live split in AlertsProvider.
 const REPLAY_MS = 3_000;
@@ -43,6 +45,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
   const alerts = useMemo(() => knownAlerts ?? [], [knownAlerts]);
+  const counts = countAlerts(alerts);
+  const floodConditions = useFloodConditions();
 
   const pollSites = useCallback(async () => {
     try {
@@ -130,18 +134,19 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 </p>
               )}
               {/* "Alerts" is every active alert (same number as the nav badge); "Stop work" is lightning stop-work sites. */}
-              <dl className="grid grid-cols-4 gap-2 text-center">
+              <dl className="grid grid-cols-5 gap-2 text-center">
                 <div><dt className="text-xs text-muted">Sites</dt><dd className="text-2xl font-bold">{sites.length}</dd></div>
                 <div><dt className="text-xs text-muted">High risk</dt><dd className="text-2xl font-bold text-risk-red">{sites.filter((s) => riskLevel(s.hazard_index) === "red").length}</dd></div>
-                <div><dt className="text-xs text-muted">Alerts</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-red" : "text-muted"}`}>{alertsKnown ? `${alerts.length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
+                <div><dt className="text-xs text-muted">Alerts</dt><dd className={`text-2xl font-bold ${!alertsKnown || alertsStale ? "text-muted" : counts.lightning ? "text-risk-red" : alerts.length ? "text-risk-amber" : "text-risk-green"}`}>{alertsKnown ? `${alerts.length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
                 <div><dt className="text-xs text-muted">Stop work</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-red" : "text-muted"}`}>{alertsKnown ? `${sites.filter((s) => lightning.has(s.id)).length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
+                <div><dt className="text-xs text-muted">Flood risk</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-amber" : "text-muted"}`}>{alertsKnown ? `${counts.flood}${alertsStale ? "?" : ""}` : "—"}</dd></div>
               </dl>
               {alertsStale && <p role="status" className="mt-2 text-center text-xs font-medium text-muted">? = last known before the connection was lost</p>}
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>
             </div>
             <ul className="space-y-3 p-4 lg:overflow-y-auto">
               {sorted.map((site) => <li key={site.id} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }} onClick={() => setSelectedId(site.id)}>
-                <SiteCard site={site} lightningAlert={lightning.get(site.id)} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
+                <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
               </li>)}
             </ul>
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}
