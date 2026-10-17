@@ -151,3 +151,15 @@ def test_readings_from_before_pass_counts_keep_the_old_rule():
     readings = {("wildfire", "nearest_detection_mi"): 1.0, ("wildfire", "nearest_detection_epoch"): NOW.timestamp(),
                 ("wildfire", "nearest_confidence"): 1.0, ("wildfire", "detections_25mi"): 1.0}
     assert score_site(inputs(readings), {})["cards"]["wildfire"]["hazard_status"] == "danger"
+
+
+def test_heat_reading_after_the_peak_leads_with_the_rest_of_today():
+    peak_at = NOW - timedelta(hours=3)                    # 2 PM peak; it's 5 PM now (EDT)
+    readings = {("heat", "heat_index_f"): 88.0, ("heat", "peak_heat_index_f"): 96.0,
+                ("heat", "peak_at_epoch"): peak_at.timestamp(), ("heat", "rest_of_day_peak_heat_index_f"): 89.0}
+    card = score_site(inputs(readings), {})["cards"]["heat"]
+    assert card["reading"] == "Heat index 88°F now; up to 89°F for the rest of today (OSHA lower risk)"
+    assert card["hazard_status"] == "ok" and card["risk_band"] == "moderate"    # band: today's whole-day peak
+    readings[("heat", "peak_at_epoch")] = (NOW + timedelta(hours=2)).timestamp()
+    readings[("heat", "rest_of_day_peak_heat_index_f")] = 96.0
+    assert "today peaks at 96°F at 4:00 PM (OSHA moderate risk)" in score_site(inputs(readings), {})["cards"]["heat"]["reading"]

@@ -30,7 +30,8 @@ export default function CrewReadings({ detail, stale }: { detail: SiteDetail | n
     {stale && <p role="status" className="mb-3 font-semibold text-muted">Readings not confirmed · showing the last real readings.</p>}
     <div className="grid grid-cols-2 gap-3">
       <Reading title="Heat index" card={heat} stale={stale} timezone={timezone} value={finite(heat?.heat_index_f, 0, "°F")}>
-        <p>OSHA: {heat?.risk_band ? OSHA[heat.risk_band] : "Unknown"}</p>
+        {/* risk_band is for today's whole-day peak; the card's color is the rest of today. */}
+        <p>OSHA at today&apos;s peak: {heat?.risk_band ? OSHA[heat.risk_band] : "Unknown"}</p>
       </Reading>
       <Reading title="Rain · past 24 h" card={rain} stale={stale} timezone={timezone} value={finite(rain?.rain_past_24h_in, 1, "in")}>
         <p>Next 24 h: {finite(rain?.rain_next_24h_in, 1, "in")}</p>

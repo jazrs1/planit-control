@@ -114,9 +114,15 @@ def heat(inp: Inputs) -> Hazard:
     peak_time = datetime.fromtimestamp(peak_at, timezone.utc) if peak_at else None
     as_of = _as_of(inp, "heat", "heat_index_f")
     peak_past = peak_time is not None and as_of is not None and peak_time < as_of
-    reading = f"Heat index {hi_now:.0f}°F now; today {'peaked at' if peak_past else 'peaks at'} {peak:.0f}°F"
-    reading += f" at {_time(peak_time, inp.site)}" if peak_time else ""
-    reading += f" (OSHA {OSHA_LABEL[band]} risk)"
+    if peak_past:
+        # Today's peak is behind us (e.g. it was at midnight, or it's evening): lead with what's left,
+        # the same window the card's color uses.
+        reading = (f"Heat index {hi_now:.0f}°F now; up to {rest:.0f}°F for the rest of today "
+                   f"(OSHA {OSHA_LABEL[osha_risk_band(round(rest))]} risk)")
+    else:
+        reading = f"Heat index {hi_now:.0f}°F now; today peaks at {peak:.0f}°F"
+        reading += f" at {_time(peak_time, inp.site)}" if peak_time else ""
+        reading += f" (OSHA {OSHA_LABEL[band]} risk)"
     if nws_alert:
         reading = f"{_until(nws_alert, inp.site)}. {reading}"
     card = {"risk_band": band, "peak_heat_index_f": round(peak, 1), "peak_at": peak_time,
