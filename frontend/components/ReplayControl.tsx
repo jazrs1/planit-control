@@ -72,7 +72,7 @@ export default function ReplayControl() {
         </>
       ) : running ? (
         <>
-          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger">
+          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger rounded-pill bg-transparent px-5">
             {stopIcon}{busy ? "Stopping…" : "Stop replay"}
           </button>
           <span className="pc-chip pc-chip--quiet text-[0.8125rem]" title="Simulated seconds per real second">{replay?.speed}×</span>
@@ -84,7 +84,7 @@ export default function ReplayControl() {
           disabled={busy || unavailable}
           onClick={() => void run(() => startReplay())}
           title={unavailable ? "Needs a connection to the server" : "Play a recorded storm through the live pipeline on a simulated clock"}
-          className="pc-btn pc-btn--primary"
+          className="pc-btn rounded-pill border-text/40 bg-transparent px-5 text-text"
         >
           {playIcon}{busy ? "Starting…" : "Replay storm"}
         </button>

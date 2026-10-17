@@ -34,7 +34,8 @@ export function stormCellsGeoJson(cells: LightningCell[], nowMs: number, unconfi
   for (const cell of cells) {
     if (!Number.isFinite(cell.lat) || !Number.isFinite(cell.lon) || !Number.isFinite(cell.radius_mi) || cell.radius_mi < 0) continue;
     const uncertain = unconfirmed || (!demo && cellUnconfirmed(cell, nowMs));
-    const properties = { uncertain };
+    // Replay cells are drawn blue once the API flags them (#48); real ones keep the storm colors.
+    const properties = { uncertain, replay: (cell as LightningCell & { replay?: boolean }).replay === true };
     const ring = Array.from({ length: 64 }, (_, i) => destination(cell.lon, cell.lat, i * 360 / 64, cell.radius_mi));
     ring.push(ring[0]);
     features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties });

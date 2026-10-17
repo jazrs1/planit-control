@@ -100,7 +100,7 @@
   --pc-shadow-float: 0 1px 2px light-dark(oklch(0.3 0.02 70 / 0.06), oklch(0 0 none / 0.4)), 0 10px 30px light-dark(oklch(0.3 0.02 70 / 0.1), oklch(0 0 none / 0.45));
 
   /* Type: Overpass, from the Highway Gothic lineage of US road signs. Loaded in app/layout.tsx. */
-  --pc-font-sans: var(--font-overpass), ui-sans-serif, system-ui, sans-serif;
+  --pc-font-sans: "PC Separator", var(--font-overpass), ui-sans-serif, system-ui, sans-serif;
   --pc-font-mono: var(--font-overpass-mono), ui-monospace, "SF Mono", Menlo, monospace;
   /* Type scale: four sizes, two weights (400, 600). Labels 12px grey, body 15px at 1.5 line height,
      values 20px, headline numbers 32px. Tailwind: text-xs, text-sm (15px here), text-xl, text-[2rem].

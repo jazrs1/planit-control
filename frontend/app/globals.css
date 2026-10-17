@@ -2,6 +2,15 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "../styles/tokens.css";
 
+/* Overpass's middle dot sits close to the following word ("County ·Updated"). This face draws only
+   "·" (U+00B7), from a system font whose dot is centered, so every " · " separator is evenly spaced
+   app-wide, in plain text and labels alike. Everything else falls through to Overpass. */
+@font-face {
+  font-family: "PC Separator";
+  src: local("Helvetica Neue"), local("HelveticaNeue"), local("Arial"), local("ArialMT"), local("Segoe UI"), local("Roboto"), local("DejaVu Sans");
+  unicode-range: U+00B7;
+}
+
 /* Hover only where a fine pointer hovers, so a tap never leaves a hover state stuck. */
 @custom-variant hover {
   @media (hover: hover) and (pointer: fine) {
@@ -112,9 +121,10 @@
 
 /* Laid over the map: hairline, soft shadow. A utility, so it takes variants (lg:pc-float). */
 @utility pc-float {
-  background: color-mix(in oklch, var(--pc-surface) 95%, transparent);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  /* Opaque enough that map labels never show through; the blur softens what's left at the edges. */
+  background: color-mix(in oklch, var(--pc-surface) 99%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid color-mix(in oklch, var(--pc-border) 70%, transparent);
   border-radius: var(--pc-radius-card);
   box-shadow: var(--pc-shadow-float);

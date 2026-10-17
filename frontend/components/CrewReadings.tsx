@@ -14,7 +14,7 @@ const OSHA: Record<OshaHeatRisk, string> = { lower: "Lower", moderate: "Moderate
 function Reading({ title, card, value, children, stale, timezone }: { title: string; card?: HazardCard | null; value: ReactNode; children?: ReactNode; stale: boolean; timezone: string }) {
   const known = hasReading(card);
   const band = known && !stale ? BANDS[card!.hazard_status!] : null;
-  return <article className={`flex min-w-0 flex-col border-[length:var(--pc-rule-heavy)] bg-surface ${band ? "border-rule" : "border-dashed border-muted text-muted"}`}>
+  return <article className={`flex min-w-0 flex-col overflow-clip rounded-card bg-surface ${band ? "border border-border shadow-card" : "border-2 border-dashed border-muted text-muted"}`}>
     <h3 className={`flex h-9 items-center justify-between gap-2 px-3 ${band ? band.band : "border-be-2 border-dashed border-muted"}`}>
       <span className="pc-label truncate text-[0.6875rem] tracking-[0.03em]">{title}</span>
       <span className="pc-label shrink-0 text-[0.6875rem] tracking-[0.03em]">{band ? band.label : known ? `${BANDS[card!.hazard_status!].label}?` : "No data"}</span>
@@ -34,7 +34,7 @@ export default function CrewReadings({ detail, stale }: { detail: SiteDetail | n
   const big = (value: number | null | undefined, decimals: number, unit: string) => value !== null && value !== undefined && Number.isFinite(value) ? <>{value.toFixed(decimals)}<span className="ms-1 font-sans text-base font-extrabold">{unit}</span></> : "No data";
   const timezone = detail?.timezone ?? "UTC";
   return <section aria-labelledby="readings-heading" className={stale ? "grayscale" : ""}>
-    <h2 id="readings-heading" className="pc-label mbe-3 text-sm">Today&apos;s key readings · now</h2>
+    <h2 id="readings-heading" className="pc-label mbe-3 text-xs text-muted">Today&apos;s key readings · now</h2>
     {stale && <p role="status" className="mbe-3 font-semibold text-muted">Readings not confirmed · showing the last real readings.</p>}
     <div className="grid grid-cols-2 gap-3">
       <Reading title="Heat index" card={heat} stale={stale} timezone={timezone} value={big(heat?.heat_index_f, 0, "°F")}>
