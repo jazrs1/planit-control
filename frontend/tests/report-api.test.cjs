@@ -83,7 +83,7 @@ test("abort cancels an in-flight upload", async () => {
 });
 
 test("creates a report using the exact contract fields and uploaded photo URL", async () => {
-  const body = { site_id: null, photo_url: "http://api.test/uploads/photo.png", lat: 27.8, lon: -82.4, category: "wildlife", note: "Snake: near gate", reporter_role: "crew_member" };
+  const body = { site_id: null, photo_url: "http://api.test/uploads/photo.png", lat: 27.8, lon: -82.4, category: "wildlife", note: "near gate", reporter_role: "crew_member", species: "Snake" };
   const api = loadApi({ fetch: async (url, options) => {
     assert.equal(url, "http://api.test/reports");
     assert.equal(options.method, "POST");

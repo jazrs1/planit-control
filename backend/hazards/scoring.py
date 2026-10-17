@@ -35,6 +35,8 @@ class Inputs:
     flood_alert: dict | None = None
     crew_wildlife_reports: int = 0
     firms_detail: str | None = None                          # e.g. "skipped: FIRMS_MAP_KEY not set"
+    crew_reports: list[dict] = field(default_factory=list)   # last 48 h within 2 mi, newest first
+    now: datetime | None = None                              # for "2 h ago"
 
 
 @dataclass
@@ -262,6 +264,71 @@ def wildlife(inp: Inputs, species_counts: dict[str, int]) -> Hazard:
     return Hazard(summary, score, score, label, label)
 
 
+# ---------- crew reports ----------
+
+CATEGORY_LABEL = {"downed_line": "Downed line", "flooding": "Flooding or washout", "wildlife": "Wildlife",
+                  "fire_smoke": "Fire or smoke", "heat_illness": "Heat illness", "unsafe_ground": "Unsafe ground",
+                  "other": "Other"}
+# Which hazard card a crew report raises to at least "watch" (today only). Downed lines and
+# "other" have no hazard card of their own: they go on the crew_hazards card.
+CREW_CARD = {"flooding": "flood", "heat_illness": "heat", "unsafe_ground": "soil_saturation",
+             "fire_smoke": "wildfire", "wildlife": "wildlife"}
+CREW_WATCH = 4.0
+
+
+def ago(when: datetime, now: datetime | None) -> str:
+    minutes = max(0, int(((now or datetime.now(timezone.utc)) - when).total_seconds() // 60))
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    hours = minutes // 60
+    return f"{hours} h ago" if hours < 48 else f"{hours // 24} days ago"
+
+
+def crew_label(report: dict) -> str:
+    label = CATEGORY_LABEL.get(report["category"], report["category"])
+    return f"{label} ({report['species']})" if report.get("species") else label
+
+
+def crew_line(reports: list[dict], now: datetime | None) -> str:
+    """'Crew report: Flooding or washout, 2 h ago (+1 more)' for the newest of `reports`."""
+    newest = reports[0]
+    more = f" (+{len(reports) - 1} more)" if len(reports) > 1 else ""
+    return f"Crew report: {crew_label(newest)}, {ago(newest['created_at'], now)}{more}"
+
+
+def apply_crew_reports(parts: dict[str, "Hazard"], inp: Inputs) -> None:
+    """Raise each mapped card to at least watch today and put the crew report first in its reading."""
+    for hazard, part in parts.items():
+        reports = [r for r in inp.crew_reports if CREW_CARD.get(r["category"]) == hazard]
+        if not reports:
+            continue
+        part.today = max(part.today, CREW_WATCH)
+        part.card["hazard_status"] = status_for(part.today)
+        part.card["reading"] = f"{crew_line(reports, inp.now)}. {part.card.get('reading') or ''}".strip()
+        if part.today == CREW_WATCH or not part.label_today:
+            part.label_today = f"Crew report: {crew_label(reports[0])}"
+
+
+def crew_hazards(inp: Inputs) -> dict:
+    """The site's crew-hazard card: every crew report within 2 mi in 48 h. Danger for a downed line,
+    watch for 'other', otherwise ok (the other categories raise their own hazard cards)."""
+    reports = inp.crew_reports
+    downed = [r for r in reports if r["category"] == "downed_line"]
+    status = "danger" if downed else "watch" if any(r["category"] == "other" for r in reports) else "ok"
+    if reports:
+        lines = [f"Crew report: {crew_label(r)}, {ago(r['created_at'], inp.now)}" for r in (downed or reports)[:3]]
+        reading = "; ".join(lines) + (f" (+{len(reports) - len(lines)} more)" if len(reports) > len(lines) else "")
+    else:
+        reading = "No crew hazard reports within 2 mi in the last 48 h"
+    return {
+        "hazard_status": status, "reading": reading, "as_of": inp.now,
+        "reports": [{"id": r["id"], "category": r["category"], "species": r.get("species"),
+                     "reported_at": r["created_at"], "distance_mi": r["distance_mi"]} for r in reports],
+    }
+
+
 # ---------- index ----------
 
 def combine(scores: dict[str, tuple[float, str]], stop_work: bool) -> tuple[float, str, list[dict]]:
@@ -287,10 +354,13 @@ def score_site(inp: Inputs, species_counts: dict[str, int]) -> dict:
     """All card extras plus today's and tomorrow's index for one site."""
     parts = {"heat": heat(inp), "lightning": lightning(inp), "flood": flood(inp),
              "soil_saturation": soil(inp), "wildfire": wildfire(inp), "wildlife": wildlife(inp, species_counts)}
+    apply_crew_reports(parts, inp)
     today, top, factors = combine({h: (p.today, p.label_today) for h, p in parts.items()},
                                   stop_work=inp.lightning_alert is not None)
     tomorrow, top_tomorrow, factors_tomorrow = combine(
         {h: (p.tomorrow, p.label_tomorrow) for h, p in parts.items()}, stop_work=False)
-    return {"cards": {h: p.card for h, p in parts.items()}, "hazard_index_today": today,
+    cards = {h: p.card for h, p in parts.items()}
+    cards["crew_hazards"] = crew_hazards(inp)
+    return {"cards": cards, "hazard_index_today": today,
             "hazard_index_tomorrow": tomorrow, "top_hazard": top, "top_factors": factors,
             "top_hazard_tomorrow": top_tomorrow, "top_factors_tomorrow": factors_tomorrow}

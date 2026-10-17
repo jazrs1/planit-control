@@ -7,8 +7,8 @@ it starts. Uses real time, not the replay clock.
 """
 
 import asyncio
-
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -51,9 +51,12 @@ def generate(pool: ConnectionPool, site_ids: list[str] | None = None, now: datet
     """Build inputs, write, and store briefings for tomorrow. Returns the site ids done."""
     now = now or datetime.now(timezone.utc)
     built = briefing_inputs.build_all(pool, site_ids, now)
+    # Gemini calls are slow (up to ~90 s each), so write several at once; writer spaces the starts.
+    with ThreadPoolExecutor(max_workers=get_settings().gemini_concurrency) as workers:
+        written_by_site = dict(zip(built, workers.map(lambda item: write(item[0]), built.values())))
     done = []
     for site_id, (inputs, factors) in built.items():
-        written = write(inputs)
+        written = written_by_site[site_id]
         numbers, unavailable = key_numbers(inputs)
         with pool.connection() as conn:
             conn.execute(

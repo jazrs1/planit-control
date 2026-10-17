@@ -175,3 +175,10 @@ def test_gemini_wrong_hazard_word_gets_retry(monkeypatch, gemini_on):
     calls = fake(monkeypatch, wrong, right)
     w = writer.write(calm)
     assert w.generator == "gemini" and "saturated" in calls[1]
+
+
+def test_gemini_timeout_retries_once_then_template(monkeypatch, gemini_on):
+    calls = fake(monkeypatch, TimeoutError(), GOOD)
+    assert writer.write(BUSY).generator == "gemini" and len(calls) == 2
+    fake(monkeypatch, TimeoutError(), TimeoutError())
+    assert writer.write(BUSY).generator == "template"

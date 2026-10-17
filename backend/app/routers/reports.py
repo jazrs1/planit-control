@@ -7,7 +7,7 @@ from app.schemas import CreateReportRequest, HazardReport
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-COLUMNS = "id, site_id, photo_url, lat, lon, category, note, reporter_role, created_at"
+COLUMNS = "id, site_id, photo_url, lat, lon, category, species, note, reporter_role, created_at"
 
 
 @router.get("", response_model=list[HazardReport])
@@ -23,8 +23,8 @@ def create_report(body: CreateReportRequest, pool: ConnectionPool = Depends(get_
     try:
         with pool.connection() as conn:
             return conn.execute(
-                f"""INSERT INTO reports (site_id, photo_url, lat, lon, category, note, reporter_role)
-                    VALUES (%(site_id)s, %(photo_url)s, %(lat)s, %(lon)s, %(category)s, %(note)s,
+                f"""INSERT INTO reports (site_id, photo_url, lat, lon, category, species, note, reporter_role)
+                    VALUES (%(site_id)s, %(photo_url)s, %(lat)s, %(lon)s, %(category)s, %(species)s, %(note)s,
                             %(reporter_role)s)
                     RETURNING {COLUMNS}""",
                 body.model_dump(),

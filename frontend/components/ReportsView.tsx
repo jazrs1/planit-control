@@ -77,7 +77,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
                 <div className="flex items-start gap-3">
                   <ReportPhoto key={report.photo_url} src={report.photo_url} alt={`${REPORT_LABEL[report.category]} reported by crew`} className="h-20 w-20 shrink-0" />
                   <div className="min-w-0">
-                    <h2 className="break-words font-semibold">{REPORT_LABEL[report.category]}</h2>
+                    <h2 className="break-words font-semibold">{REPORT_LABEL[report.category]}{report.species ? ` · ${report.species}` : ""}</h2>
                     <p className="break-words text-sm text-muted">{site?.name ?? (report.site_id ? `${report.site_id} · site details unavailable` : "Site unknown / not associated")}</p>
                     <time dateTime={report.created_at} className="text-sm text-muted">{time}</time>
                   </div>

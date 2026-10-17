@@ -17,6 +17,7 @@ from hazards.scoring import Inputs
 WILDLIFE_RADIUS_MI = 5 / 1.609344   # iNaturalist query radius: 5 km
 CREW_REPORT_RADIUS_MI = 2.0
 WILDLIFE_DAYS = 30
+CREW_RECENT = timedelta(hours=48)   # crew reports that change a site's hazard cards
 
 
 def miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -55,8 +56,8 @@ def load(pool: ConnectionPool) -> Snapshot:
                         if a["type"] == "flood"}
         firms = conn.execute("SELECT detail FROM data_sources WHERE name = 'firms'").fetchone()
         reports = conn.execute(
-            """SELECT lat, lon, created_at, reporter_role FROM reports
-               WHERE category = 'wildlife' AND created_at > %s""", (since,)).fetchall()
+            """SELECT id, lat, lon, created_at, category, species, reporter_role FROM reports
+               WHERE created_at > %s""", (since,)).fetchall()
         observations = conn.execute(
             """SELECT species, venomous, observed_at, lat, lon, quality_grade FROM wildlife_observations
                WHERE observed_at > %s ORDER BY observed_at DESC""", (since,)).fetchall()
@@ -70,8 +71,13 @@ def load(pool: ConnectionPool) -> Snapshot:
     for s in sites:
         near_obs = [(miles(s["lat"], s["lon"], o["lat"], o["lon"]), o) for o in observations]
         near_obs = [(d, o) for d, o in near_obs if d <= WILDLIFE_RADIUS_MI]
-        near_reports = [(miles(s["lat"], s["lon"], r["lat"], r["lon"]), r) for r in reports]
-        near_reports = [(d, r) for d, r in near_reports if d <= CREW_REPORT_RADIUS_MI]
+        near_all = [(miles(s["lat"], s["lon"], r["lat"], r["lon"]), r) for r in reports]
+        near_all = [(d, r) for d, r in near_all if d <= CREW_REPORT_RADIUS_MI]
+        near_reports = [(d, r) for d, r in near_all if r["category"] == "wildlife"]   # wildlife: 30 days
+        crew_recent = sorted(
+            [{"id": r["id"], "category": r["category"], "species": r["species"], "created_at": r["created_at"],
+              "distance_mi": round(d, 1)} for d, r in near_all if r["created_at"] > real_now - CREW_RECENT],
+            key=lambda r: r["created_at"], reverse=True)
         counts: dict[str, int] = {}
         for _, o in near_obs:
             counts[o["species"]] = counts.get(o["species"], 0) + 1
@@ -80,13 +86,14 @@ def load(pool: ConnectionPool) -> Snapshot:
             [{"species": o["species"], "distance_mi": round(d, 1), "seen_at": o["observed_at"],
               "source": "iNaturalist (research grade)" if o["quality_grade"] == "research" else "iNaturalist (needs ID)"}
              for d, o in near_obs]
-            + [{"species": "Wildlife (crew report)", "distance_mi": round(d, 1), "seen_at": r["created_at"],
-                "source": "Crew report"} for d, r in near_reports],
+            + [{"species": f"{r['species']} (crew report)" if r["species"] else "Wildlife (crew report)",
+                "distance_mi": round(d, 1), "seen_at": r["created_at"], "source": "Crew report"} for d, r in near_reports],
             key=lambda x: x["seen_at"], reverse=True)[:10]
         snap.inputs[s["id"]] = Inputs(
             site=s, readings=by_site[s["id"]],
             nws=[a for a in nws if a["site_id"] == s["id"]],
             lightning_alert=lightning.get(s["id"]), flood_alert=flood_alerts.get(s["id"]),
             crew_wildlife_reports=len(near_reports), firms_detail=firms["detail"] if firms else None,
+            crew_reports=crew_recent, now=real_now,
         )
     return snap

@@ -14,7 +14,7 @@ from alerts.engine import ALL_CLEAR_AFTER, STOP_WORK_RADIUS_MI
 from hazards import http, snapshot
 from hazards.heat import heat_index_f, osha_risk_band
 from hazards.risk import predict
-from hazards.scoring import SOIL_READING, soil_level
+from hazards.scoring import SOIL_READING, ago, crew_label, soil_level
 from hazards.sources import open_meteo
 from hazards.sources.nws import FIRE_LEVELS, FLOOD_LEVELS, HEAT_LEVELS, STORM_LEVELS
 from hazards.store import write_readings
@@ -38,13 +38,18 @@ def clock_time(dt: datetime, tz: ZoneInfo) -> str:
     return local.strftime(fmt).lstrip("0")
 
 
-def go_status(index: float, storm_chance: int, nws_events: list[str]) -> str:
+CREW_CAUTION = {"downed_line", "heat_illness"}
+
+
+def go_status(index: float, storm_chance: int, nws_events: list[str], crew_categories: list[str] = ()) -> str:
     """Headline decision, made in code (never by the writer). Band of tomorrow's index
     (green go / amber caution / red no_go), raised to at least caution when thunderstorms are
-    likely during work hours or NWS has a watch or warning in effect for tomorrow."""
+    likely during work hours, NWS has a watch or warning in effect for tomorrow, or a crew reported
+    a downed line or heat illness nearby in the last 48 hours."""
     status = "no_go" if index >= 7 else "caution" if index >= 4 else "go"
     if status == "go" and (storm_chance >= THUNDERSTORM_LIKELY_PCT
-                           or any(("Watch" in e or "Warning" in e) for e in nws_events)):
+                           or any(("Watch" in e or "Warning" in e) for e in nws_events)
+                           or any(c in CREW_CAUTION for c in crew_categories)):
         status = "caution"
     return status
 
@@ -142,11 +147,15 @@ def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snaps
     level = soil_level(vwc[0]) if vwc else None
     fire = inp.readings.get(("wildfire", "detections_25mi"))
     index = scored["hazard_index_tomorrow"]
+    # Crew reports (no free-text notes: they're untrusted text and could carry unchecked numbers).
+    crew = [{"category": crew_label(r), "reported": ago(r["created_at"], now),
+             "reported_at": clock_time(r["created_at"], tz), "distance_mi": r["distance_mi"]}
+            for r in inp.crew_reports]
     inputs = {
         "site": {"name": site["name"], "county": site["county"], "timezone": site["timezone"]},
         "for_date": day.isoformat(),
         "day": datetime.combine(day, time(12), tz).strftime("%A, %b %d").replace(" 0", " "),
-        "go_status": go_status(index, work_storm_pct, [n["event"] for n in nws]),
+        "go_status": go_status(index, work_storm_pct, [n["event"] for n in nws], [r["category"] for r in inp.crew_reports]),
         "hazard_index": index,
         "hazard_index_scale": "0 to 10; green under 4, amber 4 to under 7, red 7 and up",
         "top_hazard": scored["top_hazard_tomorrow"],
@@ -164,6 +173,7 @@ def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snaps
         "wildlife": {"sightings_last_30_days": [{"species": k, "count": v} for k, v in snap.species_counts[site["id"]].items()],
                      "crew_reports_within_2_mi_last_30_days": inp.crew_wildlife_reports},
         "wildfire": {"detections_within_25_mi": int(fire[0])} if fire else {"detections_within_25_mi": "unavailable"},
+        "crew_reports_last_48_h_within_2_mi": crew,
         "rules": {"lightning_stop_work_radius_mi": int(STOP_WORK_RADIUS_MI),
                   "lightning_all_clear_wait_min": int(ALL_CLEAR_AFTER.total_seconds() // 60)},
     }
