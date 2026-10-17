@@ -10,8 +10,11 @@ rules (alerts/engine.py: newest_qualifying_strikes + decide) and advisories use 
 plan(). Nothing is written to the database.
 
 For each stop-work start: was there an advisory for that site in the hour before, and how many
-minutes ahead? Also: how far off the first arrival estimate was, and how many advisories were
-never followed by a stop-work (false alarms).
+minutes ahead? Also: how far off the first arrival estimate was, how many advisories were never
+followed by a stop-work (false alarms), and green gaps: an advisory that cleared before a stop-work
+started at that site within the hour, leaving the site "clear" in between.
+
+    python -m scripts.evaluate_lightning_forecast --site vandolah-power-station   # one site's timeline
 """
 
 import argparse
@@ -37,6 +40,23 @@ class OpenAdvisory:
     updated_at: datetime
     arrival_at: datetime
     first_arrival_at: datetime
+    ended_at: datetime | None = None
+    end: str | None = None          # 'clear' | 'supersede'
+
+
+def green_gaps(stop_starts: list[tuple[str, datetime]], issued: list[OpenAdvisory]) -> list[dict]:
+    """Stop-works that started after the site's advisory had cleared (not superseded), within the
+    hour, with no advisory issued in between: the site showed clear right before a stop-work."""
+    gaps = []
+    for site_id, start in stop_starts:
+        mine = [a for a in issued if a.site_id == site_id and a.started_at < start]
+        if not mine:
+            continue
+        last = max(mine, key=lambda a: a.started_at)
+        if last.end == "clear" and last.ended_at <= start and start - last.ended_at <= cellmod.HORIZON:
+            gaps.append({"site_id": site_id, "cleared_at": last.ended_at, "stop_work_at": start,
+                         "gap_min": round((start - last.ended_at).total_seconds() / 60, 1)})
+    return gaps
 
 
 def load_sites() -> list[engine.Site]:
@@ -88,7 +108,9 @@ def simulate(window: str) -> dict:
                 adv = advisories[act.site_id]
                 adv.updated_at, adv.arrival_at = now, act.arrival.arrival_at
             else:
-                advisories.pop(act.site_id, None)
+                adv = advisories.pop(act.site_id, None)
+                if adv:
+                    adv.ended_at, adv.end = now, act.kind
 
     rows = approach.lead_times(stop_starts, [(a.site_id, a.started_at) for a in issued])
     by_adv = {(a.site_id, a.started_at): a for a in issued}
@@ -110,6 +132,8 @@ def simulate(window: str) -> dict:
         "advisories_issued": len(issued),
         "advisories_followed_by_stop_work": len(followed),
         "per_stop_work": rows,
+        "green_gaps": green_gaps(stop_starts, issued),
+        "timeline": {"advisories": [a.__dict__ for a in issued], "stop_work_starts": stop_starts},
     }
 
 
@@ -123,6 +147,10 @@ def print_report(r: dict) -> None:
     print(f"  first arrival estimate, median |error|: {r['median_abs_arrival_error_min']} min")
     print(f"  advisories issued: {r['advisories_issued']}, followed by a stop-work within 60 min: "
           f"{r['advisories_followed_by_stop_work']}")
+    print(f"  green gaps (advisory cleared, then a stop-work within 60 min): {len(r['green_gaps'])}")
+    for g in r["green_gaps"]:
+        print(f"    {g['site_id']}: cleared {g['cleared_at']:%H:%M:%S}, stop-work {g['stop_work_at']:%H:%M:%S}"
+              f" ({g['gap_min']} min clear in between)")
     for row in r["per_stop_work"]:
         lead = f"{row['lead_min']:>5} min ahead" if row["lead_min"] is not None else "   no warning"
         err = f" (arrival estimate off by {row['arrival_error_min']:+} min)" if row["arrival_error_min"] is not None else ""
@@ -134,6 +162,7 @@ def main() -> None:
     parser.add_argument("--window", help="folder under data/replay/ (default: newest)")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--db", action="store_true", help="report on the last app replay's stored rows instead")
+    parser.add_argument("--site", help="print one site's advisory and stop-work timeline")
     args = parser.parse_args()
     if args.db:
         from app.db import close_pool, get_pool, open_pool
@@ -148,10 +177,25 @@ def main() -> None:
     if not windows:
         raise SystemExit("no replay windows in data/replay/ (run python -m scripts.find_replay_window)")
     report = simulate(args.window or windows[-1])
-    if args.json:
+    if args.site:
+        print_timeline(report, args.site)
+    elif args.json:
         print(json.dumps(report, indent=1, default=str))
     else:
         print_report(report)
+
+
+def print_timeline(r: dict, site_id: str) -> None:
+    events = [(a["started_at"], f"advisory issued (arrival est. {a['first_arrival_at']:%H:%M})")
+              for a in r["timeline"]["advisories"] if a["site_id"] == site_id]
+    events += [(a["ended_at"], f"advisory {'cleared -> CLEAR' if a['end'] == 'clear' else 'superseded by stop-work'}")
+               for a in r["timeline"]["advisories"] if a["site_id"] == site_id and a["ended_at"]]
+    events += [(t, "STOP WORK starts (first qualifying strike)") for s, t in r["timeline"]["stop_work_starts"] if s == site_id]
+    print(f"{site_id} in {r['window']} (UTC):")
+    for t, what in sorted(events):
+        print(f"  {t:%H:%M:%S}  {what}")
+    gaps = [g for g in r["green_gaps"] if g["site_id"] == site_id]
+    print(f"  green gaps: {gaps or 'none'}")
 
 
 if __name__ == "__main__":

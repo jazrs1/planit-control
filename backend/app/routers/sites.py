@@ -7,9 +7,11 @@ from pydantic import TypeAdapter
 from alerts import approach, engine
 from app import clock, site_data
 from app.cache import api_cache
+from app.config import get_settings
 from app.db import get_pool, get_pool_optional
 from app.schemas import Beacon, ScoreHistory, Site, SiteDetail
 from hazards import model_scores
+from lightning import health
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 
@@ -59,24 +61,37 @@ def score_history(site_id: str, pool: ConnectionPool | None = Depends(get_pool_o
 
 @router.get("/{site_id}/beacon", response_model=Beacon)
 def site_beacon(site_id: str, pool: ConnectionPool = Depends(get_pool)):
-    """Tiny state for a hardware alarm: stop > approaching > flood > clear, with seconds to the
-    lightning all-clear or minutes until the storm arrives. App clock (simulated during replay),
-    except that a real stop-work always wins: during a replay a live stop-work is reported on real time.
+    """Tiny state for a hardware alarm: stop > unknown > approaching > flood > clear, with seconds to
+    the lightning all-clear or minutes until the storm arrives. The real state is worked out on real
+    time; during a replay the replay's state is worked out on the replay clock too, and the higher
+    priority wins (approach.combine_beacons), so a real stop-work, advisory or flood alert is never
+    hidden by a replay. "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on
+    that clock (lightning/health.py). A backend with live ingestion turned off (LIGHTNING_INGEST_ENABLED)
+    has no real lightning layer to report during a replay, so only a real stop-work counts there.
     Cached like /alerts; alert and advisory changes clear the cache."""
     if site_data.known_site(site_id) is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
 
     def compute() -> bytes:
-        now, replay = clock.now(), clock.is_simulated()
         with pool.connection() as conn:
-            if replay:
-                real_now = clock.real_now()
-                live = engine.active_alerts(conn, real_now, False, site_id=site_id)
-                if any(a["type"] == engine.ALERT_TYPE for a in live):
-                    return _json(_beacon, approach.beacon(site_id, live, None, real_now))
-            alerts = engine.active_alerts(conn, now, replay, site_id=site_id)
-            advisories = approach.active_advisories(conn, replay, site_id=site_id)
-        return _json(_beacon, approach.beacon(site_id, alerts, advisories[0] if advisories else None, now))
+            real = _mode_beacon(conn, site_id, clock.real_now(), replay=False)
+            states = [real]
+            if clock.is_simulated():
+                # Ingestion off here means "no live data by design", not a stalled feed: its real "unknown"
+                # mustn't hide the replay. A real stop-work (written by another backend) still counts.
+                if not get_settings().lightning_ingest_enabled and real["state"] != "stop":
+                    states = []
+                states.append(_mode_beacon(conn, site_id, clock.now(), replay=True))
+        return _json(_beacon, approach.combine_beacons(states))
 
     return Response(api_cache.get_or_compute(("beacon", site_id, clock.is_simulated()), compute),
                     media_type="application/json")
+
+
+def _mode_beacon(conn, site_id: str, now, *, replay: bool) -> dict:
+    """The beacon from one mode's alerts and advisory (real or replay), on that mode's clock."""
+    alerts = engine.active_alerts(conn, now, replay, site_id=site_id)
+    advisories = approach.active_advisories(conn, replay, site_id=site_id)
+    state = approach.beacon(site_id, alerts, advisories[0] if advisories else None, now,
+                            health.is_current(now, replay=replay))
+    return {**state, "replay": replay}

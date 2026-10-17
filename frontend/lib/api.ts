@@ -1,4 +1,4 @@
-import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, PushEndpointRequest, PushPublicKey, PushSubscribeRequest, PushSubscriptionInfo, PushTestResponse, PushUnsubscribeResponse, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
@@ -6,6 +6,7 @@ import mockLightningCells from "@shared/mocks/lightning_cells.json";
 import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
 import mockScoreHistory from "@shared/mocks/score_history.json";
+import mockPushSubscription from "@shared/mocks/push_subscription.json";
 
 import mockReports from "@shared/mocks/reports.json";
 import { markFailure, markSuccess } from "@/lib/connection";
@@ -59,6 +60,10 @@ export const getScoreHistory = (id: Site["id"]) => request<ScoreHistory>(`/sites
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
 export const getLightningCells = () => request<LightningCellsResponse>("/lightning/cells");
+export const getPushPublicKey = () => request<PushPublicKey>("/push/public-key", { signal: AbortSignal.timeout(15_000) });
+export const subscribePush = (body: PushSubscribeRequest) => request<PushSubscriptionInfo>("/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+export const unsubscribePush = (body: PushEndpointRequest) => request<PushUnsubscribeResponse>("/push/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+export const testPush = (body: PushEndpointRequest) => request<PushTestResponse>("/push/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
 /** Evaluation artifacts, never demo data. Bound the wait so the explanation remains available offline. */
 export const getModelInfo = () => request<ModelInfo>("/model/info", { signal: AbortSignal.timeout(10_000) });
 /** The plot path comes from /model/info and belongs to the API host, not the frontend host. */
@@ -67,8 +72,8 @@ export const modelCalibrationUrl = (path: ModelInfo["calibration"]["plot_url"]) 
 export const getBriefings = () => request<BriefingsResponse>("/briefings");
 /** 404 means the site has no briefing yet (see ApiRequestError.status). */
 export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
-/** One site: generated right away. All sites (no site_id): queued in the background; needs the demo
- *  code (a 401 without it). Protected requests send the demo code when one has been entered. */
+/** One site: generated right away. All sites (no site_id): queued in the background. Both need the
+ *  demo code (a 401 without it). Protected requests send the demo code when one has been entered. */
 export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
   request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
@@ -86,6 +91,7 @@ export const DEMO_DATA = {
   lightningCells: mockLightningCells as LightningCellsResponse,
   /** The sample belongs only to its site_id; never reuse it for another site. */
   scoreHistory: mockScoreHistory as ScoreHistory,
+  pushSubscription: mockPushSubscription as PushSubscriptionInfo,
   /** Keyed by site id; only the 6 mock sites have one. */
   siteDetails: mockSiteDetails as Record<string, SiteDetail>,
   /** Keyed by site id; only the 6 mock sites have one. */

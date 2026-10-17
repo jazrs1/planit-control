@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { APP_COLORS } from "@/lib/branding";
 import { APP_DESCRIPTION, APP_NAME, pageMetadata } from "@/lib/metadata";
 import { AlertsProvider } from "@/components/AlertsProvider";
+import { PushProvider } from "@/components/PushProvider";
 import OutageShell from "@/components/OutageShell";
 import TopNavigation from "@/components/TopNavigation";
 import { getAlerts, orNull } from "@/lib/api";
@@ -44,8 +45,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="min-h-screen pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[calc(env(safe-area-inset-bottom)+5rem)] pl-[env(safe-area-inset-left)] antialiased sm:pb-0">
         <AlertsProvider initialAlerts={alerts}>
-          <TopNavigation />
-          <OutageShell>{children}</OutageShell>
+          <PushProvider>
+            <TopNavigation />
+            <OutageShell>{children}</OutageShell>
+          </PushProvider>
         </AlertsProvider>
       </body>
     </html>
