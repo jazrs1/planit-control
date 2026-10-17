@@ -19,6 +19,7 @@ from functools import lru_cache
 
 from psycopg_pool import ConnectionPool
 
+from alerts import approach
 from app import clock, mocks
 from app.config import BACKEND_DIR
 from hazards import snapshot
@@ -109,6 +110,7 @@ def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -
         "hazard_index_tomorrow": scored["hazard_index_tomorrow"],
         "top_hazard": scored["top_hazard"],
         "top_factors": scored["top_factors"],
+        "lightning_approach": approach.view(snap.approaching.get(site["id"]), snap.clock_now or clock.now()),
         "updated_at": max(as_of) if as_of else datetime.now(timezone.utc),
         "nws_alerts": [{"event": a["event"], "severity": a["severity"], "headline": a["headline"],
                         "ends_at": a["ends_at"]} for a in inputs.nws] if detail else [],

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from psycopg_pool import ConnectionPool
 
-from alerts import engine
+from alerts import approach, engine
 from app import clock
 from hazards import model_scores
 from hazards.scoring import Inputs
@@ -33,6 +33,8 @@ class Snapshot:
     inputs: dict[str, Inputs]
     species_counts: dict[str, dict[str, int]]                       # site -> {species: n}
     sightings: dict[str, list[dict]] = field(default_factory=dict)  # site -> WildlifeSighting dicts
+    approaching: dict[str, dict] = field(default_factory=dict)      # site -> open lightning advisory
+    clock_now: datetime | None = None                               # lightning time (simulated in replay)
 
 
 def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
@@ -57,6 +59,7 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
                      if a["type"] == engine.ALERT_TYPE}
         flood_alerts = {a["site_id"]: a for a in engine.active_alerts(conn, real_now, replay=False)
                         if a["type"] == "flood"}
+        approaching = {a["site_id"]: a for a in approach.active_advisories(conn, replay=clock.is_simulated())}
         firms = conn.execute("SELECT detail FROM data_sources WHERE name = 'firms'").fetchone()
         reports = conn.execute(
             """SELECT id, lat, lon, created_at, category, species, reporter_role FROM reports
@@ -71,7 +74,7 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
         if r["site_id"] in by_site:
             by_site[r["site_id"]][(r["hazard"], r["metric"])] = (r["value"], r["ts"])
 
-    snap = Snapshot(sites=sites, inputs={}, species_counts={})
+    snap = Snapshot(sites=sites, inputs={}, species_counts={}, approaching=approaching, clock_now=clock_now)
     for s in sites:
         near_obs = [(miles(s["lat"], s["lon"], o["lat"], o["lon"]), o) for o in observations]
         near_obs = [(d, o) for d, o in near_obs if d <= WILDLIFE_RADIUS_MI]

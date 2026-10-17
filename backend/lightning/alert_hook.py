@@ -13,20 +13,32 @@ Rules for the engine:
   - `flashes` covers Florida plus ~30 mi. Apply the stop-work radius yourself, e.g. with
     lightning.geo.nearest_site_miles(), miles_between() in SQL, or the 5-minute rollup.
   - Exceptions are logged and swallowed by the caller, so a bug here can't stop ingestion.
+
+After the stop-work engine, the "lightning approaching" forecast (alerts/approach.py) runs in its own
+transaction and its own try/except: it sees this cycle's stop-work alerts, and a failure in it can
+never affect them.
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # glm.py imports this module, so avoid a runtime import cycle
     from lightning.glm import Flash
 
+log = logging.getLogger(__name__)
+
 
 def on_new_flashes(flashes: list[Flash], now: datetime) -> None:
-    from alerts import engine
+    from alerts import approach, engine
     from app import clock
 
     # Replay writes its own alerts (alerts.replay = true) so it never touches live ones.
-    engine.run(flashes, now, replay=clock.is_simulated())
+    replay = clock.is_simulated()
+    engine.run(flashes, now, replay=replay)
+    try:
+        approach.run(now, replay=replay)
+    except Exception:  # noqa: BLE001 - the forecast must never disturb stop-work alerts
+        log.exception("Lightning approach forecast failed (stop-work alerts are unaffected)")

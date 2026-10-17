@@ -1,0 +1,23 @@
+{
+  "stop": {
+    "site_id": "hammock-solar",
+    "state": "stop",
+    "seconds_to_all_clear": 1451,
+    "minutes_to_arrival": null,
+    "as_of": "2025-08-04T22:30:00Z"
+  },
+  "approaching": {
+    "site_id": "osceola-generating-station-fl",
+    "state": "approaching",
+    "seconds_to_all_clear": null,
+    "minutes_to_arrival": 12,
+    "as_of": "2025-08-04T22:30:00Z"
+  },
+  "clear": {
+    "site_id": "big-bend",
+    "state": "clear",
+    "seconds_to_all_clear": null,
+    "minutes_to_arrival": null,
+    "as_of": "2025-08-04T22:30:00Z"
+  }
+}
