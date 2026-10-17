@@ -19,6 +19,7 @@ from pathlib import Path
 from psycopg_pool import ConnectionPool
 
 from app import clock
+from app.cache import api_cache
 from app.config import BACKEND_DIR
 from lightning import glm
 
@@ -95,6 +96,7 @@ class ReplayRunner:
         await asyncio.to_thread(_reset_window, pool, names, start, end)
 
         clock.start_simulation(start, self.speed)
+        api_cache.invalidate()
         log.info("Replay %s started at %sx (%d files)", self.window, self.speed, len(files))
         try:
             for path in files:
@@ -123,6 +125,7 @@ class ReplayRunner:
             log.exception("Replay %s failed", self.window)
         finally:
             clock.stop_simulation()
+            api_cache.invalidate()
 
 
 def _reset_window(pool: ConnectionPool, names: list[str], start, end) -> None:

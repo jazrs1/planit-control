@@ -281,6 +281,9 @@ def run(flashes: list, now: datetime, *, replay: bool) -> CycleSummary:
     with get_pool().connection() as conn:
         summary = process(conn, flashes, now, load_sites(conn), replay=replay)
     if summary.changed:
+        from app.cache import api_cache
+
+        api_cache.invalidate()  # committed: let /alerts and /sites show it on the next request
         log.info("Alerts at %s%s: created %s, extended %s, cleared %s", now.isoformat(timespec="seconds"),
                  " (replay)" if replay else "", summary.created, summary.extended, summary.cleared)
     return summary

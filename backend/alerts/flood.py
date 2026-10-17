@@ -73,5 +73,8 @@ def evaluate(pool: ConnectionPool, now: datetime) -> dict[str, list[str]]:
                     {"id": active["id"], "now": now})
                 changes["cleared"].append(r["id"])
     if any(changes.values()):
+        from app.cache import api_cache
+
+        api_cache.invalidate()  # committed above: show the change on the next request
         log.info("Flood alerts: %s", changes)
     return changes

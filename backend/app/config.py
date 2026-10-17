@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     lightning_ingest_enabled: bool = True
     lightning_poll_seconds: float = 20.0
     hazard_polling_enabled: bool = True
+    # Seconds to cache GET /sites, /sites/{id}, /alerts (0 disables). Alert changes bypass it.
+    api_cache_seconds: float = 2.5
     # Contact info sent in the User-Agent to NWS, FEMA, iNaturalist, etc. (NWS requires one).
     nws_contact: str = "https://github.com/jazrs1/planit-control"
 
