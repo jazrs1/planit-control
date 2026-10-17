@@ -1,4 +1,5 @@
 import type { Alert, Site } from "@shared/types";
+import Link from "next/link";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 
 // Reference component: copy this structure for new cards.
@@ -16,6 +17,8 @@ type SiteCardProps = {
   site: Site;
   /** Active lightning alert for this site, if any. */
   lightningAlert?: Alert;
+  selected?: boolean;
+  onSelect?: () => void;
 };
 
 function formatLocalTime(iso: string, timeZone: string) {
@@ -33,14 +36,14 @@ function timeZoneAbbr(timeZone: string) {
   return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
 }
 
-export default function SiteCard({ site, lightningAlert }: SiteCardProps) {
+export default function SiteCard({ site, lightningAlert, selected, onSelect }: SiteCardProps) {
   const risk = RISK_STYLES[riskLevel(site.hazard_index)];
 
   return (
-    <article className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4 shadow-card">
+    <article className={`flex flex-col gap-3 rounded-card border border-border bg-surface p-4 shadow-card ${selected ? "ring-2 ring-brand" : ""}`}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-text">{site.name}</h2>
+          <h2 className="text-base font-semibold text-text"><Link href={`/sites/${site.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-brand">{site.name}</Link></h2>
           <p className="text-sm text-muted">
             {site.county} County · {timeZoneAbbr(site.timezone)}
           </p>
@@ -59,8 +62,10 @@ export default function SiteCard({ site, lightningAlert }: SiteCardProps) {
         <span className="font-medium">{HAZARD_LABEL[site.top_hazard]}</span>
       </p>
 
+      {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className="rounded-card border border-border px-3 py-2 text-left text-sm text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">{selected ? "Selected on map" : "Show on map"}</button>}
+
       {lightningAlert && (
-        <div className="rounded-card bg-risk-red px-3 py-2 text-sm font-semibold text-white" role="alert">
+        <div className="rounded-card bg-risk-red px-3 py-2 text-sm font-semibold text-surface">
           ⚡ STOP WORK: lightning {lightningAlert.last_strike_distance_mi} mi away
           {lightningAlert.all_clear_at && (
             <span className="block font-normal">
