@@ -18,6 +18,27 @@ export type HazardType =
 
 // ---------- GET /sites ----------
 
+/** "Lightning approaching": a tracked storm cell's leading edge is expected to reach the site's
+ * 10-mile stop-work ring within 60 minutes. An advisory, never a stop-work order. */
+export interface LightningApproach {
+  /** Estimated time the leading edge reaches the 10-mile ring. */
+  arrival_at: string;
+  /** Whole minutes from the server's now (simulated during replay); 0 = arriving now. An optimistic
+   * estimate (on the replay, lightning usually came sooner): show as "lightning possible within N min",
+   * never as a countdown. See docs/lightning-forecast.md. */
+  minutes_to_arrival: number;
+  /** Where the storm is, seen from the site: 16-point compass, e.g. "WSW". */
+  from_direction: string;
+  from_bearing_deg: number;
+  /** Direction the storm is moving, degrees clockwise from north. */
+  heading_deg: number;
+  speed_mph: number;
+  /** Leading edge to the site, now. */
+  distance_mi: number;
+  issued_at: string;
+  updated_at: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -28,6 +49,9 @@ export interface Site {
   timezone: string;
   hazard_index: HazardIndex;
   top_hazard: HazardType;
+  /** Sent by the live backend (null when no storm is approaching or the site is in stop-work);
+   * absent in older mocks. */
+  lightning_approach?: LightningApproach | null;
 }
 
 export type SitesResponse = Site[];
@@ -157,11 +181,18 @@ export interface NwsAlert {
   ends_at: string | null;
 }
 
+/** Where a hazard-index factor came from: the ML weather model, or a safety rule
+ * (OSHA heat band, wildfire, wildlife, crew report, lightning stop-work). */
+export type FactorSource = "model" | "rule";
+
 export interface ContributingFactor {
-  hazard: HazardType;
+  /** null for a factor that isn't one hazard: a downed-line crew report (see conditions.crew_hazards). */
+  hazard: HazardType | null;
   label: string;
   /** Share of the hazard index, 0–1. Factors for a site sum to <= 1. */
   weight: number;
+  /** Always sent by the live backend; absent in older mocks. */
+  source?: FactorSource | null;
 }
 
 export interface SiteDetail extends Site {
@@ -303,6 +334,48 @@ export interface LightningFlash {
 
 export type LightningRecentResponse = LightningFlash[];
 
+// ---------- GET /lightning/cells ----------
+
+/** A storm cell: a cluster of flashes from the last 20 minutes. Ids are per response (not stable). */
+export interface LightningCell {
+  id: string;
+  lat: number;
+  lon: number;
+  /** Flashes in the last 20 minutes. */
+  flash_count: number;
+  /** Flashes in the last 5 minutes. */
+  recent_flashes: number;
+  /** 90th-percentile distance of the last 5 minutes' flashes from the center. */
+  radius_mi: number;
+  /** true when the motion is reliable enough to forecast with. */
+  tracked: boolean;
+  /** null when not tracked; 0 when tracked but nearly stationary. */
+  speed_mph: number | null;
+  /** Direction of motion, degrees clockwise from north; null when not tracked or stationary. */
+  heading_deg: number | null;
+  /** 16-point compass of heading_deg, e.g. "NE". */
+  moving_toward: string | null;
+  last_flash_at: string;
+}
+
+export type LightningCellsResponse = LightningCell[];
+
+// ---------- GET /sites/{id}/beacon ----------
+
+/** Tiny state for a hardware alarm. Priority: stop > approaching > flood > clear. */
+export type BeaconState = "stop" | "approaching" | "flood" | "clear";
+
+export interface Beacon {
+  site_id: string;
+  state: BeaconState;
+  /** Only when state is "stop": seconds until the lightning all-clear (if no new strikes). */
+  seconds_to_all_clear: number | null;
+  /** Only when state is "approaching": whole minutes until the storm reaches the 10-mile ring
+   * (optimistic: lightning can come sooner; not a countdown). */
+  minutes_to_arrival: number | null;
+  as_of: string;
+}
+
 // ---------- POST /replay/start, POST /replay/stop, GET /replay/status ----------
 
 export interface StartReplayRequest {
@@ -321,6 +394,106 @@ export interface ReplayStatus {
   files_total: number;
   files_done: number;
   flashes_ingested: number;
+}
+
+// ---------- GET /sites/{id}/score-history ----------
+
+export type ScoreHorizon = "today" | "tomorrow";
+
+/** One stored scoring run (hourly, after the weather poll) for one day. */
+export interface ScorePoint {
+  scored_at: string;
+  /** Site-local date the score is for (YYYY-MM-DD). */
+  for_date: string;
+  /** "today" when for_date was the site's own date at scored_at; "tomorrow" the day after. */
+  horizon: ScoreHorizon;
+  hazard_index: HazardIndex;
+  top_hazard: HazardType | null;
+  /** The ML weather score alone, 0–10; null when the model hadn't scored that day yet. */
+  model_score: HazardIndex | null;
+}
+
+export interface ScoreHistory {
+  site_id: string;
+  /** Last 7 days, oldest first. Empty without a database or before the first scoring run. */
+  points: ScorePoint[];
+}
+
+// ---------- GET /model/info ----------
+
+export interface ModelMetrics {
+  /** Precision-recall AUC: how well risky days rank at the top (higher is better). */
+  pr_auc: number;
+  roc_auc: number;
+  /** Mean squared error of the probability (lower is better). */
+  brier: number;
+}
+
+export interface ModelComparison {
+  name: string;
+  description: string;
+  /** Scored from same-day forecasts ("today"). */
+  same_day: ModelMetrics;
+  /** Scored from forecasts issued ~24 h earlier ("tomorrow"); null if not evaluated. */
+  day_ahead: ModelMetrics | null;
+}
+
+export interface ModelBand {
+  band: RiskLevel;
+  share_of_days: number;
+  /** Share of that band's site-days with a logged hazardous event. */
+  event_rate: number;
+  share_of_events: number;
+}
+
+export interface IndexAnchor {
+  index: HazardIndex;
+  /** Percentile of the validation year's site-days, 0–1. */
+  percentile: number;
+  /** Calibrated probability at that index. */
+  probability: number;
+}
+
+export interface CalibrationBin {
+  mean_predicted: number;
+  observed: number;
+  site_days: number;
+}
+
+export interface ModelInfo {
+  /** Training timestamp; stored with every score. */
+  version: string;
+  trained_at: string;
+  /** What the model predicts (the label). */
+  label: string;
+  weather_source: string;
+  /** How the ML score and the safety rules combine into the hazard index. */
+  hybrid: string;
+  training: {
+    train_years: number[];
+    validation_year: number;
+    test_year: number;
+    sites: number;
+    train_site_days: number;
+    train_events: number;
+  };
+  test: { site_days: number; events: number; base_rate: number };
+  /** On the test year: the model first, then the baselines. */
+  results: ModelComparison[];
+  /** Test year, same-day forecasts. */
+  bands: ModelBand[];
+  index_anchors: IndexAnchor[];
+  calibration: {
+    /** Path on the API (e.g. "/model/calibration.svg"); light and dark mode. */
+    plot_url: string;
+    /** Test year, same-day forecasts; the plot's points (bins with >= 50 site-days). */
+    bins: CalibrationBin[];
+  };
+  /** What drives the model most, largest first (mean |SHAP|, log-odds). */
+  top_features: { label: string; importance: number }[];
+  limitations: string[];
+  /** Last successful hourly scoring run; null without a database or before the first run. */
+  last_scored_at: string | null;
 }
 
 // ---------- Errors ----------

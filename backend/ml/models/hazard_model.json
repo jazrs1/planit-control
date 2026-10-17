@@ -1,0 +1,116 @@
+{
+ "version": 1,
+ "trained_at": "2026-10-17T04:37:49+00:00",
+ "features": [
+  "tmax_f",
+  "heat_index_max_f",
+  "rain_in",
+  "rain_rate_max_in",
+  "rain_prior3_in",
+  "rain_prior7_in",
+  "gust_max_mph",
+  "cape_max",
+  "thunder_hours",
+  "soil_moisture_pct",
+  "doy_sin",
+  "doy_cos",
+  "lat",
+  "lon"
+ ],
+ "lightgbm_params": {
+  "objective": "binary",
+  "metric": "average_precision",
+  "learning_rate": 0.03,
+  "min_child_samples": 100,
+  "feature_fraction": 0.8,
+  "bagging_fraction": 0.8,
+  "bagging_freq": 1,
+  "lambda_l2": 1.0,
+  "seed": 7,
+  "deterministic": true,
+  "force_row_wise": true,
+  "verbose": -1,
+  "num_leaves": 7,
+  "scale_pos_weight": 1.0,
+  "monotone_constraints": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0
+  ],
+  "monotone_constraints_method": "advanced"
+ },
+ "num_boost_round": 904,
+ "label": "NOAA Storm Events crew-relevant event within 15 mi or in the site's NWS zone/county, by site-local date",
+ "weather_source": "Open-Meteo gfs_seamless (HRRR over Florida); training on the Historical Forecast API",
+ "split": {
+  "train": [
+   2022,
+   2023
+  ],
+  "validation": 2024,
+  "test": 2025
+ },
+ "calibration": {
+  "method": "platt",
+  "fit_on": 2024,
+  "a": 0.8426598902564706,
+  "b": -0.5899066092792541
+ },
+ "index": {
+  "reference_year": 2024,
+  "percentiles": [
+   0.0,
+   0.65,
+   0.9,
+   0.99,
+   0.999
+  ],
+  "probability_anchors": [
+   0.0,
+   0.010127067666338278,
+   0.05179231331126548,
+   0.5150556461618019,
+   0.9041587028099359
+  ],
+  "index_values": [
+   0.0,
+   4.0,
+   7.0,
+   9.0,
+   10.0
+  ]
+ },
+ "baselines": {
+  "climatology_by_month": {
+   "1": 0.008504398826979473,
+   "2": 0.0006493506493506494,
+   "3": 0.017595307917888565,
+   "4": 0.036060606060606064,
+   "5": 0.030205278592375366,
+   "6": 0.0496969696969697,
+   "7": 0.03988269794721408,
+   "8": 0.0530791788856305,
+   "9": 0.054242424242424245,
+   "10": 0.012316715542521995,
+   "11": 0.029393939393939392,
+   "12": 0.011730205278592375
+  },
+  "rule": {
+   "rain_in_at_least": 1.0,
+   "heat_index_f_at_least": 108.0,
+   "fires": 0.13479623824451412,
+   "quiet": 0.01853115362571982
+  }
+ }
+}

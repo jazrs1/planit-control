@@ -126,7 +126,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
         <div className="grid flex-1 lg:min-h-0 lg:grid-cols-[2fr_1fr]">
           <section aria-label="Florida site safety map" className="relative h-[55dvh] min-h-80 lg:h-full">
             <SiteMap sites={sites} alerts={alerts} flashes={flashes} nowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} />
-            <div className="absolute bottom-10 left-3 flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 text-xs shadow-card" aria-label="Map legend">
+            <div className="absolute bottom-10 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 text-xs shadow-card" aria-label="Map legend">
               <span className="text-risk-green">● Low &lt; 4</span><span className="text-risk-amber">● Elevated 4–&lt;7</span><span className="text-risk-red">● High ≥ 7</span><span>◎ Lightning stop work</span>
               <span className="flex items-center gap-1"><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{offline ? "?" : ""}) · {offline ? "last known, fade paused" : "newest brightest"}</span>
             </div>

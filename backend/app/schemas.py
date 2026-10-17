@@ -13,6 +13,18 @@ HazardType = Literal["heat", "lightning", "flood", "soil_saturation", "wildfire"
 HazardIndex = Annotated[float, Field(ge=0, le=10)]
 
 
+class LightningApproach(BaseModel):
+    arrival_at: datetime
+    minutes_to_arrival: int
+    from_direction: str
+    from_bearing_deg: float
+    heading_deg: float
+    speed_mph: float
+    distance_mi: float
+    issued_at: datetime
+    updated_at: datetime
+
+
 class Site(BaseModel):
     id: str
     name: str
@@ -22,6 +34,7 @@ class Site(BaseModel):
     timezone: str
     hazard_index: HazardIndex
     top_hazard: HazardType
+    lightning_approach: LightningApproach | None = None
 
 
 class HazardCard(BaseModel):
@@ -115,10 +128,14 @@ class NwsAlert(BaseModel):
     ends_at: datetime | None
 
 
+FactorSource = Literal["model", "rule"]
+
+
 class ContributingFactor(BaseModel):
-    hazard: HazardType
+    hazard: HazardType | None   # None: a factor that isn't one hazard (a downed-line crew report)
     label: str
     weight: float = Field(ge=0, le=1)
+    source: FactorSource | None = None
 
 
 class SiteDetail(Site):
@@ -224,3 +241,121 @@ class ReplayStatus(BaseModel):
     files_total: int
     files_done: int
     flashes_ingested: int
+
+
+# ---------- GET /sites/{id}/score-history ----------
+
+class ScorePoint(BaseModel):
+    scored_at: datetime
+    for_date: str
+    horizon: Literal["today", "tomorrow"]
+    hazard_index: HazardIndex
+    top_hazard: HazardType | None
+    model_score: HazardIndex | None
+
+
+class ScoreHistory(BaseModel):
+    site_id: str
+    points: list[ScorePoint]
+
+
+# ---------- GET /model/info ----------
+
+class ModelMetrics(BaseModel):
+    pr_auc: float
+    roc_auc: float
+    brier: float
+
+
+class ModelComparison(BaseModel):
+    name: str
+    description: str
+    same_day: ModelMetrics
+    day_ahead: ModelMetrics | None
+
+
+class ModelTraining(BaseModel):
+    train_years: list[int]
+    validation_year: int
+    test_year: int
+    sites: int
+    train_site_days: int
+    train_events: int
+
+
+class ModelTestSet(BaseModel):
+    site_days: int
+    events: int
+    base_rate: float
+
+
+class ModelBand(BaseModel):
+    band: Literal["green", "amber", "red"]
+    share_of_days: float
+    event_rate: float
+    share_of_events: float
+
+
+class IndexAnchor(BaseModel):
+    index: HazardIndex
+    percentile: float
+    probability: float
+
+
+class CalibrationBin(BaseModel):
+    mean_predicted: float
+    observed: float
+    site_days: int
+
+
+class ModelCalibration(BaseModel):
+    plot_url: str
+    bins: list[CalibrationBin]
+
+
+class ModelFeature(BaseModel):
+    label: str
+    importance: float
+
+
+class ModelInfo(BaseModel):
+    version: str
+    trained_at: datetime
+    label: str
+    weather_source: str
+    hybrid: str
+    training: ModelTraining
+    test: ModelTestSet
+    results: list[ModelComparison]
+    bands: list[ModelBand]
+    index_anchors: list[IndexAnchor]
+    calibration: ModelCalibration
+    top_features: list[ModelFeature]
+    limitations: list[str]
+    last_scored_at: datetime | None
+
+
+# ---------- GET /lightning/cells ----------
+
+class LightningCell(BaseModel):
+    id: str
+    lat: float
+    lon: float
+    flash_count: int
+    recent_flashes: int
+    radius_mi: float
+    tracked: bool
+    speed_mph: float | None
+    heading_deg: float | None
+    moving_toward: str | None
+    last_flash_at: datetime
+
+
+# ---------- GET /sites/{id}/beacon ----------
+
+class Beacon(BaseModel):
+    site_id: str
+    state: Literal["stop", "approaching", "flood", "clear"]
+    seconds_to_all_clear: int | None
+    minutes_to_arrival: int | None
+    as_of: datetime

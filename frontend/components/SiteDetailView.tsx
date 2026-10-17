@@ -7,10 +7,11 @@ import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import BriefingCard from "@/components/BriefingCard";
 import HazardPanel from "@/components/HazardPanel";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
+import { formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
-import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
+import { HAZARD_LABEL, factorHazardLabel, riskLevel } from "@/lib/risk";
 import { formatAgo, formatSiteDateTime, formatSiteTime, timeZoneAbbr } from "@/lib/time";
 import { usePolling } from "@/lib/usePolling";
 
@@ -83,7 +84,8 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
             <div>
               <p className="text-lg font-bold">⚡ STOP WORK: lightning</p>
               <p className="text-sm">
-                {alert.last_strike_distance_mi === null ? "Lightning within 10 mi." : `Last strike ${alert.last_strike_distance_mi} mi away.`}
+                {/* Same rounding as every other page: down, so a strike inside 10 mi never reads 10.0. */}
+                {formatStrikeDistance(alert.last_strike_distance_mi) === null ? "Lightning within 10 mi." : `Last strike ${formatStrikeDistance(alert.last_strike_distance_mi)} away.`}
                 {" "}Each new strike restarts the 30-minute wait.
               </p>
             </div>
@@ -374,7 +376,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
             {detail.top_factors.map((f) => (
               <li key={`${f.hazard}-${f.label}`} className="text-sm">
                 <div className="flex justify-between gap-2">
-                  <span><span className="font-medium">{HAZARD_LABEL[f.hazard]}</span> · {f.label}</span>
+                  <span><span className="font-medium">{factorHazardLabel(f.hazard)}</span> · {f.label}</span>
                   <span className="shrink-0 tabular-nums text-muted">{Math.round(f.weight * 100)}%</span>
                 </div>
                 <div className="mt-1 h-2 rounded-pill bg-bg" aria-hidden="true">

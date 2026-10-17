@@ -307,3 +307,32 @@ def test_claude_request_and_response_shape(monkeypatch):
     reply.stop_reason, reply.stop_details, reply.content = "refusal", NS(category="general_harms"), []
     with pytest.raises(writer.Refused):
         writer._call_claude(BUSY, "k", "claude-sonnet-5-5", None)
+
+
+def test_each_briefing_gets_the_time_it_was_written(monkeypatch):
+    """A 55-site batch takes minutes: generated_at is per briefing, not the batch start."""
+    from contextlib import contextmanager
+    from datetime import timedelta
+    from app.config import get_settings
+    from briefing import service
+    monkeypatch.setattr(get_settings(), "briefing_concurrency", 1)
+    batch_start = datetime(2026, 10, 16, 22, 0, tzinfo=timezone.utc)
+    ticks = iter(batch_start + timedelta(seconds=10 * i) for i in range(1, 10))
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return next(ticks)
+    stored = []
+
+    class Pool:
+        @contextmanager
+        def connection(self):
+            yield type("Conn", (), {"execute": lambda self, sql, params: stored.append(params)})()
+    monkeypatch.setattr(service, "datetime", Clock)
+    monkeypatch.setattr(service.briefing_inputs, "build_all",
+                        lambda pool, ids, now: {"a": (BUSY, []), "b": (CALM, [])})
+    monkeypatch.setattr(service, "write", writer.template)
+    service.generate(Pool(), now=batch_start)
+    times = [p["now"] for p in stored]
+    assert len(times) == 2 and times[0] < times[1] and batch_start not in times

@@ -47,7 +47,9 @@ def key_numbers(inputs: dict) -> tuple[dict, list[str]]:
     }, unavailable
 
 
-def _store(pool: ConnectionPool, site_id: str, inputs: dict, factors: list[dict], written, now: datetime) -> None:
+def _store(pool: ConnectionPool, site_id: str, inputs: dict, factors: list[dict], written) -> None:
+    """Upsert one briefing. Its time (generated_at) is when it was written, not when the batch
+    started: a 55-site batch takes minutes."""
     numbers, unavailable = key_numbers(inputs)
     with pool.connection() as conn:
         conn.execute(
@@ -61,7 +63,7 @@ def _store(pool: ConnectionPool, site_id: str, inputs: dict, factors: list[dict]
                    actions = EXCLUDED.actions, top_factors = EXCLUDED.top_factors,
                    key_numbers = EXCLUDED.key_numbers, unavailable = EXCLUDED.unavailable,
                    inputs = EXCLUDED.inputs, generator = EXCLUDED.generator, model = EXCLUDED.model""",
-            {"site": site_id, "for_date": inputs["for_date"], "text": written.text, "now": now,
+            {"site": site_id, "for_date": inputs["for_date"], "text": written.text, "now": datetime.now(timezone.utc),
              "go": inputs["go_status"], "top": inputs["top_hazard"], "headline": written.headline,
              "risks": Jsonb(written.risks), "actions": Jsonb(written.actions), "factors": Jsonb(factors),
              "numbers": Jsonb(numbers), "unavailable": unavailable, "inputs": Jsonb(inputs),
@@ -83,7 +85,7 @@ def generate(pool: ConnectionPool, site_ids: list[str] | None = None, now: datet
 
     def write_and_store(item: tuple[str, tuple[dict, list[dict]]]) -> str:
         site_id, (inputs, factors) = item
-        _store(pool, site_id, inputs, factors, write(inputs), now)
+        _store(pool, site_id, inputs, factors, write(inputs))
         return site_id
 
     with ThreadPoolExecutor(max_workers=get_settings().briefing_concurrency) as workers:

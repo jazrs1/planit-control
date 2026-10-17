@@ -8,3 +8,5 @@ xarray==2026.9.0
 h5netcdf==1.8.1
 h5py==3.16.0
 numpy==2.4.6
+pandas==3.0.6
+lightgbm==4.7.0
