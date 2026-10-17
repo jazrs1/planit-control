@@ -41,3 +41,15 @@ export function formatForDate(date: string) {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 }
+
+/** A briefing key number with its unit: "6.5 / 10", "93°F", "20%", "1.8 in". */
+export function formatKeyNumber(key: keyof BriefingKeyNumbers, value: number): string {
+  switch (key) {
+    case "hazard_index": return `${value.toFixed(1)} / 10`;
+    case "max_heat_index_f": return `${Math.round(value)}°F`;
+    case "lightning_probability_pct":
+    case "soil_moisture_pct": return `${Math.round(value)}%`;
+    case "rain_in": return `${value.toFixed(1)} in`;
+    case "wildfire_detections_25mi": return String(value);
+  }
+}

@@ -5,7 +5,8 @@ import type { ScoreHistory, Site } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import ScoreSparkline from "@/components/ScoreSparkline";
 import { DEMO_DATA, getScoreHistory } from "@/lib/api";
-import { HISTORY_STALE_MS, historyPoints } from "@/lib/scoreHistory";
+import { HISTORY_STALE_MS, historyPoints, latestTomorrow } from "@/lib/scoreHistory";
+import { HAZARD_LABEL, liveHazardIndex, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
 import { useVisibility } from "@/lib/useVisibility";
 
@@ -41,11 +42,21 @@ function HistoryForMode({ site, compact = false, lazy = false, unconfirmed = fal
   const old = !demo && !replay?.running && latest && now !== null && now - Date.parse(latest.scored_at) > HISTORY_STALE_MS;
   const uncertain = !demo && (unconfirmed || failed || connection.level !== "online" || !!old);
 
+  // Compact (the expanded dashboard row): three small stats, then today's runs. "Now" is the row's own
+  // index, so the stats never contradict the row.
+  const index = liveHazardIndex(site);
+  const tomorrow = latestTomorrow(history);
+  const stat = (label: string, value: string, shape?: string) => <div className="grid gap-0.5"><dt className="text-xs text-muted">{label}</dt>
+    <dd className="flex items-center gap-1.5 text-xl font-semibold leading-tight tabular-nums">{shape && <span aria-hidden="true" className={`pc-shape pc-shape--${shape} text-[0.7rem]`} />}{value}</dd></div>;
   return <div ref={ref} className={`min-w-0 space-y-2 ${compact ? "min-h-16" : "rounded-card border border-border bg-surface p-4 shadow-card"}`}>
-    {compact ? <p className="text-xs font-semibold text-muted">7-day hazard index</p> : <h2 className="font-semibold text-text">7-day hazard index</h2>}
+    {compact ? <dl className="grid grid-cols-[auto_auto_1fr] gap-x-6">
+      {stat("Now", Number.isFinite(index) ? index.toFixed(1) : "—", Number.isFinite(index) ? riskLevel(index) : undefined)}
+      {stat("Tomorrow", tomorrow ? tomorrow.hazard_index.toFixed(1) : "—", tomorrow ? riskLevel(tomorrow.hazard_index) : undefined)}
+      <div className="grid min-w-0 gap-0.5"><dt className="text-xs text-muted">Top hazard</dt><dd className="truncate text-sm font-semibold leading-7">{HAZARD_LABEL[site.top_hazard] ?? "—"}</dd></div>
+    </dl> : <h2 className="font-semibold text-text">Hazard index history</h2>}
     {demo && <p className="text-xs font-semibold text-muted">Demo data · sample history, not live</p>}
     {history === null && !demo ? <p role="status" className="text-sm text-muted">{failed ? "History unavailable · Not confirmed" : visible ? "Loading history…" : "History loads when this card is visible"}</p>
-      : <ScoreSparkline history={history} site={site} compact={compact} unconfirmed={uncertain} demo={demo} />}
+      : <ScoreSparkline history={history} site={site} compact={compact} unconfirmed={uncertain} demo={demo} zoneStated={!compact} />}
     {uncertain && history !== null && <p role="status" className="text-xs font-semibold text-muted">{old ? "Old scoring data · " : ""}? Last known history · Not confirmed</p>}
     {!compact && replay?.running && <p className="text-xs text-muted">Scoring history stays live during lightning replay.</p>}
   </div>;

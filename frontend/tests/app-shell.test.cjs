@@ -50,4 +50,9 @@ test("each page metadata has a description and a matching social title", () => {
   assert.equal(metadata.openGraph.title, "Alerts · PlanIT Control");
   assert.equal(metadata.twitter.card, "summary_large_image");
   assert.equal(metadata.twitter.title, metadata.openGraph.title);
+  // The homepage's shared-link card says the name and the tagline, while its tab title stays per page.
+  const home = load("lib/metadata.ts").pageMetadata("Dashboard", "Monitor sites.", { title: "PlanIT Control", description: "Live job-site safety for Florida utility crews" });
+  assert.equal(home.title.absolute, "Dashboard · PlanIT Control");
+  assert.equal(home.openGraph.title, "PlanIT Control");
+  assert.equal(home.openGraph.description, "Live job-site safety for Florida utility crews");
 });

@@ -355,16 +355,33 @@ export interface SendBriefingResponse {
 
 /** One GOES-19 GLM flash over Florida (+30 mi). */
 export interface LightningFlash {
+  /** Strike time. Real flashes are on real time; replay flashes on the replay's (historical) clock, so
+   * age a flash against real now or ReplayStatus.simulated_now depending on `replay`. */
   ts: string;
   lat: number;
   lon: number;
+  /** false: real lightning (always included, newest first). true: from the running replay, listed after
+   * the real ones, newest first. Without a replay every flash is real. */
+  replay: boolean;
 }
 
+/** GET /lightning/recent: real flashes always, plus replay flashes while a replay runs. Each layer is
+ * capped at 10,000; GET /lightning/recent/counts has the uncapped counts. */
 export type LightningRecentResponse = LightningFlash[];
+
+/** GET /lightning/recent/counts?minutes=15: flashes in the same windows as /lightning/recent, uncapped. */
+export interface LightningRecentCounts {
+  minutes: number;
+  /** Last `minutes` of real time. */
+  real: number;
+  /** Last `minutes` of the replay clock; 0 when no replay runs. */
+  replay: number;
+}
 
 // ---------- GET /lightning/cells ----------
 
-/** A storm cell: a cluster of flashes from the last 20 minutes. Ids are per response (not stable). */
+/** A storm cell: a cluster of flashes from the last 20 minutes. Ids are per response (not stable); a
+ * replay cell's id starts with "replay-". */
 export interface LightningCell {
   id: string;
   lat: number;
@@ -383,9 +400,14 @@ export interface LightningCell {
   heading_deg: number | null;
   /** 16-point compass of heading_deg, e.g. "NE". */
   moving_toward: string | null;
+  /** Real cells: real time. Replay cells: the replay's (historical) clock, like LightningFlash.ts. */
   last_flash_at: string;
+  /** false: from real lightning (always included, largest first). true: from the running replay, listed
+   * after the real ones, largest first. */
+  replay: boolean;
 }
 
+/** GET /lightning/cells: real storm cells always, plus a running replay's. */
 export type LightningCellsResponse = LightningCell[];
 
 // ---------- GET /sites/{id}/beacon ----------

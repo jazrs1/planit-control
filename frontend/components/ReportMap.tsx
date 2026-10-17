@@ -99,14 +99,14 @@ export default function ReportMap({ reports, pin, onPin, selectedId, onSelect, e
 
   return (
     <div className="relative">
-      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card border border-border sm:h-96" />
+      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card shadow-card sm:h-96" />
       {!loaded && !error && <p role="status" className="pointer-events-none absolute inset-x-0 inset-bs-0 grid h-80 place-items-center text-sm text-muted sm:h-96">Loading map…</p>}
       {loaded && emptyText && <p className="pointer-events-none absolute inset-x-0 inset-bs-0 grid h-80 place-items-center sm:h-96"><span className="pc-float px-3 py-2 text-sm font-semibold text-muted">{emptyText}</span></p>}
-      {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-56 rounded-card border border-border bg-surface p-2 text-sm text-muted">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
+      {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-64 rounded-card bg-surface px-4 py-3 text-xs text-muted shadow-card">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
       {onPin && <button type="button" disabled={!ready} onClick={() => {
         const center = map.current?.getCenter().wrap();
         if (center) onPin({ lat: center.lat, lon: center.lng });
-      }} className="mbs-2 min-h-11 rounded-card border border-border bg-surface px-4 text-sm font-semibold text-brand disabled:opacity-50">Use map center as pin</button>}
+      }} className="pc-link mbs-2 text-xs disabled:opacity-50">Use map center as pin</button>}
     </div>
   );
 }

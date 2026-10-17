@@ -38,7 +38,7 @@ const approach = {
 };
 const site = { id: "big-bend", name: "Big Bend", county: "Hillsborough", timezone: "America/New_York", hazard_index: 5, top_hazard: "heat", lightning_approach: approach };
 const lightning = { id: "stop-1", site_id: site.id, type: "lightning", started_at: approach.updated_at, all_clear_at: approach.arrival_at, last_strike_distance_mi: 3 };
-const cell = { id: "cell-1", lat: 28, lon: -82, radius_mi: 10, flash_count: 100, recent_flashes: 25, tracked: true, speed_mph: 18, heading_deg: 90, moving_toward: "E", last_flash_at: approach.updated_at };
+const cell = { id: "cell-1", lat: 28, lon: -82, radius_mi: 10, flash_count: 100, recent_flashes: 25, tracked: true, speed_mph: 18, heading_deg: 90, moving_toward: "E", last_flash_at: approach.updated_at, replay: false };
 const detail = { ...require("../../shared/mocks/site_details.json")[site.id], ...site };
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 const Chip = load("components/LightningApproachChip.tsx").default;
@@ -46,7 +46,8 @@ const helpers = load("lib/lightning.ts");
 const chipProps = { approach, nowMs, stopWork: false, unconfirmed: false };
 
 function advisory(html) {
-  assert.match(html, /LIGHTNING POSSIBLE WITHIN THE HOUR/);
+  assert.match(html, /Lightning possible within the hour/);
+  assert.match(html, /Advisory/, "reads as an advisory, not a confirmed alert");
   assert.match(html, /Storm approaching from the W at 18 mph/);
   assert.doesNotMatch(html, /20:57|4:57|17 min|arrival_at|role="timer"|All clear/);
 }
@@ -70,7 +71,7 @@ test("stale and unknown advisories stay visible, grey with ? and Not confirmed; 
   ]) {
     const html = render(Chip, props);
     advisory(html);
-    assert.match(html, /Unconfirmed/);
+    assert.match(html, /unconfirmed/i);
     assert.doesNotMatch(html, /WITHIN THE HOUR \?/);
     assert.match(html, /Last known/);
     assert.match(html, /Not confirmed/);
@@ -90,7 +91,7 @@ test("dashboard cards suppress advisories for a stop-work, including last-known 
   for (const alertsUnconfirmed of [false, true]) {
     const html = render(Card, { site, nowMs, alerts: [lightning], alertsUnconfirmed, selected: true });
     assert.match(html, /STOP WORK/);
-    assert.doesNotMatch(html, /LIGHTNING POSSIBLE|Storm approaching/);
+    assert.doesNotMatch(html, /Lightning possible|Storm approaching/i);
   }
   assert.match(render(Card, { site, nowMs, approachUnconfirmed: true, selected: true }), /Not confirmed/);
   assert.match(render(Card, { site, nowMs }), /Lightning possible/);
@@ -101,6 +102,7 @@ const baseState = { alerts: [], status: "live", replay: null, connection: { leve
 function modules(state, extra = {}) {
   return {
     "@/components/AlertsProvider": { useAlertsState: () => state, useServerNow: () => () => nowMs },
+    "@/components/ViewModeProvider": { useViewMode: () => ({ mode: state.viewMode ?? "live", setMode() {} }) },
     "@/components/BriefingCard": nullComponent,
     "@/components/HazardPanel": nullComponent,
     "@/components/SiteScoreHistory": nullComponent,
@@ -122,7 +124,12 @@ test("site detail shows the advisory, respects stop-work priority, and labels co
     if (state.status === "demo") assert.match(html, /Demo data/);
   }
   const Detail = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [lightning] })).default;
-  assert.doesNotMatch(render(Detail, { siteId: site.id, initialDetail: detail }), /LIGHTNING POSSIBLE/);
+  assert.doesNotMatch(render(Detail, { siteId: site.id, initialDetail: detail }), /Lightning possible/i);
+  // A replay stop-work is only a secondary tag: it never hides a real advisory.
+  const Replay = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [{ ...lightning, replay: true }] })).default;
+  const replayHtml = render(Replay, { siteId: site.id, initialDetail: detail });
+  advisory(replayHtml);
+  assert.ok(replayHtml.indexOf("Lightning possible") < replayHtml.indexOf("Replay"), "the real advisory comes before the replay tag");
   const Offline = load("components/SiteDetailView.tsx", modules({ ...baseState, status: "stale", connection: { level: "offline", lastSuccessAt: nowMs } })).default;
   const html = render(Offline, { siteId: site.id, initialDetail: detail });
   advisory(html);
@@ -169,7 +176,7 @@ test("crew view shows direction and speed and gives known stop-work priority", (
     const html = renderToStaticMarkup(driver.render(selected.type, selected.props));
     if (state.alerts?.length) {
       assert.match(html, /STOP WORK/);
-      assert.doesNotMatch(html, /LIGHTNING POSSIBLE/);
+      assert.doesNotMatch(html, /Lightning possible/i);
     } else {
       advisory(html);
       if (state.alerts === null) assert.match(html, /Not confirmed/);
@@ -212,6 +219,20 @@ test("untracked or stationary cells get circles only; old and failed cells are m
   }
 });
 
+test("storm cells: each layer on its own clock, so real cells stay current during a replay", () => {
+  const real = Date.parse("2026-10-17T22:00:00Z"), sim = Date.parse("2025-08-04T22:20:00Z");
+  const realCell = { ...cell, id: "cell-1", last_flash_at: new Date(real - 60_000).toISOString() };
+  const replayCell = { ...cell, replay: undefined, id: "replay-cell-1", last_flash_at: new Date(sim - 60_000).toISOString() };
+  assert.equal(helpers.cellIsReplay(realCell, real), false);
+  assert.equal(helpers.cellIsReplay(replayCell, real), true, "the replay- id prefix");
+  assert.equal(helpers.cellIsReplay({ ...realCell, replay: true }, real), true, "the explicit flag wins");
+  assert.equal(helpers.cellUnconfirmed(realCell, sim, real), false, "a fresh real cell during a replay");
+  assert.equal(helpers.cellUnconfirmed(replayCell, sim, real), false, "a fresh replay cell on the replay clock");
+  const features = helpers.stormCellsGeoJson([realCell, replayCell], sim, false, false, real).features.filter(f => f.geometry.type === "Polygon");
+  assert.equal(JSON.stringify(features.map(f => f.properties.replay)), "[false,true]");
+  assert.ok(features.every(f => !f.properties.uncertain));
+});
+
 test("storm cells share lightning polling, speed up in replay, retain failed data, and isolate demo data", async () => {
   const driver = hookDriver();
   let polls, failCells = false, failFlashes = false, cellReads = 0;
@@ -228,8 +249,10 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   });
   Object.assign(overrides["@/lib/api"], {
     getSites: async () => [site],
-    getLightningRecent: async () => { if (failFlashes) throw Error("offline flashes"); return [{ lat: 28, lon: -82, ts: approach.updated_at }]; },
+    getLightningRecent: async () => { if (failFlashes) throw Error("offline flashes"); return [{ lat: 28, lon: -82, ts: approach.updated_at, replay: false }]; },
     getLightningCells: async () => { cellReads++; if (failCells) throw Error("offline cells"); return [cell]; },
+    // A server without #48's counts endpoint: the dashboard counts the flashes it has.
+    getLightningCounts: async () => { throw Error("404 Not Found"); },
   });
   const Dashboard = load("components/SupervisorDashboard.tsx", overrides).default;
   const draw = () => { polls = []; return driver.render(Dashboard, { initialSites: [site] }); };
@@ -268,4 +291,94 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   assert.equal(map(tree).demo, true);
   assert.equal(map(tree).cells, overrides["@/lib/api"].DEMO_DATA.lightningCells);
   assert.match(renderToStaticMarkup(tree), /Demo data/);
+});
+
+// ---------- View mode: one moment at a time, per device ----------
+
+const replayStop = { ...lightning, id: "replay-stop-1", replay: true, all_clear_at: "2025-08-04T22:40:00Z" };
+const realStop = { ...lightning, id: "real-stop-1", replay: false };
+
+function dashboard(state) {
+  const driver = hookDriver();
+  const Map = () => null, Card = () => null;
+  const overrides = modules(state, {
+    react: driver.hooks,
+    "@/components/SiteMap": { __esModule: true, default: Map, LIGHTNING_WINDOW_MIN: 15 },
+    "@/components/SiteCard": { __esModule: true, default: Card },
+    "@/components/ReplayControl": nullComponent,
+    "@/lib/useFloodConditions": { useFloodConditions: () => ({}) },
+    "@/lib/usePolling": { usePolling() {} },
+  });
+  Object.assign(overrides["@/lib/api"], { getSites: async () => [site], getLightningRecent: async () => [], getLightningCells: async () => [], getLightningCounts: async () => ({ minutes: 15, real: 0, replay: 0 }) });
+  const Dashboard = load("components/SupervisorDashboard.tsx", overrides).default;
+  const tree = driver.render(Dashboard, { initialSites: [site] });
+  return { tree, map: elements(tree, el => el.type === Map)[0].props, cards: elements(tree, el => el.type === Card), html: renderToStaticMarkup(tree) };
+}
+
+test("Live view (the default) hides the replay: no replay alerts on the map or in the list, only a banner", () => {
+  const running = { running: true, window: "2025-08-04_2200-2300", simulated_now: "2025-08-04T22:20:00Z", files_done: 60, files_total: 180, flashes_ingested: 5000, window_start: "2025-08-04T22:00:00Z", window_end: "2025-08-04T23:00:00Z", quiet_until: "2025-08-04T23:31:00Z" };
+  const { map, cards, html } = dashboard({ ...baseState, alerts: [replayStop], replay: running });
+  assert.equal(map.alerts.length, 0, "no replay alerts on the map");
+  assert.ok(cards.every(card => card.props.alerts.length === 0), "no replay rows");
+  assert.match(html, /A storm replay is running/);
+  assert.match(html, /Watch replay/);
+});
+
+test("Replay view pins a real stop-work on top and keeps it on the map; the list shows the replay's states", () => {
+  const { map, cards, html } = dashboard({ ...baseState, alerts: [replayStop, realStop], viewMode: "replay", replay: { running: true, window: "2025-08-04_2200-2300", simulated_now: "2025-08-04T22:20:00Z", files_done: 60, files_total: 180, flashes_ingested: 5000, window_start: "2025-08-04T22:00:00Z", window_end: "2025-08-04T23:00:00Z", quiet_until: "2025-08-04T23:31:00Z" } });
+  assert.match(html, /aria-label="Live now"/);
+  assert.match(html, /Live now[\s\S]*Big Bend[\s\S]*pc-chip--stop/);
+  assert.ok(map.alerts.some(alert => !alert.replay), "the real stop-work stays on the map (drawn red, the real one wins)");
+  const row = cards.find(card => card.props.site.id === site.id);
+  assert.ok(row.props.alerts.every(alert => alert.replay), "the row shows the replay's state; the real one is pinned");
+  assert.match(html, /Back to live/);
+});
+
+test("starting a replay switches this device to Replay view", async () => {
+  const driver = hookDriver(), modes = [];
+  const Control = load("components/ReplayControl.tsx", {
+    react: driver.hooks,
+    "@/components/AlertsProvider": { useAlertsState: () => ({ ...baseState, refresh: async () => {} }), useServerNow: () => () => nowMs },
+    "@/components/DemoCode": { useDemoCode: () => ({ call: (action) => action(), form: null }) },
+    "@/components/ViewModeProvider": { useViewMode: () => ({ mode: "live", setMode: (mode) => modes.push(mode) }) },
+    "@/lib/api": { startReplay: async () => ({ running: true }), stopReplay: async () => ({}) },
+  }).default;
+  const button = elements(driver.render(Control, {}), el => el.type === "button")[0];
+  button.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(JSON.stringify(modes), '["replay"]');
+});
+
+test("Restart stops and starts the same storm again in one tap, and keeps this device in Replay view", async () => {
+  const driver = hookDriver(), calls = [], modes = [];
+  const running = { running: true, window: "2025-08-04_2200-2300", speed: 30, simulated_now: "2025-08-04T22:20:00Z", files_done: 60, files_total: 180, flashes_ingested: 5000 };
+  const Control = load("components/ReplayControl.tsx", {
+    react: driver.hooks,
+    "@/components/AlertsProvider": { useAlertsState: () => ({ ...baseState, replay: running, refresh: async () => {} }), useServerNow: () => () => nowMs },
+    "@/components/DemoCode": { useDemoCode: () => ({ call: (action) => action(), form: null }) },
+    "@/components/ViewModeProvider": { useViewMode: () => ({ mode: "replay", setMode: (mode) => modes.push(mode) }) },
+    "@/lib/api": { startReplay: async (body) => { calls.push(["start", body.window, body.speed]); return running; }, stopReplay: async () => { calls.push(["stop"]); return {}; } },
+  }).default;
+  const restart = elements(driver.render(Control, {}), el => el.type === "button").find(el => JSON.stringify(el.props.children).includes("Restart"));
+  restart.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(JSON.stringify(calls), '[["stop"],["start","2025-08-04_2200-2300",30]]', "stop first, then the same window and speed from the beginning");
+  assert.equal(JSON.stringify(modes), '["replay"]');
+});
+
+test("view mode is per device: one device in Replay view leaves another in Live view", () => {
+  const device = () => {
+    const storage = new Map();
+    const exports = {};
+    const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, "../lib/viewMode.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    vm.runInNewContext(source, { exports, require, window: { localStorage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) } } });
+    return exports;
+  };
+  const a = device(), b = device();
+  assert.equal(a.readViewMode(), "live", "Live by default");
+  a.writeViewMode("replay");
+  assert.equal(a.readViewMode(), "replay");
+  assert.equal(b.readViewMode(), "live", "another device stays Live");
+  const { shown, pinned } = a.alertsForView([replayStop, realStop], "live");
+  assert.equal(JSON.stringify([shown.map(x => x.id), pinned.length]), '[["real-stop-1"],0]');
 });

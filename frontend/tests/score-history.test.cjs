@@ -102,12 +102,12 @@ test("missing, short (under 6 runs) and duplicate-only series show Not enough hi
 test("risk zones have fixed 0–10 geometry, latest point uses shared risk bands, and stale/demo states are explicit", () => {
   const html = renderChart({});
   for (const band of ["green", "amber", "red"]) assert.match(html, new RegExp(`fill-risk-${band}-bg`));
-  assert.match(html, /Latest 7\.0/);
+  assert.match(html, /3:00 PM run · 7\.0/, "a run label, never a bare 'Latest' that could contradict the row");
   assert.match(html, /r="4\.5" class="fill-risk-red stroke-surface"/);
   assert.match(html, /Oct 16, 3:00 PM CDT · 7\.0 \/ 10/);
   assert.match(html, /cx="592" cy="33\.2/);
   const stale = renderChart({ unconfirmed: true });
-  assert.match(stale, /Latest 7\.0 \?/);
+  assert.match(stale, /3:00 PM run · 7\.0 \?/);
   assert.match(stale, /Not confirmed/);
   assert.match(stale, /stroke-muted/);
   assert.doesNotMatch(stale, /fill-risk-(?:red|amber|green)/);
@@ -115,6 +115,14 @@ test("risk zones have fixed 0–10 geometry, latest point uses shared risk bands
   for (const [score, band] of [[3.9, "green"], [4, "amber"], [6.9, "amber"], [7, "red"]]) {
     assert.match(renderChart({ history: { ...history, points: [point(-5, 3), point(-4, 3), point(-3, 3), point(-2, 3), point(-1, 3), point(0, score)] } }), new RegExp(`r="4.5" class="fill-risk-${band}`));
   }
+});
+
+test("a stop-work spike says so in its tooltip, and axis labels drop the zone where the page states it", () => {
+  const spike = { ...history, points: [...history.points.slice(0, -1), point(0, 9, { top_hazard: "lightning" })] };
+  assert.match(renderChart({ history: spike }), /9\.0 \/ 10 · Stop-work active at this run/);
+  const stated = renderChart({ zoneStated: true });
+  assert.match(stated, />Oct 16, 3:00 PM</);
+  assert.doesNotMatch(stated, />Oct 16, 3:00 PM CDT</);
 });
 
 test("tooltips work with keyboard, hover and touch and always use the site's timezone", () => {

@@ -4,18 +4,29 @@ import { pageMetadata } from "@/lib/metadata";
 export const metadata = pageMetadata("About", "About PlanIT Control and adding the field safety app to your phone’s home screen.");
 
 export default function AboutPage() {
-  return <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
-    <header><h1 className="pc-title">About PlanIT Control</h1><p className="mbs-2 text-lg">Job-site safety for utility field crews.</p></header>
-    <section className="space-y-3 rounded-card border border-border bg-surface p-5">
-      <h2 className="text-xl font-bold">Your site, at a glance</h2>
-      <p>Check lightning stop-work alerts, flood risk, site readings, crew hazard reports, and next-day briefings. Built for the Sperry Tech challenge at SwampHacks XII.</p>
+  return <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
+    <header className="flex flex-col gap-2">
+      <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em]">About PlanIT Control</h1>
+      <p className="text-muted">Job-site safety for utility field crews.</p>
+    </header>
+    <section className="pc-panel flex flex-col items-start gap-4 p-6 max-sm:p-5">
+      <h2 className="text-xl font-semibold">Your site, at a glance</h2>
+      <p className="max-w-[68ch]">Check lightning stop-work alerts, flood risk, site readings, crew hazard reports, and next-day briefings. Built for the Sperry Tech challenge at SwampHacks XII.</p>
       <Link href="/crew" className="pc-btn pc-btn--primary">Open crew view</Link>
     </section>
-    <section className="space-y-3 rounded-card border border-border bg-surface p-5">
-      <h2 className="text-xl font-bold">Add to your home screen</h2>
-      <p><strong>iPhone:</strong> Open this site in Safari, tap Share, then Add to Home Screen. Choose Open as Web App if it is shown.</p>
-      <p><strong>Android:</strong> Open this site in Chrome, open the browser menu, then choose Add to Home screen or Install app.</p>
-      <p className="text-muted">The home-screen app opens Crew view. Live conditions and reporting need a server connection; unavailable safety data stays marked unknown.</p>
+    <section className="pc-panel flex flex-col gap-4 p-6 max-sm:p-5">
+      <h2 className="text-xl font-semibold">Add to your home screen</h2>
+      <dl className="flex flex-col gap-4">
+        <div className="grid gap-x-6 sm:grid-cols-[6rem_minmax(0,1fr)]">
+          <dt className="font-semibold">iPhone</dt>
+          <dd className="max-w-[68ch]">Open this site in Safari, tap Share, then Add to Home Screen. Choose Open as Web App if it is shown.</dd>
+        </div>
+        <div className="grid gap-x-6 sm:grid-cols-[6rem_minmax(0,1fr)]">
+          <dt className="font-semibold">Android</dt>
+          <dd className="max-w-[68ch]">Open this site in Chrome, open the browser menu, then choose Add to Home screen or Install app.</dd>
+        </div>
+      </dl>
+      <p className="max-w-[68ch] text-xs text-muted">The home-screen app opens Crew view. Live conditions and reporting need a server connection; unavailable safety data stays marked unknown.</p>
     </section>
   </main>;
 }

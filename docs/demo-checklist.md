@@ -5,10 +5,10 @@
 | Real time after **Replay storm** | Simulated | What happens |
 |---|---|---|
 | 0:00 | 6:00 PM | **Okeechobee** goes to stop-work (strike 6.6 mi away) |
-| ≈ 0:21 | 6:10 PM | **Vandolah: lightning possible.** Beacon **yellow**, `STORM NEARBY`, 3 beeps (LCD text pending A's REPLAY label) |
-| ≈ 1:09 | 6:34 PM | **Vandolah: stop-work.** Beacon **red**, `STOP WORK 30:00` counting down at 30×, 3 beeps (LCD text pending A's REPLAY label) |
+| ≈ 0:21 | 6:10 PM | **Vandolah: lightning possible.** Beacon **yellow**, `REPLAY Vandolah` / `STORM NEARBY`, 3 beeps |
+| ≈ 1:09 | 6:34 PM | **Vandolah: stop-work.** Beacon **red**, `REPLAY Vandolah` / `STOP WORK 30:00` counting down at 30×, 3 beeps |
 | 2:00 | 7:00 PM | Last satellite file. Quiet period; countdowns finish |
-| ≈ 2:49 | 7:24 PM | Vandolah all clear: beacon **green** |
+| ≈ 2:49 | 7:24 PM | Vandolah all clear: beacon **green**, `Vandolah Power S` / `ALL CLEAR` |
 | ≈ 2:59 | 7:29:36 PM | **Okeechobee clears**, exactly 30 min after its last strike |
 | ≈ 3:02 | 7:31 PM | Replay ends; the app is back on live data by itself |
 
@@ -18,7 +18,7 @@
 - **Counts:** **High risk**, **Stop work** and the nav badge count real alerts only. The replay's counts are on the dark replay panel.
 - **Index:** the score shown is the live one (`hazard_index_live`). A replay-raised score gets a dashed blue outline, never a real red.
 
-**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** _(Pending A's change: until the beacon firmware adds the REPLAY label, its LCD shows the same text as for a real alert.)_ The beacon shows the site's combined state, and a real stop-work always wins.
+**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** On the beacon, a replay stop-work or approach puts `REPLAY` before the site name on line 1 (`REPLAY Vandolah`); a real alert shows the plain site name. **Any real alert always beats a replay on the beacon:** a real stop-work, storm warning, flood alert or unknown always shows over the replay. The replay's state shows only when the real state is clear.
 
 ## 1. Preflight (15 minutes before)
 
@@ -32,62 +32,78 @@
   - Then it blinks yellow `NO DATA` until the API answers, and settles on the live state for **Vandolah** (line 1 `Vandolah Power S`). That's green `ALL CLEAR` unless there's a real storm.
 - [ ] **Demo code** at hand (it isn't written here). On the laptop browser, press **Replay storm** once, enter the code (the browser remembers it), then press **Stop replay**. The real demo then starts with one click.
 - [ ] **Phone and power bank** charged:
-  - Open `https://stormsafecrews.us/crew` and set **Your site** to **Okeechobee Clean Energy Center** (it's remembered).
+  - Open `https://stormsafecrews.us/crew` and set **Your site** to **Vandolah Power Station** (it's remembered), the same site as the beacon.
+  - Leave **Read alerts aloud** off: it's off after every page load, and you turn it on in the demo. Turn the phone's volume up.
   - Allow the camera for the report.
 - [ ] **Deploy freeze:** from 30 minutes before judging until after, no merges to `main` (Vercel builds the site from it) and no `deploy/update.sh` on the server. A restart only pauses the API for a few seconds: Caddy retries for up to 10 s instead of showing an error. But a restarted server rebuilds the replay's event list (about 30 s) and forgets the last replay.
 
-## 2. The 3-minute demo
+## 2. The 4-minute demo
 
-**0:00. Dashboard.**
-- **Say:** "Live hazards for 55 real Florida power plants: lightning, heat, flooding, soil, wildfire and wildlife, scored 0–10. The map shows where, and the list ranks sites by risk."
-- **Click:** **Replay storm** on the replay panel. If asked, enter the demo code.
+Press **Replay storm** about **5 seconds in**; after that the replay runs on its own while you talk. The talk times below assume that: talk time = replay time + 0:05. If you press later, every replay moment moves by the same amount.
 
-**0:05. The storm comes in.**
-- **Watch:** flashes fill the map, and Okeechobee is already in stop-work.
-- **Say:** "This is the real satellite record of a real storm, going through the same code as live. Replay alerts are blue on screen and labeled REPLAY on the beacon, so nobody mistakes them for a real one." _(Beacon label pending A's change.)_
+| Talk | Replay | Moment |
+|---|---|---|
+| 0:05 | 0:00 | Replay starts; Okeechobee is in stop-work at once |
+| 0:26 | 0:21 | **Vandolah yellow**: beacon `REPLAY Vandolah` / `STORM NEARBY` |
+| 1:14 | 1:09 | **Vandolah red**: beacon `REPLAY Vandolah` / `STOP WORK 30:00` |
+| 2:05 | 2:00 | Storm data ends; countdowns keep running |
+| 2:54 | 2:49 | **Vandolah all clear**: beacon green; the phone says it aloud |
+| 3:04 | 2:59 | Okeechobee clears |
+| 3:07 | 3:02 | Replay ends; the app is back on live data |
 
-**≈ 0:21. Vandolah: yellow.**
-- **Beacon:** yellow, `STORM NEARBY`, three beeps.
-- **Screen:** Vandolah's row shows **REPLAY · LIGHTNING POSSIBLE WITHIN THE HOUR**.
-- **Say:** "Our storm-cell forecast tracked this cell about 24 simulated minutes before it arrived. We don't show minutes, because arrival estimates ran late."
+**0:00–0:30. The problem, and start the replay.**
+- **Say:** "Crews decide every day whether it's safe to work. The data exists: lightning, heat, floods, fires, gators. But it's scattered. PlanIT puts it on one screen for 55 Florida power plants."
+- **Click** (about 0:05): **Replay storm**. Enter the demo code if asked.
+- **Say:** "This is a real storm, August 4, 2025, replayed through our live system at 30 times speed."
 
-**≈ 1:09. Vandolah: red.**
-- **Beacon:** red, `STOP WORK 30:00`, counting down.
-- **Screen:** Vandolah gets a blue **Stop work** chip with a countdown, and a dashed blue ring on the map.
-- **Say:** "A strike within 10 miles stops work. All clear is 30 minutes after the last strike."
-- Press the beacon button to silence the beeps.
+**0:30–1:15. The dashboard; Vandolah warns, then stops.**
+- **Show:** the map and **Sites by risk**.
+- **Say:** "Every site gets a 0-to-10 hazard index, ranked by risk."
+- **≈ 0:26:** the beacon turns **yellow** and beeps. On screen, Vandolah's row shows **REPLAY · Lightning possible**.
+- **Say:** "Our forecast tracks storm cells. It warned Vandolah about 24 storm minutes ahead. We don't show a countdown: arrival estimates run late."
+- **≈ 1:14:** the beacon turns **red**, `STOP WORK 30:00`. Press its button to silence it.
+- **Say:** "Lightning within 10 miles. Stop work."
 
-**1:20. Okeechobee's countdown.** Click its row in **Sites by risk** (replay stop-work sites sort right after any real ones). Optionally, hold the beacon button 2 s to switch it to Okeechobee.
-- **Say:** "Every new strike within 10 miles resets the 30 minutes. Okeechobee reset 177 times in this storm, and it clears exactly 30 minutes after its final strike, even if satellite files arrive late."
+**1:15–2:00. The stop-work rule, Okeechobee's resets, REPLAY labels.**
+- **Show:** Okeechobee's row in **Sites by risk**, with its countdown jumping back up.
+- **Say:** "The rule: a strike within 10 miles stops work. All clear is 30 minutes after the last strike, and every new strike resets it. Okeechobee reset 177 times in this storm."
+- **Say:** "It runs on strike time, so a late satellite file can never cut a countdown short."
+- **Show:** the blue chips and REPLAY tags, and the dark replay panel's **Key events**.
+- **Say:** "Replay alerts are blue and labeled REPLAY, on screen and on the beacon. A real alert always wins."
 
-**1:40. Replay panel.**
-- **Show:**
-  - The timeline from **Storm start** to **Storm end**.
-  - **Flashes per 5 min** and **Replay sites in stop-work**.
-  - **Key events**, newest first: Stop work, Lightning possible, All clear.
-- **Say:** "Every stop-work, warning and all-clear, as it happened."
+**2:00–2:45. The crew view on a phone, a hazard report, read-aloud.**
+- **Show:** the phone: **Your site** is Vandolah, in **STOP WORK** with a REPLAY tag and countdown.
+- **Tap:** **Read alerts aloud** on. The phone says "Read aloud on for Vandolah Power Station."
+- **Say:** "This is the foreman's view: one site, big and clear. It can speak alerts, hands-free."
+- **Tap:** **Report hazard**:
+  1. Take a photo.
+  2. **What did you see?** **Other**.
+  3. Site **Away from a site / unknown**.
+  4. **Use my location**.
+  5. **Submit hazard report**.
+- **Say:** "Crews report hazards with a photo and a map pin. A report near a site raises that site's card."
 
-**2:00. Phone: crew view.**
-- **Show:** **Your site** shows Okeechobee's **STOP WORK** with its REPLAY tag and countdown.
-- **Say:** "This is what the foreman sees."
+**2:45–3:30. Briefings, the model, the honest limits.**
+- **≈ 2:54:** the beacon turns **green**, and the phone says "Replay: All clear at Vandolah Power Station. Stop work has ended." Pause and point at both.
+- **Show:** the **Briefings** tab, and open one.
+- **Say:** "Every evening at 6, Claude writes a briefing for each site. Code checks every number against the data, and the go or no-go call is made in code, never by the model."
+- **Say:** "The index is a LightGBM model on archived forecasts. On a year it never saw, it ranks risky days three to four times better than the baselines."
+- **Say:** "But 58% of hazard days still looked green. So the index plans the day, and the stop-work engine protects the crew."
 
-**2:15. Phone: crew hazard report.** Tap **Report hazard**, then:
-1. Take a photo.
-2. **What did you see?** **Other**.
-3. Site **Away from a site / unknown**.
-4. **Use my location**.
-5. **Submit hazard report**.
+**3:30–4:00. Florida first, and the close.**
+- **Say:** "We started with Florida. The lightning satellite covers the Americas, so a new region needs its sites and a retrained model."
+- **Say:** "And PlanIT never says all clear without data. When it doesn't know, it says unknown. Thank you."
+- The replay ended at about 3:07 on its own; the app is back on live data.
 
-It's a real report: it appears on the dashboard map with its age. Reports within 2 miles of a site raise that site's card, which is why it's away from a site here.
+### The 60-second version
 
-**2:35. Briefings tab.**
-- **Show:** Go / Caution / No-go counts, then open one ("Written by Claude").
-- **Say:** "Every number in it is checked against the site's data, it stays under 150 words, and Claude Haiku rereads it. If a check fails, it falls back to Gemini, then a template. The go / no-go call is made in code, never by the model."
-
-**2:50. The model, in one line.**
-- **Say:** "The index comes from a LightGBM model trained on archived forecasts against NOAA storm reports. It ranks risky days 3–4 times better than the baselines. But 58% of logged hazard days still looked green, so the index plans the day, and the live stop-work engine protects the crew."
-
-**≈ 3:00. Okeechobee clears; ≈ 3:02 the replay ends.** The app is back on live data with no reload, and the beacon is green again (with no real storm).
+Press **Replay storm** as you start talking (talk time = replay time).
+- **0:00.** "PlanIT puts lightning, heat, flood, fire and wildlife risk on one screen, for 55 Florida power plants. This is a real storm, replayed at 30 times speed."
+- **0:10.** "A strike within 10 miles stops work. All clear is 30 minutes after the last strike, and every strike resets it: Okeechobee here reset 177 times."
+- **≈ 0:21:** the beacon turns yellow. "And the beacon just turned yellow: our forecast saw this storm heading for Vandolah about 24 minutes ahead."
+- **0:35.** Show the phone. "The crew sees it on a phone, can hear it read aloud, and can report a hazard with a photo."
+- **0:45.** "Every evening, Claude writes a fact-checked briefing for each site. And when we're missing data, we say unknown, never all clear."
+- **If they stay:** Vandolah turns red at 1:09.
 
 ## 3. Likely judge questions
 

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import { useDemoCode } from "@/components/DemoCode";
+import { useViewMode } from "@/components/ViewModeProvider";
 import { startReplay, stopReplay } from "@/lib/api";
+import { clearDemoCode, getDemoCode } from "@/lib/demoCode";
 
 function formatSimulated(ms: number) {
   return new Date(ms).toLocaleString("en-US", {
@@ -26,6 +28,10 @@ export default function ReplayControl() {
   const [message, setMessage] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
   const demoCode = useDemoCode();
+  const { setMode } = useViewMode();
+  // Whether this device remembers the demo code (24 h), read after mount and after each action.
+  const [codeSaved, setCodeSaved] = useState(false);
+  useEffect(() => { setCodeSaved(getDemoCode() !== null); }, [busy]);
   const running = replay?.running ?? false;
   // Offline, the replay may have finished or been stopped: show what was last seen, not "running".
   const offline = connection.level !== "online";
@@ -55,11 +61,11 @@ export default function ReplayControl() {
 
   const stopIcon = <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" fill="currentColor" /></svg>;
   const playIcon = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor" /></svg>;
-  const simulated = (label: string, time: string, detail: string, muted = false) => (
+  const simulated = (label: string, time: string, detail?: string, muted = false) => (
     <p role="status" className={`grid leading-tight ${muted ? "text-muted" : ""}`}>
-      <span className="pc-label text-muted">{label}</span>
+      <span className="text-xs text-muted">{label}</span>
       <span className="font-mono text-xl font-bold tabular-nums">{time}</span>
-      <span className="text-xs text-muted">{detail}</span>
+      {detail && <span className="text-xs text-muted">{detail}</span>}
     </p>
   );
 
@@ -72,23 +78,31 @@ export default function ReplayControl() {
         </>
       ) : running ? (
         <>
-          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger">
+          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger rounded-pill bg-transparent px-5">
             {stopIcon}{busy ? "Stopping…" : "Stop replay"}
           </button>
+          {/* One tap, no confirmation: stop (which waits until the replay has stopped), then start the same
+              storm from the beginning. Without a remembered demo code it's asked for once, then retried. */}
+          <button type="button" disabled={busy} onClick={() => void run(async () => { await stopReplay(); await startReplay({ window: replay?.window ?? undefined, speed: replay?.speed ?? undefined }); setMode("replay"); })}
+            className="pc-btn rounded-pill border-text/40 bg-transparent px-5 text-text">
+            {busy ? "Restarting…" : "Restart"}
+          </button>
           <span className="pc-chip pc-chip--quiet text-[0.8125rem]" title="Simulated seconds per real second">{replay?.speed}×</span>
-          {simulated("Simulated time", now === null ? "--" : formatSimulated(now), `${replay?.files_done}/${replay?.files_total} files · ${replay?.flashes_ingested.toLocaleString()} flashes`)}
+          {simulated("Simulated time", now === null ? "--" : formatSimulated(now))}
         </>
       ) : (
         <button
           type="button"
           disabled={busy || unavailable}
-          onClick={() => void run(() => startReplay())}
+          // Starting a replay switches this device (only) to Replay view.
+          onClick={() => void run(async () => { await startReplay(); setMode("replay"); })}
           title={unavailable ? "Needs a connection to the server" : "Play a recorded storm through the live pipeline on a simulated clock"}
-          className="pc-btn pc-btn--primary"
+          className="pc-btn rounded-pill border-text/40 bg-transparent px-5 text-text"
         >
           {playIcon}{busy ? "Starting…" : "Replay storm"}
         </button>
       )}
+      {codeSaved && !demoCode.form && <button type="button" onClick={() => { clearDemoCode(); setCodeSaved(false); }} className="pc-link text-xs text-muted">Forget demo code</button>}
       {demoCode.form}
       {message && <p role="alert" className="w-full font-semibold text-risk-red">Replay: {message}</p>}
     </div>
