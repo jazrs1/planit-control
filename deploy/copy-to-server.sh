@@ -112,7 +112,11 @@ if [ -d "$U/replay" ]; then
   echo "Replay windows: $(ls "$APP/data/replay" | tr '\n' ' ')"
 fi
 if [ -d "$U/uploads" ]; then
-  cp -R -n "$U/uploads/." /var/lib/planit/uploads/
+  # Keep existing photos. Not `cp -n`: on Ubuntu 24.04 (coreutils 9.4) it exits 1 when it skips a file.
+  for f in "$U/uploads"/*; do
+    [ -e "$f" ] || continue
+    [ -e "/var/lib/planit/uploads/${f##*/}" ] || cp -R "$f" /var/lib/planit/uploads/
+  done
   chown -R planit:planit /var/lib/planit/uploads
 fi
 rm -rf "$U"
