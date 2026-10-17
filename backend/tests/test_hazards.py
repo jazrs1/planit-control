@@ -77,3 +77,12 @@ def test_missing_sources_say_so_instead_of_guessing():
     cards = score_site(inputs(firms_detail="skipped: FIRMS_MAP_KEY not set"), {})["cards"]
     assert cards["heat"]["reading"] == "No live heat data yet" and "hazard_status" not in cards["heat"]
     assert "no FIRMS key" in cards["wildfire"]["reading"] and "hazard_status" not in cards["wildfire"]
+
+
+def test_firms_ignores_plant_hot_spots():
+    from hazards.sources.firms import plant_hot_spots
+    plant = {"id": "p", "lat": 30.0, "lon": -85.0}
+    at_stack = {"lat": 30.0005, "lon": -85.0005}          # ~0.05 mi: the plant's own heat
+    grass_fire = {"lat": 30.05, "lon": -85.0}             # ~3.5 mi away
+    kept, ignored = plant_hot_spots([at_stack, grass_fire], [plant])
+    assert kept == [grass_fire] and ignored == 1

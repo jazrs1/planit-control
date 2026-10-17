@@ -226,6 +226,9 @@ def wildfire(inp: Inputs) -> Hazard:
         reading = f"Fire detected {nearest:.1f} mi away at {_time(detected_at, inp.site)} ({count} within 25 mi in 24 h)"
     else:
         reading = "No fires detected within 25 mi in the last 24 h"
+    hot_spots = int(_value(inp, "wildfire", "plant_hot_spots_ignored") or 0)
+    if hot_spots:
+        reading += f"; {hot_spots} hot spot{'s' if hot_spots != 1 else ''} at the plant ignored (plant heat)"
     if nws_alert:
         reading = f"{_until(nws_alert, inp.site)}. {reading}"
     card.update({"nearest_detection_mi": nearest, "detected_at": detected_at,
