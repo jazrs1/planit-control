@@ -42,10 +42,12 @@ SYSTEM = f"""You write next-day safety briefings for utility field crew supervis
 Use ONLY the facts in the JSON you are given. Never add a hazard, number, time, place or
 distance that is not in the JSON, and copy every number and time exactly as it is written there
 (for example "2 PM", "0.25", "6:52 AM"). Skip anything that is null, empty, or "unavailable".
+Don't mention a hazard the JSON doesn't have, even to say it won't happen: write "dry", not
+"no thunderstorms"; "moist ground", not "not saturated".
 Return JSON with:
 - "headline": one sentence about the day; do not repeat the go/no-go word, it is added for you.
 - "risks": the 3 most important risks, most important first, each with when it happens.
-- "actions": 2 to 4 concrete, plain-language actions tied to those risks, e.g. when to start and
+- "actions": 2 or 3 concrete, plain-language actions tied to those risks, e.g. when to start and
   finish heavy work, expecting lightning stops (use the rules in the JSON), bringing mats for
   vehicles on wet ground, checking for snakes or alligators before staging.
 Crew reports in "crew_reports_last_48_h_within_2_mi" are what crews saw on site: always mention a
