@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     briefing_hour: int = 18
     gemini_model: str = "gemini-3.8-flash"
     gemini_min_interval_seconds: float = 4.0   # ~15 requests/minute
+    gemini_concurrency: int = 4                # briefings written at once (calls take up to ~90 s)
     # Contact info sent in the User-Agent to NWS, FEMA, iNaturalist, etc. (NWS requires one).
     nws_contact: str = "https://github.com/jazrs1/planit-control"
 

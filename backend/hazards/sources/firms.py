@@ -4,7 +4,12 @@ Needs FIRMS_MAP_KEY (free: https://firms.modaps.eosdis.nasa.gov/api/map_key/). W
 poll is skipped and recorded as such, and wildfire cards say satellite detection is off.
 
 Writes per site (wildfire): nearest_detection_mi, nearest_detection_epoch, nearest_confidence
-(0 low, 1 nominal, 2 high), detections_25mi. NaN means no detection over Florida.
+(0 low, 1 nominal, 2 high), detections_25mi, plant_hot_spots_ignored. NaN means no detection.
+
+Power plants are hot: VIIRS flags their stacks and flares as "fires", and the near-real-time feed
+has no industrial flag. Detections within PLANT_HOT_SPOT_KM of any of our sites are therefore
+treated as plant heat and not counted as wildfire (they stay in fire_detections). Trade-off: a
+real fire inside that ring would be missed.
 """
 
 import csv
@@ -25,6 +30,8 @@ SOURCES = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"]
 CONFIDENCE = {"l": "low", "n": "nominal", "h": "high", "low": "low", "nominal": "nominal", "high": "high"}
 CONFIDENCE_CODE = {"low": 0, "nominal": 1, "high": 2}
 NEARBY_MI = 25
+PLANT_HOT_SPOT_KM = 1.0
+PLANT_HOT_SPOT_MI = PLANT_HOT_SPOT_KM / 1.609344
 
 
 class SkipSource(Exception):
@@ -51,7 +58,9 @@ def fetch(key: str) -> list[dict]:
     area = f"{lon0:.2f},{lat0:.2f},{lon1:.2f},{lat1:.2f}"
     detections = []
     for source in SOURCES:
-        text = http.get(f"{API}/{key}/{source}/{area}/1", accept="text/csv", retries=2).decode()
+        # Day range 1 is "today's UTC date" only (empty just after midnight UTC), so ask for 2 days;
+        # poll() keeps the last 24 hours.
+        text = http.get(f"{API}/{key}/{source}/{area}/2", accept="text/csv", retries=2).decode()
         if not text.startswith("latitude"):
             raise ValueError(f"FIRMS {source}: {text[:80]}")  # e.g. "Invalid MAP_KEY."
         detections += parse_csv(text)
@@ -64,17 +73,25 @@ def _miles(lat1, lon1, lat2, lon2) -> float:
     return 2 * 3958.8 * math.asin(math.sqrt(h))
 
 
-def site_readings(site: dict, detections: list[dict]) -> list[tuple[str, str, float]]:
+def plant_hot_spots(detections: list[dict], sites: list[dict]) -> tuple[list[dict], int]:
+    """(detections that may be wildfire, count ignored as a plant's own heat)."""
+    kept = [d for d in detections
+            if all(_miles(s["lat"], s["lon"], d["lat"], d["lon"]) > PLANT_HOT_SPOT_MI for s in sites)]
+    return kept, len(detections) - len(kept)
+
+
+def site_readings(site: dict, detections: list[dict], ignored_here: int = 0) -> list[tuple[str, str, float]]:
     nan = float("nan")
+    tail = [("wildfire", "plant_hot_spots_ignored", float(ignored_here))]
     if not detections:
         return [("wildfire", "nearest_detection_mi", nan), ("wildfire", "nearest_detection_epoch", nan),
-                ("wildfire", "nearest_confidence", nan), ("wildfire", "detections_25mi", 0.0)]
+                ("wildfire", "nearest_confidence", nan), ("wildfire", "detections_25mi", 0.0)] + tail
     dist = [(_miles(site["lat"], site["lon"], d["lat"], d["lon"]), d) for d in detections]
     miles, nearest = min(dist, key=lambda x: x[0])
     return [("wildfire", "nearest_detection_mi", round(miles, 2)),
             ("wildfire", "nearest_detection_epoch", nearest["ts"].timestamp()),
             ("wildfire", "nearest_confidence", float(CONFIDENCE_CODE.get(nearest["confidence"], 1))),
-            ("wildfire", "detections_25mi", float(sum(1 for m, _ in dist if m <= NEARBY_MI)))]
+            ("wildfire", "detections_25mi", float(sum(1 for m, _ in dist if m <= NEARBY_MI)))] + tail
 
 
 def poll(pool: ConnectionPool, sites: list[dict], now: datetime) -> str:
@@ -88,6 +105,8 @@ def poll(pool: ConnectionPool, sites: list[dict], now: datetime) -> str:
                VALUES (%(ts)s, %(lat)s, %(lon)s, %(satellite)s, %(confidence)s, %(frp_mw)s)
                ON CONFLICT DO NOTHING""", detections)
     recent = [d for d in detections if d["ts"] >= now - timedelta(hours=24)]
-    rows = [(s["id"], now, hz, m, v, NAME) for s in sites for hz, m, v in site_readings(s, recent)]
+    fires, ignored = plant_hot_spots(recent, sites)
+    rows = [(s["id"], now, hz, m, v, NAME) for s in sites for hz, m, v in site_readings(
+        s, fires, sum(1 for d in recent if _miles(s["lat"], s["lon"], d["lat"], d["lon"]) <= PLANT_HOT_SPOT_MI))]
     write_readings(pool, rows)
-    return f"{len(recent)} detections over Florida in 24 h"
+    return f"{len(recent)} detections over Florida in 24 h ({ignored} ignored as plant hot spots)"

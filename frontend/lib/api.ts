@@ -1,4 +1,4 @@
-import type { Alert, ApiError, Briefing, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, SendBriefingRequest, SendBriefingResponse, SiteDetail, StartReplayRequest } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningFlash, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
@@ -54,6 +54,8 @@ export const getSites = () => request<Site[]>("/sites");
 export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
+/** Latest briefing for every site in one request (cached on the server). */
+export const getBriefings = () => request<BriefingsResponse>("/briefings");
 /** 404 means the site has no briefing yet (see ApiRequestError.status). */
 export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
 /** One site: generated right away. All sites (no site_id): queued in the background. */

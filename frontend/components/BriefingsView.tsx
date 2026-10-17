@@ -12,10 +12,11 @@ import type { BriefingResult } from "@/lib/loadBriefings";
 import { usePolling } from "@/lib/usePolling";
 
 // Briefings change once a day (6 PM site time) or on send-now, so poll slowly, except right after
-// "Send briefings now", when they arrive one by one from the background job.
+// "Send briefings now", when they arrive one by one from the background job (all 55 take ~15-20 min
+// with Gemini). Each poll is one cached GET /briefings, so following for longer is cheap.
 const POLL_MS = 5 * 60_000;
 const FOLLOW_MS = 5_000;
-const FOLLOW_FOR_MS = 3 * 60_000;
+const FOLLOW_FOR_MS = 25 * 60_000;
 const RETRY_MS = 5_000;
 
 type Filter = "all" | GoStatus;

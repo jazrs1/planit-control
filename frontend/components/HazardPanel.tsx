@@ -79,7 +79,7 @@ export default function HazardPanel({ title, card, rows, freshness, timeZone, no
 
       <p className="mt-auto text-xs text-muted">
         {freshness.kind === "live"
-          ? connectionLost ? "Last known before the connection was lost" : "Live"
+          ? status === null ? "No live reading" : connectionLost ? "Last known before the connection was lost" : "Live"
           : asOf === null
             ? "No live reading yet"
             : <>
