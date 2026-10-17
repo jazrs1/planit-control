@@ -279,7 +279,8 @@ def alerts_changed(now: datetime, *, replay: bool) -> None:
         if not _active():
             return
         with _state:
-            _latest_now[replay] = now
+            # Keep the latest: the flood rule and the forecast thread can report an older `now` than the engine.
+            _latest_now[replay] = max(now, _latest_now.get(replay, now))
             if _queued[replay]:
                 return
             _queued[replay] = True
