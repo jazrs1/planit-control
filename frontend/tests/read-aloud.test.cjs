@@ -42,12 +42,18 @@ test("unknown is never all clear: it says the connection was lost, once", () => 
   assert.deepEqual(say(stopped, readAloudState(site, [], "live", null, NOW), true), ["All clear at Big Bend. Stop work has ended."]);
 });
 
-test("replay alerts are prefixed and a cleared replay stop-work ends", () => {
-  const before = readAloudState(site, [], "live", null, NOW);
-  const replay = readAloudState(site, [stop({ replay: true })], "live", null, NOW);
+test("replay alerts are prefixed, and a replay ending is never an all clear", () => {
+  const before = readAloudState(site, [], "live", null, NOW, true);
+  const replay = readAloudState(site, [stop({ replay: true })], "live", null, NOW, true);
   assert.deepEqual(say(before, replay), ["Replay: Stop work at Big Bend. Lightning 3.2 miles away."]);
-  const cleared = readAloudState(site, [stop({ replay: true })], "live", null, Date.parse("2026-10-17T20:41:00Z"));
-  assert.deepEqual(say(replay, cleared), ["Replay: All clear at Big Bend. Stop work has ended."]);
+  // Its countdown ran out on the replay clock while the replay goes on.
+  const cleared = readAloudState(site, [stop({ replay: true })], "live", null, Date.parse("2026-10-17T20:41:00Z"), true);
+  assert.deepEqual(say(replay, cleared), ["Replay: Stop work ended at Big Bend."]);
+  // The replay was stopped partway: its stop-work and flood risk vanish together, said once.
+  const both = readAloudState(site, [stop({ replay: true }), stop({ id: "a2", type: "flood", replay: true })], "live", null, NOW, true);
+  const stoppedReplay = readAloudState(site, [], "live", null, NOW, false);
+  assert.deepEqual(say(both, stoppedReplay), ["Replay ended at Big Bend."]);
+  for (const line of [...say(replay, cleared), ...say(both, stoppedReplay)]) assert.doesNotMatch(line, /All clear/);
 });
 
 test("a lightning advisory is spoken, and a replay stop-work doesn't hide a real one", () => {

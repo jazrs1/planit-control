@@ -5,12 +5,14 @@ import { HAZARD_LABEL } from "@/lib/risk";
 // What the crew view's read-aloud says. Pure, so the rules are testable:
 // - one site only, and only when its state changes (a new strike resetting the countdown is not a change);
 // - replay alerts are prefixed "Replay:";
+// - only a real stop-work ending says "All clear": a replay ending says "Replay ended" (stopped partway)
+//   or "Replay: Stop work ended" (its countdown ran out while the replay goes on);
 // - unknown is never "All clear": an alert can only end while the alert state is known.
 
 /** The site's spoken state: unknown, or the set of active things, each with its own key. */
 export type ReadAloudState =
   | { known: false }
-  | { known: true; items: Map<string, string> };
+  | { known: true; items: Map<string, string>; replayRunning: boolean };
 
 /** Alert state that can't be trusted: no data yet, or the connection dropped. */
 export function alertsKnown(alerts: Alert[] | null, status: string) {
@@ -19,7 +21,7 @@ export function alertsKnown(alerts: Alert[] | null, status: string) {
 
 const miles = (text: string) => text.replace(/ mi$/, " miles");
 
-export function readAloudState(site: Pick<Site, "id" | "name">, alerts: Alert[] | null, status: string, approach: LightningApproach | null | undefined, replayNowMs: number | null): ReadAloudState {
+export function readAloudState(site: Pick<Site, "id" | "name">, alerts: Alert[] | null, status: string, approach: LightningApproach | null | undefined, replayNowMs: number | null, replayRunning = false): ReadAloudState {
   if (!alertsKnown(alerts, status)) return { known: false };
   const items = new Map<string, string>();
   const mine = (alerts ?? []).filter((alert) => alert.site_id === site.id);
@@ -41,17 +43,21 @@ export function readAloudState(site: Pick<Site, "id" | "name">, alerts: Alert[] 
   if (approach && !items.has(`lightning:${approach.replay ? "replay" : "real"}`)) {
     items.set(`approach:${approach.replay ? "replay" : "real"}`, `${approach.replay ? "Replay: " : ""}Lightning possible within the hour at ${site.name}.`);
   }
-  return { known: true, items };
+  return { known: true, items, replayRunning };
 }
 
-/** What ending a state sounds like. An advisory ending says nothing: that's not an all clear. */
-function ended(key: string, siteName: string): string | null {
+/** What ending a state sounds like. An advisory ending says nothing: that's not an all clear. Only a real
+ *  stop-work ending is "All clear"; a stopped replay is just "Replay ended". */
+function ended(key: string, siteName: string, replayRunning: boolean): string | null {
   const [type, kind] = key.split(":");
-  const prefix = kind === "replay" ? "Replay: " : "";
-  if (type === "lightning") return `${prefix}All clear at ${siteName}. Stop work has ended.`;
-  if (type === "flood") return `${prefix}Flood risk has ended at ${siteName}.`;
   if (type === "approach") return null;
-  return `${prefix}${HAZARD_LABEL[type as keyof typeof HAZARD_LABEL] ?? "Alert"} alert has ended at ${siteName}.`;
+  if (kind === "replay") {
+    if (!replayRunning) return `Replay ended at ${siteName}.`;
+    return type === "lightning" ? `Replay: Stop work ended at ${siteName}.` : type === "flood" ? `Replay: Flood risk ended at ${siteName}.` : `Replay: Alert ended at ${siteName}.`;
+  }
+  if (type === "lightning") return `All clear at ${siteName}. Stop work has ended.`;
+  if (type === "flood") return `Flood risk has ended at ${siteName}.`;
+  return `${HAZARD_LABEL[type as keyof typeof HAZARD_LABEL] ?? "Alert"} alert has ended at ${siteName}.`;
 }
 
 /** The lines to speak going from `previous` (the last known state) to `next`, in priority order:
@@ -64,8 +70,9 @@ export function readAloudChanges(siteName: string, previous: ReadAloudState, nex
   for (const [key, text] of next.items) if (!before.has(key)) lines.push({ order: order(key), text });
   for (const key of before.keys()) {
     if (next.items.has(key)) continue;
-    const text = ended(key, siteName);
+    const text = ended(key, siteName, next.replayRunning);
     if (text) lines.push({ order: order(key), text });
   }
-  return lines.sort((a, b) => a.order - b.order).map((line) => line.text);
+  // A stopped replay ends all its alerts at once: say "Replay ended" once.
+  return [...new Set(lines.sort((a, b) => a.order - b.order).map((line) => line.text))];
 }

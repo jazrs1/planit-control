@@ -18,6 +18,7 @@ const SECTIONS = [
   { id: "stop-work", label: "Stop-work rule" },
   { id: "index", label: "Hazard index" },
   { id: "model", label: "Machine learning model" },
+  { id: "briefing", label: "Next-day briefing" },
   { id: "limits", label: "Honest limits" },
   { id: "replay", label: "Replay mode" },
 ];
@@ -227,6 +228,25 @@ export default async function HowItWorksPage() {
           <p className="mbs-2 max-w-[68ch] text-muted">{modelInfo.hybrid}</p>
         </details>}
         <ModelExplanation info={modelInfo} />
+      </Section>
+
+      <Section id="briefing" title="Next-day briefing" takeaway="Every evening at 6 PM site time, each site gets go, caution or no-go for tomorrow. Fixed rules in code make the call, never the AI writer.">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xl font-semibold">No-go only for a named hard stop during work hours</h3>
+          <p className="max-w-[68ch] text-muted">Work hours are 7 AM to 5 PM site time. The briefing names the stop and when it applies, for example: “NO-GO for Thursday, Jul 16: Flood Warning 7 AM-3 PM.”</p>
+        </div>
+        <ul className="flex max-w-[68ch] list-disc flex-col gap-2 ps-5">
+          <li><strong>An NWS warning</strong> in effect during work hours: Hurricane, Tropical Storm, Tornado, Flood (including Flash Flood and Coastal Flood), or Excessive or Extreme Heat. A Red Flag Warning counts when a fire is within 10 mi.</li>
+          <li><strong>Very high heat:</strong> OSHA&apos;s very high band at the work-hours peak.</li>
+          <li><strong>A confirmed fire within 5 mi:</strong> seen on 2 or more satellite passes, or with high confidence. One pass is a reason to check, not to stop.</li>
+          <li><strong>A crew report</strong> of a downed line or site flooding in the last 48 hours.</li>
+          <li><strong>3 in or more of rain during work hours when both forecasts agree:</strong> our forecast and the NWS forecast must each reach 3 in.</li>
+        </ul>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xl font-semibold">Everything else is at most caution</h3>
+          <p className="max-w-[68ch]">A high hazard index on its own, hazards outside work hours, thunderstorms likely during work hours, any other NWS watch or warning, a fire seen on one satellite pass, heavy rain in only one forecast, or a heat-illness report. Rain that falls mostly after work hours gets a plan-ahead action instead: secure tools and materials, and expect soft ground the next morning.</p>
+        </div>
+        <p className="max-w-[68ch] text-muted">Claude writes the briefing from the same facts (then Gemini, then a fixed template). Every number and hazard word is checked against the input before it&apos;s sent, and when our rain forecast and the NWS forecast are far apart, the app shows the range instead of the higher one.</p>
       </Section>
 
       <Section id="limits" title="Honest limits" takeaway="What this system can't tell you, so nobody over-trusts it.">

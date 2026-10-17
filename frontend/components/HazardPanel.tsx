@@ -35,6 +35,8 @@ type HazardPanelProps = {
   /** The one number the card leads with ("91°F"), and what it is ("Heat index now"). */
   value: string | null;
   caption: string;
+  /** An optional small secondary line under the caption ("NWS: 7.1 in"). */
+  note?: string | null;
   rows: HazardRow[];
   freshness: Freshness;
   timeZone: string;
@@ -45,7 +47,7 @@ type HazardPanelProps = {
   children?: ReactNode;
 };
 
-export default function HazardPanel({ title, card, value, caption, rows, freshness, timeZone, nowMs, connectionLost, children }: HazardPanelProps) {
+export default function HazardPanel({ title, card, value, caption, note = null, rows, freshness, timeZone, nowMs, connectionLost, children }: HazardPanelProps) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
   const status = card?.hazard_status ?? null;
@@ -83,6 +85,7 @@ export default function HazardPanel({ title, card, value, caption, rows, freshne
           <div className={uncertain ? "text-muted" : ""}>
             <p className="text-[2rem] font-semibold leading-tight tracking-[-0.01em]">{value ?? "—"}</p>
             <p className="text-xs text-muted">{caption}</p>
+            {note && <p className="text-xs text-muted">{note}</p>}
           </div>
         )}
 
