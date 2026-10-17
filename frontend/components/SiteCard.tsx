@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Alert, FloodConditions, Site } from "@shared/types";
 import AlertBanner from "@/components/AlertBanner";
+import LightningApproachChip from "@/components/LightningApproachChip";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 import { timeZoneAbbr } from "@/lib/time";
 
@@ -20,11 +21,14 @@ type SiteCardProps = {
   alerts?: Alert[];
   flood?: FloodConditions;
   alertsUnconfirmed?: boolean;
+  approachUnconfirmed?: boolean;
+  nowMs?: number | null;
+  demo?: boolean;
   selected?: boolean;
   onSelect?: () => void;
 };
 
-export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, selected, onSelect }: SiteCardProps) {
+export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, approachUnconfirmed = false, nowMs = null, demo = false, selected, onSelect }: SiteCardProps) {
   const risk = RISK_STYLES[riskLevel(site.hazard_index)];
 
   return (
@@ -57,6 +61,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
       {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className="rounded-card border border-border px-3 py-2 text-left text-sm text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">{selected ? "Selected on map" : "Show on map"}</button>}
 
       {alerts.map((alert) => <AlertBanner key={alert.id} alert={alert} site={site} flood={flood} compact unconfirmed={alertsUnconfirmed} />)}
+      <LightningApproachChip approach={site.lightning_approach} stopWork={alerts.some((alert) => alert.type === "lightning")} unconfirmed={approachUnconfirmed} nowMs={nowMs} demo={demo} />
     </article>
   );
 }

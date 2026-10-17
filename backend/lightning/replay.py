@@ -6,9 +6,10 @@ The app clock (app/clock.py) is switched to a simulated clock that starts at the
 first file and runs `speed` times faster, and each file is ingested when the simulated clock
 reaches the moment it would have appeared live (its start + 20 s). After the last file it keeps
 cycling with no new flashes for 31 simulated minutes so alert countdowns can finish (status shows
-files_done == files_total while still running). The live loop pauses
-meanwhile (ingest_lock), so /lightning/recent, the alert hook and anything else using clock.now() see the
-replayed storm as live.
+files_done == files_total while still running). /lightning/recent and anything else using
+clock.now() see the replayed storm as live. Replay cycles write replay alerts (replay = true); the
+live loop keeps ingesting on real time meanwhile, so real stop-work alerts stay current and
+GET /alerts shows both.
 """
 
 import asyncio
@@ -32,11 +33,6 @@ REPLAY_DIR = BACKEND_DIR / "data" / "replay"
 # enough for every 30-minute all-clear countdown to finish.
 QUIET_TAIL = timedelta(minutes=31)
 FILE_PERIOD = timedelta(seconds=glm.FILE_SECONDS)
-
-# Held by the live loop for each cycle and by a replay for its whole run, so the two never
-# interleave (and the alert hook never sees real and simulated `now` mixed together).
-ingest_lock = asyncio.Lock()
-
 
 def available_windows() -> list[str]:
     if not REPLAY_DIR.exists():
@@ -87,10 +83,6 @@ class ReplayRunner:
         }
 
     async def _run(self, pool: ConnectionPool, files: list[Path]) -> None:
-        async with ingest_lock:  # waits for an in-flight live cycle, then pauses live polling
-            await self._replay(pool, files)
-
-    async def _replay(self, pool: ConnectionPool, files: list[Path]) -> None:
         names = [p.name for p in files]
         start = glm.file_start(names[0])
         end = glm.file_start(names[-1]) + timedelta(seconds=glm.FILE_SECONDS)
@@ -109,7 +101,7 @@ class ReplayRunner:
                     # moment instead of letting simulated time race ahead of the data.
                     clock.start_simulation(due, self.speed)
                 result = await asyncio.to_thread(
-                    glm.ingest_cycle, pool, [(path.name, path.read_bytes)], clock.now())
+                    glm.ingest_cycle, pool, [(path.name, path.read_bytes)], clock.now(), True)
                 self.files_done += 1
                 self.flashes_ingested += len(result.new_flashes)
             log.info("Replay %s: all files in (%d Florida flashes); quiet tail for countdowns",
@@ -117,7 +109,7 @@ class ReplayRunner:
             tail_end = end + QUIET_TAIL
             while clock.now() < tail_end:
                 await clock.sleep_until(min(clock.now() + FILE_PERIOD, tail_end))
-                await asyncio.to_thread(glm.ingest_cycle, pool, [], clock.now())
+                await asyncio.to_thread(glm.ingest_cycle, pool, [], clock.now(), True)
             log.info("Replay %s finished", self.window)
         except asyncio.CancelledError:
             log.info("Replay %s stopped after %d/%d files", self.window, self.files_done, self.files_total)

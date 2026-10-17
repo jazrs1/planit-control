@@ -5,7 +5,8 @@
     "type": "lightning",
     "started_at": "2026-10-16T16:12:00-04:00",
     "all_clear_at": "2026-10-16T17:08:00-04:00",
-    "last_strike_distance_mi": 2.4
+    "last_strike_distance_mi": 2.4,
+    "replay": false
   },
   {
     "id": "alt_20261016_deerhaven_fld",
@@ -13,6 +14,7 @@
     "type": "flood",
     "started_at": "2026-10-16T11:00:00-04:00",
     "all_clear_at": null,
-    "last_strike_distance_mi": null
+    "last_strike_distance_mi": null,
+    "replay": false
   }
 ]

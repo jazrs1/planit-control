@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Alert, FloodStatus, OshaHeatRisk, SiteDetail, SoilLevel } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
+import { ReplayTag } from "@/components/AlertBanner";
 import BriefingCard from "@/components/BriefingCard";
 import HazardPanel from "@/components/HazardPanel";
+import LightningApproachChip from "@/components/LightningApproachChip";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
@@ -82,18 +84,18 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
         alert.type === "lightning" ? (
           <article key={alert.id} className="flex flex-col gap-3 rounded-card border border-risk-red bg-risk-red p-4 text-surface shadow-card sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-lg font-bold">⚡ STOP WORK: lightning</p>
+              <p className="text-lg font-bold">{alert.replay && <ReplayTag />}⚡ STOP WORK: lightning</p>
               <p className="text-sm">
                 {/* Same rounding as every other page: down, so a strike inside 10 mi never reads 10.0. */}
                 {formatStrikeDistance(alert.last_strike_distance_mi) === null ? "Lightning within 10 mi." : `Last strike ${formatStrikeDistance(alert.last_strike_distance_mi)} away.`}
                 {" "}Each new strike restarts the 30-minute wait.
               </p>
             </div>
-            <div className="shrink-0 sm:min-w-56"><StopWorkCountdown all_clear_at={alert.all_clear_at} /></div>
+            <div className="shrink-0 sm:min-w-56"><StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} /></div>
           </article>
         ) : alert.type === "flood" ? (
           <article key={alert.id} className="rounded-card border border-risk-amber bg-risk-amber-bg p-4 text-risk-amber shadow-card">
-            <p className="text-lg font-bold">FLOOD RISK</p>
+            <p className="text-lg font-bold">{alert.replay && <ReplayTag />}FLOOD RISK</p>
             <p className="text-sm">
               {alert.all_clear_at
                 ? `NWS flood warning in effect until ${formatSiteDateTime(alert.all_clear_at, timeZone)}.`
@@ -103,7 +105,7 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
           </article>
         ) : (
           <article key={alert.id} className="rounded-card border border-risk-red bg-risk-red-bg p-4 text-risk-red shadow-card">
-            <p className="text-lg font-bold">{HAZARD_LABEL[alert.type].toUpperCase()} ALERT</p>
+            <p className="text-lg font-bold">{alert.replay && <ReplayTag />}{HAZARD_LABEL[alert.type].toUpperCase()} ALERT</p>
             <p className="text-sm">Started {formatSiteDateTime(alert.started_at, timeZone)}.</p>
           </article>
         ),
@@ -262,6 +264,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       </header>
 
       <SiteAlerts alerts={siteAlerts} timeZone={tz} alertsUnknown={alerts === null} />
+      <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : serverNow()} demo={demo} />
 
       <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4 shadow-card">
         <h2 id="nws-heading" className="text-base font-semibold">National Weather Service alerts</h2>

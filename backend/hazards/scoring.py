@@ -114,9 +114,15 @@ def heat(inp: Inputs) -> Hazard:
     peak_time = datetime.fromtimestamp(peak_at, timezone.utc) if peak_at else None
     as_of = _as_of(inp, "heat", "heat_index_f")
     peak_past = peak_time is not None and as_of is not None and peak_time < as_of
-    reading = f"Heat index {hi_now:.0f}°F now; today {'peaked at' if peak_past else 'peaks at'} {peak:.0f}°F"
-    reading += f" at {_time(peak_time, inp.site)}" if peak_time else ""
-    reading += f" (OSHA {OSHA_LABEL[band]} risk)"
+    if peak_past:
+        # Today's peak is behind us (e.g. it was at midnight, or it's evening): lead with what's left,
+        # the same window the card's color uses.
+        reading = (f"Heat index {hi_now:.0f}°F now; up to {rest:.0f}°F for the rest of today "
+                   f"(OSHA {OSHA_LABEL[osha_risk_band(round(rest))]} risk)")
+    else:
+        reading = f"Heat index {hi_now:.0f}°F now; today peaks at {peak:.0f}°F"
+        reading += f" at {_time(peak_time, inp.site)}" if peak_time else ""
+        reading += f" (OSHA {OSHA_LABEL[band]} risk)"
     if nws_alert:
         reading = f"{_until(nws_alert, inp.site)}. {reading}"
     card = {"risk_band": band, "peak_heat_index_f": round(peak, 1), "peak_at": peak_time,
@@ -239,12 +245,20 @@ def wildfire(inp: Inputs) -> Hazard:
     count = int(_value(inp, "wildfire", "detections_25mi") or 0)
     detected = _value(inp, "wildfire", "nearest_detection_epoch")
     conf = _value(inp, "wildfire", "nearest_confidence")
-    score = 8 if nearest is not None and nearest <= 5 else 6 if nearest is not None and nearest <= 10 else \
+    # Danger within 5 mi only once confirmed: seen on 2+ satellite passes in 24 h, or high confidence.
+    # A single pass is often a one-off, so it counts as watch. (Readings from before passes_5mi existed
+    # keep the old rule until the next FIRMS poll.)
+    passes, high = _value(inp, "wildfire", "passes_5mi"), _value(inp, "wildfire", "high_confidence_5mi")
+    confirmed = passes is None or passes >= 2 or (high or 0) >= 1
+    close = nearest is not None and nearest <= 5
+    score = (8 if confirmed else 6) if close else 6 if nearest is not None and nearest <= 10 else \
         4 if nearest is not None and nearest <= 25 else 0
     score = max(score, nws_score)
     detected_at = datetime.fromtimestamp(detected, timezone.utc) if detected else None
+    one_pass = close and not confirmed
     if nearest is not None and nearest <= 25:
-        reading = f"Fire detected {nearest:.1f} mi away at {_time(detected_at, inp.site)} ({count} within 25 mi in 24 h)"
+        reading = (f"Fire detected {nearest:.1f} mi away at {_time(detected_at, inp.site)}"
+                   f"{', seen on one satellite pass only' if one_pass else ''} ({count} within 25 mi in 24 h)")
     else:
         reading = "No fires detected within 25 mi in the last 24 h"
     hot_spots = int(_value(inp, "wildfire", "plant_hot_spots_ignored") or 0)
@@ -256,7 +270,8 @@ def wildfire(inp: Inputs) -> Hazard:
                  "confidence": {0: "low", 1: "nominal", 2: "high"}.get(int(conf)) if conf is not None else None,
                  "detections_25mi": count, "hazard_status": status_for(score), "reading": reading,
                  "as_of": _as_of(inp, "wildfire", "detections_25mi")})
-    label = nws_alert["event"] if level == 2 else f"Fire detected {nearest:.0f} mi away" if score >= 4 else ""
+    label = nws_alert["event"] if level == 2 else \
+        f"Fire detected {nearest:.0f} mi away{' (one satellite pass)' if one_pass else ''}" if score >= 4 else ""
     return Hazard(card, score, score, label, label)
 
 

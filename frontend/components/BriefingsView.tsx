@@ -5,6 +5,7 @@ import type { Briefing, GoStatus, Site } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import BriefingCard from "@/components/BriefingCard";
 import type { BriefingEntry } from "@/components/BriefingCard";
+import { useDemoCode } from "@/components/DemoCode";
 import { DEMO_DATA, getSites, sendBriefingNow } from "@/lib/api";
 import { GO_LABEL, GO_STYLE } from "@/lib/briefings";
 import { loadBriefings } from "@/lib/loadBriefings";
@@ -55,6 +56,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const demoCode = useDemoCode();
   const generation = useRef(0);
   const liveRef = useRef(live);
   useEffect(() => { liveRef.current = live; }, [live]);
@@ -137,9 +139,12 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
     setSending(true);
     setSendMessage(null);
     try {
-      const res = await sendBriefingNow();
-      setSendMessage({ tone: "ok", text: `Generating ${res.queued} briefings in the background. They appear here as they finish.` });
-      setFollowUntil(Date.now() + FOLLOW_FOR_MS);
+      // Needs the demo code: on a 401 this asks for it, then retries.
+      await demoCode.call(async () => {
+        const res = await sendBriefingNow();
+        setSendMessage({ tone: "ok", text: `Generating ${res.queued} briefings in the background. They appear here as they finish.` });
+        setFollowUntil(Date.now() + FOLLOW_FOR_MS);
+      }, () => void sendAll());
     } catch (err) {
       setSendMessage({ tone: "error", text: `Couldn't send briefings: ${(err as Error).message}` });
     } finally {
@@ -210,6 +215,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
           )
         )}
       </div>
+      {demoCode.form}
       {sendMessage && (
         <p role={sendMessage.tone === "error" ? "alert" : "status"} className={`text-sm ${sendMessage.tone === "error" ? "text-risk-red" : "text-muted"}`}>
           {sendMessage.text}{following && sendMessage.tone === "ok" ? " Checking every 5 seconds…" : ""}

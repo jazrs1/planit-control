@@ -261,7 +261,7 @@ export default async function HowItWorksPage() {
         </div>
         <ul className="list-disc space-y-1 pl-5">
           <li><strong>Why the real pipeline:</strong> it proves the code that protects crews actually works, and it gives exactly the alerts crews would have seen that evening. The alert engine has no clock of its own; it runs on whatever time it&apos;s given.</li>
-          <li>Replay alerts are stored separately and <strong>never mix with live ones</strong>.</li>
+          <li>Replay alerts are stored separately and <strong>never mix with live ones</strong>. Real lightning keeps being tracked during a replay: real alerts stay on screen next to the replay&apos;s, which are tagged REPLAY.</li>
           <li>After the last file, replay runs 31 quiet simulated minutes so every countdown can finish.</li>
           <li>Heat, rain, fire and wildlife stay live during a replay; only lightning is replayed.</li>
         </ul>

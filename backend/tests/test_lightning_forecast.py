@@ -268,4 +268,24 @@ def test_beacon_and_sites_show_the_advisory(conn, monkeypatch):  # noqa: F811
     assert detail["lightning_approach"]["minutes_to_arrival"] in (14, 15)
 
 
+def test_beacon_reports_a_live_stop_work_during_a_replay(conn, monkeypatch):  # noqa: F811
+    import json
+
+    from app import clock
+    from app.cache import TTLCache
+    from app.routers import sites as route
+    from tests.test_crew_reports import FakePool
+    _ensure_table(conn)
+    monkeypatch.setattr(route, "api_cache", TTLCache())
+    real = datetime.now(timezone.utc)
+    conn.execute("DELETE FROM alerts WHERE site_id = 'sanford' AND type = 'lightning' AND status = 'active'")
+    conn.execute("""INSERT INTO alerts (site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay)
+                    VALUES ('sanford', 'lightning', %s, %s, %s, 4.2, false)""",
+                 (real - timedelta(minutes=5), real + timedelta(minutes=25), real - timedelta(minutes=5)))
+    monkeypatch.setattr(clock, "is_simulated", lambda: True)                       # a replay is running,
+    monkeypatch.setattr(clock, "now", lambda: datetime(2025, 8, 4, 22, 5, tzinfo=timezone.utc))  # quiet at Sanford
+    body = json.loads(route.site_beacon("sanford", FakePool(conn)).body)
+    assert body["state"] == "stop" and 24 * 60 < body["seconds_to_all_clear"] <= 25 * 60
+
+
 from tests.test_crew_reports import conn  # noqa: E402,F401 - the rolled-back DB fixture

@@ -1,12 +1,14 @@
-import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningFlash, ModelInfo, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
+import mockLightningCells from "@shared/mocks/lightning_cells.json";
 import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
 
 import mockReports from "@shared/mocks/reports.json";
 import { markFailure, markSuccess } from "@/lib/connection";
+import { demoCodeHeaders } from "@/lib/demoCode";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 
@@ -54,6 +56,7 @@ export const getSites = () => request<Site[]>("/sites");
 export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
+export const getLightningCells = () => request<LightningCellsResponse>("/lightning/cells");
 /** Evaluation artifacts, never demo data. Bound the wait so the explanation remains available offline. */
 export const getModelInfo = () => request<ModelInfo>("/model/info", { signal: AbortSignal.timeout(10_000) });
 /** The plot path comes from /model/info and belongs to the API host, not the frontend host. */
@@ -62,13 +65,15 @@ export const modelCalibrationUrl = (path: ModelInfo["calibration"]["plot_url"]) 
 export const getBriefings = () => request<BriefingsResponse>("/briefings");
 /** 404 means the site has no briefing yet (see ApiRequestError.status). */
 export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
-/** One site: generated right away. All sites (no site_id): queued in the background. */
+/** One site: generated right away. All sites (no site_id): queued in the background; needs the demo
+ *  code (a 401 without it). Protected requests send the demo code when one has been entered. */
 export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
-  request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
+/** Starting or stopping a replay needs the demo code (a 401 without it). */
 export const startReplay = (body: StartReplayRequest = {}) =>
-  request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: "POST" });
+  request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
+export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: "POST", headers: demoCodeHeaders() });
 
 /** shared/mocks, for the explicit "Demo data" mode only. Anything showing these must say so. */
 export const DEMO_DATA = {
@@ -76,6 +81,7 @@ export const DEMO_DATA = {
   sites: mockSites as Site[],
   alerts: mockAlerts as Alert[],
   lightning: mockLightning as LightningFlash[],
+  lightningCells: mockLightningCells as LightningCellsResponse,
   /** Keyed by site id; only the 6 mock sites have one. */
   siteDetails: mockSiteDetails as Record<string, SiteDetail>,
   /** Keyed by site id; only the 6 mock sites have one. */
