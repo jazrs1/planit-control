@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LightningFlash, Site } from "@shared/types";
+import type { LightningCell, LightningFlash, Site } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import ReplayControl from "@/components/ReplayControl";
 import SiteCard from "@/components/SiteCard";
 import SiteMap, { LIGHTNING_WINDOW_MIN } from "@/components/SiteMap";
-import { DEMO_DATA, getLightningRecent, getSites } from "@/lib/api";
+import { DEMO_DATA, getLightningCells, getLightningRecent, getSites } from "@/lib/api";
+import { cellUnconfirmed } from "@/lib/lightning";
 import { riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
 import { countAlerts } from "@/lib/alerts";
@@ -28,6 +29,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const [sitesFailed, setSitesFailed] = useState(initialSites === null);
   const [staleSince, setStaleSince] = useState<Date | null>(null);
   const [liveFlashes, setLiveFlashes] = useState<LightningFlash[]>([]);
+  const [flashesFailed, setFlashesFailed] = useState(false);
+  const [liveCells, setLiveCells] = useState<LightningCell[] | null>(null);
+  const [cellsFailed, setCellsFailed] = useState(false);
   // Same alerts as the nav badge and /alerts (AlertsProvider), so the counts always agree.
   const { alerts: knownAlerts, status: alertsStatus, replay, setDemo, refresh: refreshAlerts, connection } = useAlertsState();
   const serverNow = useServerNow();
@@ -39,13 +43,17 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const replaying = replay?.running ?? false;
   const sites = demo ? DEMO_DATA.sites : liveSites;
   const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
+  const cells = demo ? DEMO_DATA.lightningCells : liveCells;
   // Fade by age on the backend clock (simulated during replay, the demo clock in demo mode).
   // Offline, freeze the fade where it was: with no new data, letting flashes drain away would make
   // the storm look like it passed.
   const offline = connection.level !== "online";
   const lastOnlineNow = useRef<number | null>(null);
-  const nowMs = offline && lastOnlineNow.current !== null ? lastOnlineNow.current : serverNow();
-  useEffect(() => { if (!offline) lastOnlineNow.current = nowMs; });
+  const lightningStale = !demo && (offline || flashesFailed);
+  const nowMs = lightningStale && lastOnlineNow.current !== null ? lastOnlineNow.current : serverNow();
+  useEffect(() => { if (!lightningStale) lastOnlineNow.current = nowMs; });
+  const cellsUnconfirmed = !demo && (offline || cellsFailed);
+  const oldCells = !demo && cells?.some((cell) => cellUnconfirmed(cell, serverNow()));
   const alertsKnown = knownAlerts !== null;
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
@@ -67,12 +75,11 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     }
   }, []);
   const pollLightning = useCallback(async () => {
-    try {
-      const next = await getLightningRecent(LIGHTNING_WINDOW_MIN);
-      setLiveFlashes(next);
-    } catch {
-      // Keep the last flashes; the sites/alerts notices already report the connection.
-    }
+    const [flashes, cells] = await Promise.allSettled([getLightningRecent(LIGHTNING_WINDOW_MIN), getLightningCells()]);
+    if (flashes.status === "fulfilled") { setLiveFlashes(flashes.value); setFlashesFailed(false); }
+    else setFlashesFailed(true);
+    if (cells.status === "fulfilled") { setLiveCells(cells.value); setCellsFailed(false); }
+    else setCellsFailed(true); // Keep the last cells, explicitly marked as unconfirmed.
   }, []);
   usePolling(pollSites, demo ? null : replaying ? REPLAY_MS : liveSites === null ? RETRY_MS : SITES_MS);
   usePolling(pollLightning, demo || liveSites === null ? null : replaying ? REPLAY_MS : LIGHTNING_MS);
@@ -125,10 +132,13 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
       ) : (
         <div className="grid flex-1 lg:min-h-0 lg:grid-cols-[2fr_1fr]">
           <section aria-label="Florida site safety map" className="relative h-[55dvh] min-h-80 lg:h-full">
-            <SiteMap sites={sites} alerts={alerts} flashes={flashes} nowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} />
+            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} />
             <div className="absolute bottom-10 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 text-xs shadow-card" aria-label="Map legend">
               <span className="text-risk-green">● Low &lt; 4</span><span className="text-risk-amber">● Elevated 4–&lt;7</span><span className="text-risk-red">● High ≥ 7</span><span>◎ Lightning stop work</span>
-              <span className="flex items-center gap-1"><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{offline ? "?" : ""}) · {offline ? "last known, fade paused" : "newest brightest"}</span>
+              <span className={`flex items-center gap-1 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{lightningStale ? "?" : ""}) · {lightningStale ? "last known, fade paused" : "newest brightest"}</span>
+              <span role="status" className={cells === null || cellsUnconfirmed || oldCells ? "text-muted" : "text-risk-amber"}>
+                {demo && "Demo data · "}Storm cells: {cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…" : `${cells.length}${cellsUnconfirmed || oldCells ? "? · Last known · Not confirmed" : ""}`} · circle = cell extent, arrow = motion direction; no arrow = stationary or untracked
+              </span>
             </div>
           </section>
           <section aria-label="Sites ranked by hazard index" className="flex min-h-0 flex-col border-t border-border bg-bg lg:border-t-0 lg:border-l">
@@ -153,7 +163,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
             <ul className="relative space-y-3 p-4 lg:overflow-y-auto">
               {sorted.map((site) => <li key={site.id} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }} onClick={() => setSelectedId(site.id)}>
-                <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
+                <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
               </li>)}
             </ul>
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}

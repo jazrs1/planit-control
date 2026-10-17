@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Site } from "@shared/types";
-import { useAlertsState } from "@/components/AlertsProvider";
+import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import AlertBanner from "@/components/AlertBanner";
+import LightningApproachChip from "@/components/LightningApproachChip";
 import CrewReadings from "@/components/CrewReadings";
 import CrewBriefing from "@/components/CrewBriefing";
 import { DEMO_DATA, getSites } from "@/lib/api";
@@ -20,7 +21,8 @@ const RISK = {
 };
 
 function CrewSite({ site }: { site: Site }) {
-  const { alerts, status, replay } = useAlertsState();
+  const { alerts, status, replay, connection } = useAlertsState();
+  const serverNow = useServerNow();
   const { detail, briefing, detailFailed, briefingFailed, loading } = useCrewSiteData(site.id);
   const lightning = alerts?.find((alert) => alert.site_id === site.id && alert.type === "lightning");
   const flood = alerts?.find((alert) => alert.site_id === site.id && alert.type === "flood");
@@ -33,6 +35,7 @@ function CrewSite({ site }: { site: Site }) {
     {replay?.running && <p role="status" className="font-semibold text-muted">Storm replay · Refreshes every 3 seconds</p>}
     <section aria-label="Selected site safety status" className="space-y-3">
       {lightning && <AlertBanner alert={lightning} site={site} compact prominent unconfirmed={alertsUnknown} />}
+      <LightningApproachChip approach={detail?.lightning_approach} stopWork={!!lightning} unconfirmed={detailFailed || alertsUnknown || connection.level !== "online"} nowMs={serverNow()} demo={status === "demo"} />
       {flood && <AlertBanner alert={flood} site={site} compact prominent flood={detailFailed ? undefined : detail?.conditions.flood} unconfirmed={alertsUnknown} />}
       {!lightning && !flood && (alertsUnknown ? <div role="status" className="rounded-card border border-border bg-surface p-5 text-muted">
         <h2 className="text-2xl font-bold">Safety status unknown</h2>

@@ -77,3 +77,14 @@ test("the outage starts 2 minutes after the last success (or page load if none)"
   assert.equal(conn.outageStartsAt({ lastSuccessAt: 1_000, failingSince: 5_000 }, 0), 1_000 + 120_000);
   assert.equal(conn.outageStartsAt({ lastSuccessAt: null, failingSince: 5_000 }, 500), 500 + 120_000);
 });
+
+test("storm-cell requests use the API contract path and reject errors without mock fallback", async () => {
+  let status = 200, requested;
+  const cells = [{ id: "cell-1", lat: 28, lon: -82, radius_mi: 10 }];
+  const { api } = load(async (url) => { requested = url; return json(status, status === 200 ? cells : { detail: "Forecast unavailable" }); });
+  assert.deepEqual(await api.getLightningCells(), cells);
+  assert.equal(requested, "http://api.test/lightning/cells");
+  status = 503;
+  await assert.rejects(api.getLightningCells(), /Forecast unavailable/);
+  assert.ok(api.DEMO_DATA.lightningCells.length > 0);
+});
