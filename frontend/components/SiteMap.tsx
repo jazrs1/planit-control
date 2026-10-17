@@ -7,6 +7,7 @@ import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 import { formatStrikeDistance } from "@/lib/alerts";
 import { paintBasemap } from "@/lib/mapStyle";
+import { formatAgo } from "@/lib/time";
 import { resolveColor } from "@/lib/themeColor";
 
 const LIGHTNING_SOURCE = "recent-lightning";
@@ -236,6 +237,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     show(LIGHTNING_SOURCE, layers.lightning);
     show(`${LIGHTNING_SOURCE}-glow`, layers.lightning);
     show(REPORTS_SOURCE, layers.reports);
+    show(`${REPORTS_SOURCE}-age`, layers.reports);
     show(FIRES_SOURCE, layers.fires);
     show(WILDLIFE_SOURCE, layers.wildlife);
     for (const part of ["fill", "outline", "arrows"]) show(`${CELLS_SOURCE}-${part}`, layers.cells);
@@ -332,8 +334,11 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     if (!styleLoaded || !instance) return;
     const data: GeoJSON.FeatureCollection<GeoJSON.Point> = {
       type: "FeatureCollection",
+      // Reports are real, never replayed, so their age is on real time (the backend clock is simulated
+      // during a replay). Ages refresh with each 60-second reports poll.
       features: reports.filter((report) => Number.isFinite(report.lat) && Number.isFinite(report.lon))
-        .map((report) => ({ type: "Feature", geometry: { type: "Point", coordinates: [report.lon, report.lat] }, properties: { category: report.category } })),
+        .map((report) => ({ type: "Feature", geometry: { type: "Point", coordinates: [report.lon, report.lat] },
+          properties: { category: report.category, age: Number.isFinite(Date.parse(report.created_at)) ? formatAgo(Math.max(0, Date.now() - Date.parse(report.created_at))) : "" } })),
     };
     const source = instance.getSource<GeoJSONSource>(REPORTS_SOURCE);
     if (source) { void source.setData(data); return; }
@@ -341,6 +346,12 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     instance.addLayer({
       id: REPORTS_SOURCE, type: "circle", source: REPORTS_SOURCE,
       paint: { "circle-color": resolveColor("--pc-ink"), "circle-radius": 5, "circle-stroke-color": resolveColor("--pc-surface"), "circle-stroke-width": 2 },
+    });
+    // Each pin's age ("2 h ago") under it.
+    instance.addLayer({
+      id: `${REPORTS_SOURCE}-age`, type: "symbol", source: REPORTS_SOURCE,
+      layout: { "text-field": ["get", "age"], "text-font": ["Montserrat Medium"], "text-size": 11, "text-offset": [0, 1.1], "text-anchor": "top", "text-optional": true },
+      paint: { "text-color": resolveColor("--pc-text"), "text-halo-color": resolveColor("--pc-surface"), "text-halo-width": 1.5 },
     });
   }, [styleLoaded, reports]);
 

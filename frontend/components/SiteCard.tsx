@@ -68,7 +68,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
       {!selected && <StopWorkCountdown all_clear_at={lightning.all_clear_at} replay={lightning.replay} inline />}
     </span>
     : floodAlert ? <span className="flex items-center gap-1">{floodAlert.replay && <ReplayTag />}<span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : "pc-chip--flood"}`}>Flood risk</span>{lastKnown}</span>
-    : approach ? <span className="flex items-center gap-1">{approach.replay && <ReplayTag />}<span className="pc-chip pc-chip--approach">Lightning possible</span></span>
+    : approach ? <span className="flex items-center gap-1">{approach.replay && <ReplayTag />}<span className={`pc-chip ${approach.replay ? "pc-chip--replay-stop" : "pc-chip--approach"}`}>Lightning possible</span></span>
     : <span className={`text-xs font-semibold ${risk.text}`}>{risk.label}</span>;
 
   const row = <>

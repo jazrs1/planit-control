@@ -148,7 +148,7 @@
   .pc-chip--flood { background: var(--pc-risk-amber-solid); color: var(--pc-on-risk-amber); }
   .pc-chip--clear { background: var(--pc-risk-green-solid); color: var(--pc-on-risk-green); }
   .pc-chip--replay { background: var(--pc-notice); color: var(--pc-on-notice); }
-  /* A replay stop-work: blue dashed, never the real solid red. */
+  /* A replay stop-work or replay advisory: blue dashed, never a real safety color. */
   .pc-chip--replay-stop {
     background: var(--pc-surface);
     color: var(--pc-notice);
