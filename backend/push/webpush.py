@@ -4,15 +4,24 @@ A subscription is what the browser's PushManager.subscribe() returns (endpoint +
 is a URL at the browser vendor's push service; we POST the encrypted notification there. Only known
 push services are accepted, so a client can't make the server POST to an arbitrary URL. Endpoints
 are bearer secrets (anyone holding one can push to that device): never log them.
+
+Limits (docs/push-notifications.md):
+  - at most MAX_SUBSCRIPTIONS rows in total; re-subscribing an existing endpoint never counts as new;
+  - the same p256dh key under a second endpoint is refused (browsers make fresh keys per subscription);
+  - only the push service saying 404/410 deletes a subscription right away. Timeouts, 5xx and sends cut
+    off by the deadline are counted in `failures` but never delete one, except that a subscription
+    still failing with no successful delivery (or subscribe / test) for FAILING_FOR is pruned;
+  - per-client limits on new subscriptions are in app/routers/push.py.
 """
 
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 from urllib.parse import urlsplit
 
+import psycopg
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 from py_vapid import Vapid
@@ -25,8 +34,21 @@ log = logging.getLogger(__name__)
 
 # Chrome, Edge, Opera, Samsung and Brave use FCM; Firefox Mozilla autopush; Safari Apple; old Edge WNS.
 PUSH_SERVICE_DOMAINS = ("googleapis.com", "mozilla.com", "push.apple.com", "notify.windows.com")
-SEND_TIMEOUT_SECONDS = 10
+# Per request to the push service (connect, then each read). notify.py also caps a whole fan-out.
+SEND_TIMEOUT_SECONDS = 4
 GONE = (404, 410)   # the push service says the subscription no longer exists
+MAX_SUBSCRIPTIONS = 1000
+# A subscription that is still failing and hasn't worked (delivered, subscribed, test) for this long is
+# pruned. Quiet weeks with nothing to send never delete anyone: it has to be failing.
+FAILING_FOR = timedelta(days=7)
+
+
+class SubscriptionLimitReached(Exception):
+    pass
+
+
+class DuplicateKeys(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -93,13 +115,30 @@ def send(sub: dict, message: Message) -> str:
 SUB_COLUMNS = "id, site_ids, role, created_at, updated_at"
 
 
-def upsert(conn: Connection, endpoint: str, keys: dict, site_ids: list[str] | None, role: str) -> dict:
-    return conn.execute(
-        f"""INSERT INTO push_subscriptions (endpoint, keys, site_ids, role) VALUES (%s, %s, %s, %s)
-            ON CONFLICT (endpoint) DO UPDATE SET keys = EXCLUDED.keys, site_ids = EXCLUDED.site_ids,
-                role = EXCLUDED.role, updated_at = now(), failures = 0
-            RETURNING {SUB_COLUMNS}""",
-        (endpoint, Jsonb(keys), site_ids, role)).fetchone()
+def subscribe(conn: Connection, endpoint: str, keys: dict, site_ids: list[str] | None, role: str,
+              now: datetime) -> tuple[dict, bool]:
+    """Save a subscription: (row, created). An endpoint that's already there is updated in place
+    (sites, role, keys) and marked seen: never a second row, and never counted as new.
+    Raises SubscriptionLimitReached or DuplicateKeys for a new one that isn't allowed."""
+    conn.execute("SELECT pg_advisory_xact_lock(hashtext('push-subscribe'))")   # so the count check can't race
+    try:
+        with conn.transaction():   # savepoint: a duplicate key mustn't abort the caller's transaction
+            updated = conn.execute(
+                f"""UPDATE push_subscriptions SET keys = %s, site_ids = %s, role = %s, updated_at = %s,
+                           last_seen_at = %s, failures = 0
+                    WHERE endpoint = %s RETURNING {SUB_COLUMNS}""",
+                (Jsonb(keys), site_ids, role, now, now, endpoint)).fetchone()
+            if updated is not None:
+                return updated, False
+            if conn.execute("SELECT count(*) AS n FROM push_subscriptions").fetchone()["n"] >= MAX_SUBSCRIPTIONS:
+                raise SubscriptionLimitReached
+            row = conn.execute(
+                f"""INSERT INTO push_subscriptions (endpoint, keys, site_ids, role, created_at, updated_at, last_seen_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING {SUB_COLUMNS}""",
+                (endpoint, Jsonb(keys), site_ids, role, now, now, now)).fetchone()
+    except psycopg.errors.UniqueViolation:   # this p256dh key is already another endpoint's
+        raise DuplicateKeys from None
+    return row, True
 
 
 def delete(conn: Connection, endpoint: str) -> bool:
@@ -111,22 +150,40 @@ def find(conn: Connection, endpoint: str) -> dict | None:
                         (endpoint,)).fetchone()
 
 
+def seen(conn: Connection, sub_id: str, now: datetime) -> None:
+    conn.execute("UPDATE push_subscriptions SET last_seen_at = %s WHERE id = %s", (now, sub_id))
+
+
 def for_site(conn: Connection, site_id: str | None) -> list[dict]:
-    """Subscriptions that want this site (all of them for site_id None)."""
+    """Subscriptions that want this site (all of them for site_id None). Healthy ones first, so a
+    failing subscription waits behind them, not in front."""
     return conn.execute(
         """SELECT id, endpoint, keys, site_ids FROM push_subscriptions
-           WHERE %(site)s::text IS NULL OR site_ids IS NULL OR %(site)s = ANY(site_ids)""",
+           WHERE %(site)s::text IS NULL OR site_ids IS NULL OR %(site)s = ANY(site_ids)
+           ORDER BY failures, last_sent_at DESC NULLS LAST, id""",
         {"site": site_id}).fetchall()
 
 
-def record(conn: Connection, outcomes: dict[str, str]) -> None:
-    """Store send outcomes (subscription id -> 'sent' / 'gone' / 'failed'); 'gone' deletes the row."""
+def record(conn: Connection, outcomes: dict[str, str], now: datetime | None = None) -> None:
+    """Store send outcomes (subscription id -> 'sent' / 'gone' / 'failed'). Only 'gone' (the push service
+    said 404/410) deletes a row. 'failed' (timeout, 5xx, cut off by the deadline, any other error) is
+    only counted. A delivery counts as seen."""
+    now = now or clock.real_now()
     by = {k: [i for i, o in outcomes.items() if o == k] for k in ("sent", "gone", "failed")}
-    if by["gone"]:
-        conn.execute("DELETE FROM push_subscriptions WHERE id = ANY(%s)", (by["gone"],))
-        log.info("Removed %d expired push subscriptions", len(by["gone"]))
     if by["sent"]:
-        conn.execute("UPDATE push_subscriptions SET last_sent_at = now(), failures = 0 WHERE id = ANY(%s)",
-                     (by["sent"],))
+        conn.execute("UPDATE push_subscriptions SET last_sent_at = %s, last_seen_at = %s, failures = 0 "
+                     "WHERE id = ANY(%s)", (now, now, by["sent"]))
     if by["failed"]:
         conn.execute("UPDATE push_subscriptions SET failures = failures + 1 WHERE id = ANY(%s)", (by["failed"],))
+    if by["gone"]:
+        conn.execute("DELETE FROM push_subscriptions WHERE id = ANY(%s)", (by["gone"],))
+        log.info("Removed %d push subscriptions (the push service says they no longer exist)", len(by["gone"]))
+
+
+def prune(conn: Connection, now: datetime) -> int:
+    """Delete subscriptions that are failing and haven't worked for FAILING_FOR."""
+    n = conn.execute("DELETE FROM push_subscriptions WHERE failures > 0 AND last_seen_at <= %s",
+                     (now - FAILING_FOR,)).rowcount
+    if n:
+        log.info("Pruned %d push subscriptions (failing, nothing delivered for %d days)", n, FAILING_FOR.days)
+    return n
