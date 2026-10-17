@@ -19,7 +19,8 @@ from hazards.sources.nws import FIRE_LEVELS, FLOOD_LEVELS, HEAT_LEVELS, STORM_LE
 
 STOP_WORK_FACTOR = "Active stop-work: lightning within 10 mi"
 OSHA_LABEL = {"lower": "lower", "moderate": "moderate", "high": "high", "very_high": "very high"}
-SOIL_DRY_BELOW, SOIL_SATURATED_FROM = 0.15, 0.30   # m³/m³, top 9 cm; see soil_level()
+# m³/m³, GFS 0-10 cm (the hazard model's soil layer); see soil_level().
+SOIL_DRY_BELOW, SOIL_SATURATED_FROM = 0.16, 0.20
 
 
 @dataclass
@@ -140,8 +141,12 @@ def lightning(inp: Inputs) -> Hazard:
 
 
 def soil_level(vwc: float) -> str:
-    """Top-9 cm volumetric water content -> dry / moist / saturated. Florida's sandy soils hold
-    roughly 0.35-0.45 m³/m³ when saturated; 0.30+ is wet enough to rut and bog vehicles."""
+    """GFS 0-10 cm volumetric water content -> dry / moist / saturated. Cutoffs are percentiles of
+    daily soil moisture across all 55 sites in 2022-2023: saturated = the wettest 10% of site-days
+    (>= 0.20, the 90th percentile 0.1996), moist = the next 30% (>= 0.16, the 60th percentile 0.1611).
+    Model soil moisture runs drier than in-situ readings, so these are relative, not field capacity.
+    Sites on Everglades-edge wetland cells (Turkey Point, Miami-Dade Solar, West County, Okeelanta)
+    sit above 0.20 most days. See docs/ml-model.md."""
     return "dry" if vwc < SOIL_DRY_BELOW else "saturated" if vwc >= SOIL_SATURATED_FROM else "moist"
 
 

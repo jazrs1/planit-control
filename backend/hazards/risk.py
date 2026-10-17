@@ -7,16 +7,25 @@ Hybrid index, for today and tomorrow (site-local dates):
     - the ML weather score: the hazard model's calibrated probability mapped to 0-10
       (ml/model.py; scored hourly from the weather poll, hazards/model_scores.py)
     - the OSHA heat-index band score (lower 0-2, moderate 5, high 7.5, very high 9.5)
-    - the wildfire rule (FIRMS distance, red flag), the wildlife rule, and crew reports
+    - the wildfire rule (FIRMS distance), the wildlife rule, and crew reports
       (a crew report that raises a card to watch counts 4.0; today only)
+    - floors that only ever raise the index:
+        an NWS warning for the site (flood, flash flood, coastal flood, severe thunderstorm,
+          tornado, excessive/extreme heat, red flag)                              at least 7
+        an NWS watch or advisory in the same families, or our own flood-risk alert  at least 4
+        a downed-line crew report within 2 mi in the last 48 h (today only)        at least 7
+      Today counts alerts in effect at any point in the rest of today; tomorrow counts only
+      watches and warnings in effect during tomorrow.
   plus the lightning override, today only: while the site has an active stop-work alert, the index
   is at least 9.0 and the first factor is the stop-work.
 
 The ML model is the weather part (storms, rain, flooding); the rules cover what it can't learn
-from its labels (heat, fire, wildlife) and what crews see on the ground. Every factor says whether
-it came from the model or a rule. Factors list the stop-work first, then the winning part's reasons,
-then any other part at watch or above; weight = that part's share of the summed scores (the model's
-share split by its own factor weights). Returns:
+from its labels (heat, fire, wildlife), what crews see on the ground, and what forecasters have
+officially warned about. Every factor says whether it came from the model or a rule. Factors list
+the stop-work first, then warning-level floors (official warnings, downed lines), then the winning
+part's reasons, then any other part at watch or above; weight = that part's share of the summed
+scores (the model's share split by its own factor weights). top_hazard is the first factor's hazard.
+Returns:
 
   hazard_index_today, top_hazard, top_factors            (today, with the lightning override)
   hazard_index_tomorrow, top_hazard_tomorrow, top_factors_tomorrow   (never the override)
@@ -26,14 +35,34 @@ share split by its own factor weights). Returns:
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from hazards.scoring import STOP_WORK_FACTOR, Inputs, score_site
+from hazards.scoring import STOP_WORK_FACTOR, Inputs, ago, score_site
 
 STOP_WORK_MIN = 9.0
+WARNING_FLOOR = 7.0
+WATCH_FLOOR = 4.0
 SHOW_RULES_FROM = 4.0  # rule factors at watch or above are listed even when another source wins
 MAX_FACTORS = 4
+
+# NWS event -> hazard. Warnings floor the index at 7, watches and advisories at 4.
+WARNINGS = {
+    "Flood Warning": "flood", "Flash Flood Warning": "flood", "Coastal Flood Warning": "flood",
+    "Severe Thunderstorm Warning": "lightning", "Tornado Warning": "lightning",
+    "Excessive Heat Warning": "heat", "Extreme Heat Warning": "heat",  # NWS renamed it Extreme in 2025
+    "Red Flag Warning": "wildfire",
+}
+WATCHES = {
+    "Flood Watch": "flood", "Flash Flood Watch": "flood", "Coastal Flood Watch": "flood",
+    "Severe Thunderstorm Watch": "lightning", "Tornado Watch": "lightning",
+    "Excessive Heat Watch": "heat", "Extreme Heat Watch": "heat", "Fire Weather Watch": "wildfire",
+}
+ADVISORIES = {"Flood Advisory": "flood", "Coastal Flood Advisory": "flood", "Heat Advisory": "heat"}  # today only
+NWS_EVENTS = WARNINGS.keys() | WATCHES.keys() | ADVISORIES.keys()
+FLOOD_ALERT_FACTOR = "Flood-risk alert: heavy rain in flood-prone area"
+# The contract's HazardType has no electrical or crew category; a downed line is storm damage.
+DOWNED_LINE_HAZARD = "lightning"
 
 
 @dataclass
@@ -42,6 +71,7 @@ class Component:
     hazard: str            # the component's leading HazardType
     score: float           # 0-10
     factors: list[tuple[str, str, float]] = field(default_factory=list)  # (hazard, label, share of this component)
+    urgent: bool = False   # an official warning or downed line: listed right after the stop-work
 
 
 def _model_component(model: dict | None) -> Component | None:
@@ -51,8 +81,8 @@ def _model_component(model: dict | None) -> Component | None:
     return Component("model", factors[0][0] if factors else "lightning", float(model["score"]), factors)
 
 
-def _rule(hazard: str, score: float, label: str) -> Component | None:
-    return Component("rule", hazard, float(score), [(hazard, label, 1.0)]) if score > 0 and label else None
+def _rule(hazard: str, score: float, label: str, urgent: bool = False) -> Component | None:
+    return Component("rule", hazard, float(score), [(hazard, label, 1.0)], urgent) if score > 0 and label else None
 
 
 def combine(components: list[Component | None], stop_work: bool) -> tuple[float, str, list[dict]]:
@@ -63,8 +93,8 @@ def combine(components: list[Component | None], stop_work: bool) -> tuple[float,
     if stop_work:
         index = max(index, STOP_WORK_MIN)
     shown = [c for c in comps if c.score > 0 and (c is winner or c.score >= SHOW_RULES_FROM)]
+    shown.sort(key=lambda c: not c.urgent)  # stable: urgent first, then winner first by score
     total = sum(c.score for c in shown) + (STOP_WORK_MIN if stop_work else 0.0)
-    # Winner first (its reasons explain the number), then other elevated parts, each in its own order.
     factors = [{"hazard": h, "label": label, "weight": c.score / total * share, "source": c.source}
                for c in shown for h, label, share in sorted(c.factors, key=lambda f: -f[2])]
     if stop_work:
@@ -73,9 +103,72 @@ def combine(components: list[Component | None], stop_work: bool) -> tuple[float,
     factors = factors[:MAX_FACTORS]
     for f in factors:  # floor, so the weights never sum past 1
         f["weight"] = math.floor(f["weight"] * 100) / 100
-    top = "lightning" if stop_work else winner.hazard if winner and winner.score > 0 else (
-        factors[0]["hazard"] if factors else "heat")
+    top = factors[0]["hazard"] if factors else "heat"
     return round(min(index, 10.0), 1), top, factors
+
+
+# ---------- floors ----------
+
+def _clock(dt: datetime, tz: ZoneInfo, day: date) -> str:
+    """'4:30 PM' or '4 PM' on `day`; 'Sat 4 PM' on another day."""
+    local = dt.astimezone(tz)
+    text = local.strftime("%I %p" if local.minute == 0 else "%I:%M %p").lstrip("0")
+    return text if local.date() == day else f"{local.strftime('%a')} {text}"
+
+
+def _in_effect(alert: dict, start: datetime, end: datetime) -> bool:
+    """The alert's period overlaps [start, end). No onset = already in effect; no end = open-ended."""
+    onset, ends = alert.get("onset"), alert.get("ends_at")
+    return (onset is None or onset < end) and (ends is None or ends > start)
+
+
+def nws_floors(inp: Inputs, day: date, start: datetime, end: datetime, advisories: bool) -> list[Component]:
+    """One floor per hazard family: the most severe NWS alert in effect between start and end."""
+    tz = ZoneInfo(inp.site["timezone"])
+    best: dict[str, tuple[float, str]] = {}
+    for a in inp.nws:
+        event = a["event"]
+        if event in WARNINGS:
+            hazard, floor = WARNINGS[event], WARNING_FLOOR
+        elif event in WATCHES or (advisories and event in ADVISORIES):
+            hazard, floor = WATCHES.get(event) or ADVISORIES[event], WATCH_FLOOR
+        else:
+            continue
+        if not _in_effect(a, start, end):
+            continue
+        until = f" until {_clock(a['ends_at'], tz, day)}" if a.get("ends_at") else ""
+        if floor > best.get(hazard, (0.0, ""))[0]:
+            best[hazard] = (floor, f"NWS {event}{until}")
+    return [_rule(h, floor, label, urgent=floor >= WARNING_FLOOR) for h, (floor, label) in best.items()]
+
+
+def today_floors(inp: Inputs, now: datetime, today: date) -> list[Component | None]:
+    tz = ZoneInfo(inp.site["timezone"])
+    midnight = datetime.combine(today + timedelta(days=1), time(0), tz)
+    floors: list[Component | None] = nws_floors(inp, today, now, midnight, advisories=True)
+    if inp.flood_alert and not any(c.hazard == "flood" and c.score >= WATCH_FLOOR for c in floors):
+        floors.append(_rule("flood", WATCH_FLOOR, FLOOD_ALERT_FACTOR))
+    downed = next((r for r in inp.crew_reports if r["category"] == "downed_line"), None)  # newest first
+    if downed:
+        floors.append(_rule(DOWNED_LINE_HAZARD, WARNING_FLOOR, f"Crew report: downed line, {ago(downed['created_at'], now)}",
+                            urgent=True))
+    return floors
+
+
+def tomorrow_floors(inp: Inputs, tomorrow: date) -> list[Component]:
+    """Watches and warnings in effect at any point tomorrow (advisories don't carry over)."""
+    tz = ZoneInfo(inp.site["timezone"])
+    start = datetime.combine(tomorrow, time(0), tz)
+    return nws_floors(inp, tomorrow, start, start + timedelta(days=1), advisories=False)
+
+
+# ---------- index ----------
+
+def _rule_part(rules: dict, hazard: str, when: str) -> Component | None:
+    """A card rule's sub-score. NWS alerts count only through the floors, so a rule whose factor is
+    just the NWS event (e.g. the wildfire rule's "Red Flag Warning") isn't listed twice."""
+    label = rules[hazard][f"label_{when}"]
+    return None if label in NWS_EVENTS else _rule(hazard, rules[hazard][when], label)
 
 
 def local_days(inputs: Inputs) -> tuple[str, str]:
@@ -88,17 +181,20 @@ def local_days(inputs: Inputs) -> tuple[str, str]:
 def predict(inputs: Inputs, species_counts: dict[str, int]) -> dict:
     scored = score_site(inputs, species_counts)
     rules, crew = scored["rules"], scored["crew"]
+    now = inputs.now or datetime.now(timezone.utc)
     today, tomorrow = local_days(inputs)
     model_today, model_tomorrow = inputs.model.get(today), inputs.model.get(tomorrow)
 
     index_today, top_today, factors_today = combine(
         [_model_component(model_today)]
-        + [_rule(h, rules[h]["today"], rules[h]["label_today"]) for h in ("heat", "wildfire", "wildlife")]
-        + [_rule(c["hazard"], c["score"], c["label"]) for c in crew],
+        + [_rule_part(rules, h, "today") for h in ("heat", "wildfire", "wildlife")]
+        + [_rule(c["hazard"], c["score"], c["label"]) for c in crew]
+        + today_floors(inputs, now, date.fromisoformat(today)),
         stop_work=inputs.lightning_alert is not None)
     index_tomorrow, top_tomorrow, factors_tomorrow = combine(
         [_model_component(model_tomorrow)]
-        + [_rule(h, rules[h]["tomorrow"], rules[h]["label_tomorrow"]) for h in ("heat", "wildfire", "wildlife")],
+        + [_rule_part(rules, h, "tomorrow") for h in ("heat", "wildfire", "wildlife")]
+        + tomorrow_floors(inputs, date.fromisoformat(tomorrow)),
         stop_work=False)
     return {"cards": scored["cards"],
             "hazard_index_today": index_today, "top_hazard": top_today, "top_factors": factors_today,

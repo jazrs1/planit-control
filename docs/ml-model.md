@@ -244,21 +244,55 @@ The app never shows the raw model alone. `hazards/risk.predict()` is the one fun
 |---|---|---|---|
 | ML weather score | model | ✔ | ✔ |
 | OSHA heat-index band (lower 0–2, moderate 5, high 7.5, very high 9.5) | rule | ✔ (rest of today's peak) | ✔ (tomorrow's peak) |
-| Wildfire (FIRMS distance, red flag warning) | rule | ✔ | ✔ |
+| Wildfire (FIRMS distance) | rule | ✔ | ✔ |
 | Wildlife (sightings, crew wildlife reports) | rule | ✔ | ✔ |
 | Crew report that raises a card to watch | rule (4.0) | ✔ | — |
-| **Lightning stop-work** (index at least 9.0) | rule | ✔ | — |
+| **Floor: NWS warning** (see below) | rule (at least 7) | ✔ in effect today | ✔ in effect tomorrow |
+| **Floor: NWS watch** | rule (at least 4) | ✔ in effect today | ✔ in effect tomorrow |
+| **Floor: NWS advisory, or our own flood-risk alert** | rule (at least 4) | ✔ | — |
+| **Floor: downed-line crew report** within 2 mi, last 48 h | rule (at least 7) | ✔ | — |
+| **Lightning stop-work** | rule (at least 9.0) | ✔ | — |
 
 **Why a maximum and not a blend:** each part answers a different question, and a crew needs to know about the worst one. The rules cover exactly what the model can't learn from its labels: heat, fire, wildlife, and what crews see on the ground.
 
-Every factor carries `source: "model" | "rule"`. Factors list the stop-work first, then the winning part's reasons, then any other part at watch or above.
+### Floors: official warnings and downed lines
 
-**What no longer feeds the index directly:** the rule scores for rain, flood zones, soil, NWS flood and thunderstorm watches/warnings, and the heavy-rain flood alert. They all still drive their cards, alerts, and the briefing's go/caution logic. In the index, rain, storms and soil are the model's job.
+A floor only ever *raises* the index; it never lowers a higher model or rule score. The stop-work override (at least 9) still beats every floor. The floors cover:
+
+| Family | Warning (at least 7) | Watch / advisory (at least 4) |
+|---|---|---|
+| Flood | Flood, Flash Flood, Coastal Flood Warning | Flood, Flash Flood, Coastal Flood Watch; Flood, Coastal Flood Advisory |
+| Storms | Severe Thunderstorm Warning, Tornado Warning | Severe Thunderstorm Watch, Tornado Watch |
+| Heat | Excessive Heat Warning (renamed Extreme Heat Warning in 2025) | Excessive/Extreme Heat Watch, Heat Advisory |
+| Fire | Red Flag Warning | Fire Weather Watch |
+
+Our own flood-risk alert (heavy rain in a FEMA flood zone or near a river, `alerts/flood.py`) floors today at 4. A downed-line crew report within 2 miles in the last 48 hours floors today at 7, with the factor "Crew report: downed line, 2 h ago".
+
+Today counts any alert in effect during the rest of today, so a Flood Watch starting this afternoon counts and one starting tomorrow doesn't. Tomorrow counts only watches and warnings in effect at some point tomorrow; advisories, our flood alert and crew reports describe now, not tomorrow. Each hazard family contributes one floor, from its most severe alert. The factor names the alert and when it ends ("NWS Severe Thunderstorm Warning until 4:30 PM", or "until Fri 10 AM" when it ends on a later day).
+
+**Why floors exist:**
+
+- **A forecaster's warning knows things the model can't.** A Tornado Warning comes from radar showing rotation right now, and a Flash Flood Warning from observed rain and river gauges. The model sees an hourly forecast that may already be hours old.
+- **The model is weakest exactly where warnings are strongest.** It ranks ordinary storm days well, but it was over-confident on rare extremes in 2025 and doesn't learn heat or fire from its labels.
+- **Consistency for crews.** A site under a Severe Thunderstorm Warning showing green would look broken and erode trust in the whole index.
+- **A downed line is an immediate electrical danger** that no weather model predicts, so a crew's own report sets red.
+
+**What feeds the index only through floors or the model:** the card rules for rain, flood zones and soil don't feed the index directly; rain, storms and soil are the model's job, and NWS alerts and our flood alert come in through the floors. The cards, alerts and the briefing's go/caution logic still use all of them.
+
+**Factor order:** every factor carries `source: "model" | "rule"`. The stop-work comes first, then warning-level floors (official warnings, downed lines), then the winning part's reasons, then any other part at watch or above. `top_hazard` is the first factor's hazard. A downed line is listed under `lightning` (storm damage) because the API's hazard types have no electrical or crew category.
 
 **How it runs.** The hourly weather poll (`hazards/sources/open_meteo.py`) now requests exactly what the model was trained on: `gfs_seamless`, the same 7 variables and units, 8 past days + 4 forecast days. That's still one Open-Meteo call per site (≤ 10 variables, ≤ 14 days), so 1,320 calls/day, the same as before. The model is scored from that same response with no extra calls (`hazards/model_scores.py`). Every run stores one `hazard_scores` row per site for today and tomorrow: the hybrid `score` and `factors`, plus the model's own part (`model_probability`, `model_score`, `model_factors`, `model_version`; migration `007`). Between runs, `/sites` reads the latest model part back and recombines it with the live rules, so a new stop-work or crew report shows up immediately.
 
 - If the model can't load or score, the weather readings are still saved, the failure is recorded in `data_sources` as `hazard-model`, and the index falls back to the rules.
-- **Soil card source changed.** The poller used to get soil moisture from Open-Meteo's default blend (0–9 cm layers). It now gets it from GFS 0–10 cm, the layer the model was trained on. The card's dry/moist/saturated cutoffs (0.15 / 0.30 m³/m³) are unchanged. On GFS data, 48% of 2022–2025 site-days fall under 0.15 and 1.4% at or above 0.30, so "saturated" is now rare.
+- **Soil card: new source and re-tuned cutoffs.** The poller used to get soil moisture from Open-Meteo's default blend (0–9 cm layers). It now gets it from GFS 0–10 cm, the layer the model was trained on. GFS runs drier, so the old cutoffs (0.15 / 0.30) would have made "saturated" almost never happen (1.4% of days). The new cutoffs come from daily GFS soil moisture across all 55 sites in the training years (2022–2023, 40,150 site-days):
+
+  | Level | Cutoff (m³/m³) | Percentile | 2022–2023 | 2024–2025 (check) |
+  |---|---|---|---|---|
+  | Saturated | ≥ 0.20 | 90th = 0.1996 | 9.9% of days | 9.4% |
+  | Moist | 0.16 to < 0.20 | 60th = 0.1611 | 31.2% | 33.5% |
+  | Dry | < 0.16 | | 58.9% | 57.0% |
+
+  Other percentiles for reference: median 0.151, 95th 0.239, 99th 0.310. The cutoffs are pooled across sites, so wet places stay wet. Four sites on Everglades-edge wetland grid cells are "saturated" most days: Turkey Point 97%, Miami-Dade Solar 85%, West County 79%, Okeelanta 71%. The median site is saturated 1.8% of days. Per-site percentiles would even this out but change the meaning to "wet for this site".
 
 **Endpoints:** `GET /sites/{id}/score-history` (the last 7 days of hourly runs, for a sparkline), `GET /model/info` (test metrics, baselines, training years, index anchors, calibration bins, limitations), and `GET /model/calibration.svg` (the plot above).
 

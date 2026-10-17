@@ -50,7 +50,7 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
                FROM conditions WHERE ts > %s ORDER BY site_id, hazard, metric, ts DESC""",
             (real_now - timedelta(days=7),)).fetchall()
         nws = conn.execute(
-            """SELECT sa.site_id, a.event, a.headline, a.severity, a.ends_at
+            """SELECT sa.site_id, a.event, a.headline, a.severity, a.onset, a.ends_at
                FROM site_nws_alerts sa JOIN nws_alerts a ON a.id = sa.alert_id
                WHERE a.ends_at IS NULL OR a.ends_at > %s""", (real_now,)).fetchall()
         lightning = {a["site_id"]: a for a in engine.active_alerts(conn, clock_now, replay=replay)

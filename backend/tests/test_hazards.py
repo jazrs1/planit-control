@@ -44,7 +44,8 @@ def test_flood_risk_rule():
 
 
 def test_soil_levels_and_crew_wording():
-    assert [soil_level(v) for v in (0.14, 0.15, 0.29, 0.30)] == ["dry", "moist", "moist", "saturated"]
+    # Percentile cutoffs of GFS 0-10 cm soil moisture over 2022-2023 (60th: 0.16, 90th: 0.20).
+    assert [soil_level(v) for v in (0.159, 0.16, 0.199, 0.20)] == ["dry", "moist", "moist", "saturated"]
     card = score_site(inputs({("soil", "vwc_surface"): 0.36}), {})["cards"]["soil_saturation"]
     assert card["level"] == "saturated" and "vehicles may get stuck" in card["reading"]
 

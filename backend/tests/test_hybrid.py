@@ -65,14 +65,12 @@ def test_lightning_override_is_today_only_and_listed_first():
     assert scored["hazard_index_tomorrow"] == 6.5 and scored["top_factors_tomorrow"][0]["source"] == "model"
 
 
-def test_crew_reports_count_today_and_downed_lines_stay_on_their_card():
+def test_crew_reports_count_today():
     flood = {"id": "r1", "category": "flooding", "species": None, "created_at": NOW - timedelta(hours=1), "distance_mi": 0.4}
-    downed = {"id": "r2", "category": "downed_line", "species": None, "created_at": NOW, "distance_mi": 0.2}
-    scored = predict(inputs(crew_reports=[downed, flood]), {})
+    scored = predict(inputs(crew_reports=[flood]), {})
     assert scored["hazard_index_today"] == 4.0
     assert scored["top_factors"] == [{"hazard": "flood", "label": "Crew report: Flooding or washout", "weight": 1.0,
                                       "source": "rule"}]
-    assert scored["cards"]["crew_hazards"]["hazard_status"] == "danger"
     assert scored["hazard_index_tomorrow"] == 0.0
 
 
@@ -94,6 +92,111 @@ def test_weights_never_sum_past_one_and_at_most_four_factors():
     index, top, factors = combine(comps, stop_work=True)
     assert index == 9.0 and top == "lightning" and len(factors) == 4
     assert sum(f["weight"] for f in factors) <= 1.0
+
+
+# ---------- floors: official warnings, our flood alert, downed lines ----------
+
+def nws(event, ends_in_h=2.5, onset_in_h=None):
+    """An NWS alert for the site, ending `ends_in_h` hours after NOW (2 PM in New York)."""
+    return {"event": event, "headline": event, "severity": "Severe",
+            "onset": NOW + timedelta(hours=onset_in_h) if onset_in_h is not None else None,
+            "ends_at": NOW + timedelta(hours=ends_in_h) if ends_in_h is not None else None}
+
+
+@pytest.mark.parametrize("event, hazard", [
+    ("Flood Warning", "flood"), ("Flash Flood Warning", "flood"), ("Severe Thunderstorm Warning", "lightning"),
+    ("Tornado Warning", "lightning"), ("Excessive Heat Warning", "heat"), ("Extreme Heat Warning", "heat"),
+    ("Red Flag Warning", "wildfire"),
+])
+def test_nws_warning_floors_today_at_7_and_names_the_alert(event, hazard):
+    scored = predict(inputs(nws=[nws(event)]), {})
+    assert scored["hazard_index_today"] == 7.0
+    assert scored["top_hazard"] == hazard
+    assert scored["top_factors"][0] == {"hazard": hazard, "label": f"NWS {event} until 4:30 PM", "weight": 1.0,
+                                        "source": "rule"}
+
+
+@pytest.mark.parametrize("event", ["Flood Watch", "Flash Flood Watch", "Severe Thunderstorm Watch", "Tornado Watch",
+                                   "Excessive Heat Watch", "Fire Weather Watch", "Flood Advisory", "Heat Advisory"])
+def test_nws_watch_or_advisory_floors_today_at_4(event):
+    scored = predict(inputs(nws=[nws(event)]), {})
+    assert scored["hazard_index_today"] == 4.0
+    assert scored["top_factors"][0]["label"] == f"NWS {event} until 4:30 PM"
+
+
+def test_unrelated_nws_alerts_add_no_floor():
+    assert predict(inputs(nws=[nws("Rip Current Statement"), nws("Small Craft Advisory")]), {})["hazard_index_today"] == 0
+
+
+RAIN = {("flood", "rain_past_12h_in"): 2.4, ("flood", "rain_past_24h_in"): 2.6, ("flood", "rain_next_24h_in"): 0.3}
+
+
+def test_our_flood_risk_alert_floors_today_at_4():
+    scored = predict(inputs(RAIN, flood_alert={"type": "flood", "site_id": "s"}), {})
+    assert scored["hazard_index_today"] == 4.0
+    assert scored["top_factors"][0]["label"] == "Flood-risk alert: heavy rain in flood-prone area"
+    assert scored["hazard_index_tomorrow"] == 0.0     # our alert is about now, not tomorrow
+
+
+def test_downed_line_floors_today_at_7_with_its_age():
+    downed = {"id": "r2", "category": "downed_line", "species": None, "created_at": NOW - timedelta(hours=2),
+              "distance_mi": 0.2}
+    scored = predict(inputs(crew_reports=[downed]), {})
+    assert scored["hazard_index_today"] == 7.0
+    assert scored["top_factors"][0] == {"hazard": "lightning", "label": "Crew report: downed line, 2 h ago",
+                                        "weight": 1.0, "source": "rule"}
+    assert scored["cards"]["crew_hazards"]["hazard_status"] == "danger"
+    assert scored["hazard_index_tomorrow"] == 0.0
+
+
+def test_floors_only_raise_the_index():
+    hot = {("heat", "heat_index_f"): 118.0}       # OSHA very high: 9.5
+    scored = predict(inputs(hot, model={"2026-07-15": ml(8.4)}, nws=[nws("Flood Watch"), nws("Tornado Warning")]), {})
+    assert scored["hazard_index_today"] == 9.5
+    labels = [f["label"] for f in scored["top_factors"]]
+    assert labels[0] == "NWS Tornado Warning until 4:30 PM"   # warnings are listed even when they don't set the number
+    assert "Heat index up to 118°F (OSHA very high)" in labels
+
+
+def test_lightning_override_still_wins_over_floors():
+    alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW, "all_clear_at": NOW + timedelta(minutes=30)}
+    downed = {"id": "r2", "category": "downed_line", "species": None, "created_at": NOW, "distance_mi": 0.2}
+    scored = predict(inputs(nws=[nws("Severe Thunderstorm Warning")], crew_reports=[downed], lightning_alert=alert), {})
+    assert scored["hazard_index_today"] == 9.0
+    assert scored["top_hazard"] == "lightning"
+    assert [f["label"] for f in scored["top_factors"]][:3] == [
+        STOP_WORK_FACTOR, "NWS Severe Thunderstorm Warning until 4:30 PM", "Crew report: downed line, just now"]
+    assert sum(f["weight"] for f in scored["top_factors"]) <= 1.0
+
+
+def test_tomorrow_floors_come_only_from_watches_and_warnings_that_reach_tomorrow():
+    # NOW is 2 PM Jul 15 in New York; tomorrow is Jul 16.
+    ends_today = nws("Flood Warning", ends_in_h=6)                         # 8 PM tonight
+    watch_overnight = nws("Flood Watch", ends_in_h=20)                     # 10 AM tomorrow
+    advisory_overnight = nws("Heat Advisory", ends_in_h=30)                # advisories don't carry over
+    scored = predict(inputs(nws=[ends_today, watch_overnight, advisory_overnight]), {})
+    assert scored["hazard_index_today"] == 7.0
+    assert scored["hazard_index_tomorrow"] == 4.0
+    assert scored["top_factors_tomorrow"][0]["label"] == "NWS Flood Watch until 10 AM"
+
+    warning_tomorrow = nws("Excessive Heat Warning", onset_in_h=22, ends_in_h=30)  # noon to 8 PM tomorrow
+    scored = predict(inputs(nws=[warning_tomorrow]), {})
+    assert scored["hazard_index_today"] == 0.0                             # not in effect today
+    assert scored["hazard_index_tomorrow"] == 7.0
+    assert scored["top_factors_tomorrow"][0]["label"] == "NWS Excessive Heat Warning until 8 PM"
+
+
+def test_one_floor_per_hazard_family_the_most_severe():
+    scored = predict(inputs(RAIN, nws=[nws("Flood Watch"), nws("Flash Flood Warning", ends_in_h=4)],
+                            flood_alert={"type": "flood", "site_id": "s"}), {})
+    assert scored["hazard_index_today"] == 7.0
+    assert [f["label"] for f in scored["top_factors"]] == ["NWS Flash Flood Warning until 6 PM"]
+
+
+def test_multi_day_alert_names_the_day_it_ends():
+    scored = predict(inputs(nws=[nws("Flood Warning", ends_in_h=44)]), {})   # 10 AM the day after tomorrow
+    assert scored["top_factors"][0]["label"] == "NWS Flood Warning until Fri 10 AM"
+    assert scored["top_factors_tomorrow"][0]["label"] == "NWS Flood Warning until Fri 10 AM"
 
 
 # ---------- the weather poll ----------

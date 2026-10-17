@@ -3,7 +3,7 @@
   "trained_at": "2026-10-17T04:37:49+00:00",
   "label": "NOAA Storm Events crew-relevant event within 15 mi or in the site's NWS zone/county, by site-local date",
   "weather_source": "Open-Meteo gfs_seamless (HRRR over Florida); training on the Historical Forecast API",
-  "hybrid": "The hazard index is the highest of: the ML weather score (the model's calibrated probability mapped to 0-10), the OSHA heat-index band, and the wildfire, wildlife and crew-report rules. While a site has an active lightning stop-work, today's index is at least 9. Every factor says whether it came from the model or a rule.",
+  "hybrid": "The hazard index is the highest of: the ML weather score (the model's calibrated probability mapped to 0-10), the OSHA heat-index band, and the wildfire, wildlife and crew-report rules. An NWS warning (flood, flash flood, severe thunderstorm, tornado, extreme heat, red flag) or a downed-line crew report raises it to at least 7, and an NWS watch or advisory, or our flood-risk alert, to at least 4. While a site has an active lightning stop-work, today's index is at least 9. Every factor says whether it came from the model or a rule.",
   "training": {
     "train_years": [
       2022,
