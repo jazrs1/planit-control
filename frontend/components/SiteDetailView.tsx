@@ -7,6 +7,7 @@ import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import BriefingCard from "@/components/BriefingCard";
 import HazardPanel from "@/components/HazardPanel";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
+import { formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
@@ -83,7 +84,8 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
             <div>
               <p className="text-lg font-bold">⚡ STOP WORK: lightning</p>
               <p className="text-sm">
-                {alert.last_strike_distance_mi === null ? "Lightning within 10 mi." : `Last strike ${alert.last_strike_distance_mi} mi away.`}
+                {/* Same rounding as every other page: down, so a strike inside 10 mi never reads 10.0. */}
+                {formatStrikeDistance(alert.last_strike_distance_mi) === null ? "Lightning within 10 mi." : `Last strike ${formatStrikeDistance(alert.last_strike_distance_mi)} away.`}
                 {" "}Each new strike restarts the 30-minute wait.
               </p>
             </div>
