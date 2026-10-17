@@ -190,7 +190,9 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
           <span className="flex items-center gap-2 text-xs text-muted"><span className="font-mono">{timeline.events === null ? "…" : events.length}</span><span aria-hidden="true" className="motion-safe:transition-[rotate] group-open:rotate-180">▾</span></span>
         </summary>
         {events.length === 0
-          ? <p className="mbs-2 text-xs text-muted">{timeline.preparing ? "Preparing replay timeline…" : timeline.events === null ? "Loading the storm’s events…" : "No stop-work, advisory or all-clear yet."}</p>
+          ? <p className="mbs-2 text-xs text-muted">{timeline.preparing ? "Preparing replay timeline…" : timeline.events === null
+            ? timeline.failed ? <>Couldn’t load the storm’s events. {timeline.retry && <button type="button" onClick={timeline.retry} className="pc-link font-semibold">Retry</button>}</> : "Loading the storm’s events…"
+            : "No stop-work, advisory or all-clear yet."}</p>
           : <ol className="mbs-1 max-h-44 overflow-y-auto overscroll-contain">{[...events].reverse().map(eventRow)}</ol>}
       </details>
     </section>
