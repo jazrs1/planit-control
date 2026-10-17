@@ -1,6 +1,7 @@
-"""Briefing writer: grounding check, template, go/no-go rule, Gemini fallbacks, 6 PM timing."""
+"""Briefing writer: grounding check, template, go/no-go rule, Claude -> Gemini -> template, 6 PM timing."""
 
 import copy
+import json
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -77,6 +78,20 @@ def test_key_numbers_flag_missing_data():
 
 # ---------- Gemini path (HTTP faked) ----------
 
+@pytest.fixture(autouse=True)
+def no_model_keys(monkeypatch):
+    """Tests never call a real model, whatever keys backend/.env has."""
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "")
+    monkeypatch.setattr(get_settings(), "gemini_api_key", "")
+
+
+@pytest.fixture
+def claude_on(monkeypatch):
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "test-key")
+
+
 @pytest.fixture
 def gemini_on(monkeypatch):
     from app.config import get_settings
@@ -95,6 +110,19 @@ def fake(monkeypatch, *answers):
             raise answer
         return answer
     monkeypatch.setattr(writer, "_call_gemini", call)
+    return calls
+
+
+def fake_claude(monkeypatch, *answers, model="claude-sonnet-5-5"):
+    calls = []
+
+    def call(inputs, key, requested, feedback):
+        calls.append(feedback)
+        answer = answers[len(calls) - 1]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer, model
+    monkeypatch.setattr(writer, "_call_claude", call)
     return calls
 
 
@@ -175,3 +203,124 @@ def test_gemini_wrong_hazard_word_gets_retry(monkeypatch, gemini_on):
     calls = fake(monkeypatch, wrong, right)
     w = writer.write(calm)
     assert w.generator == "gemini" and "saturated" in calls[1]
+
+
+def test_gemini_timeout_retries_once_then_template(monkeypatch, gemini_on):
+    calls = fake(monkeypatch, TimeoutError(), GOOD)
+    assert writer.write(BUSY).generator == "gemini" and len(calls) == 2
+    fake(monkeypatch, TimeoutError(), TimeoutError())
+    assert writer.write(BUSY).generator == "template"
+
+
+def _http_429(body: dict):
+    import io
+    import urllib.error
+    return urllib.error.HTTPError("https://gemini", 429, "Too Many Requests", {}, io.BytesIO(json.dumps(body).encode()))
+
+
+def test_quota_used_up_pauses_gemini(monkeypatch, gemini_on):
+    monkeypatch.setattr(writer, "_paused_until", 0.0)
+    daily = {"error": {"code": 429, "message": "Quota exceeded ... limit: 20 ... Please retry in 20h11m15s"}}
+    calls = fake(monkeypatch, _http_429(daily), GOOD)
+    assert writer.write(BUSY).generator == "template" and len(calls) == 1
+    assert 20 * 3600 < writer.gemini_paused_seconds() <= 20 * 3600 + 11 * 60 + 15
+    assert writer.write(BUSY).generator == "template" and len(calls) == 1   # no call while paused
+
+
+def test_short_rate_limit_waits_and_retries(monkeypatch, gemini_on):
+    monkeypatch.setattr(writer, "_paused_until", 0.0)
+    monkeypatch.setattr(writer.time, "sleep", lambda s: None)
+    short = {"error": {"code": 429, "message": "slow down",
+                       "details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "7s"}]}}
+    calls = fake(monkeypatch, _http_429(short), GOOD)
+    assert writer.write(BUSY).generator == "gemini" and len(calls) == 2
+    assert writer.gemini_paused_seconds() == 0
+
+
+# ---------- Claude first, then Gemini, then the template ----------
+
+def _http(code: int, retry_after: str | None = None):
+    import io
+    import urllib.error
+    headers = {"retry-after": retry_after} if retry_after else {}
+    return urllib.error.HTTPError("https://api.anthropic.com", code, "error", headers, io.BytesIO(b"{}"))
+
+
+def test_claude_writes_first_and_records_model(monkeypatch, claude_on, gemini_on):
+    calls = fake_claude(monkeypatch, GOOD)
+    gemini = fake(monkeypatch)                                 # must not be called
+    w = writer.write(BUSY)
+    assert (w.generator, w.model) == ("claude", "claude-sonnet-5-5")
+    assert calls == [None] and gemini == [] and writer.problems(w.text, BUSY) == []
+
+
+def test_claude_records_the_model_that_answered(monkeypatch, claude_on):
+    fake_claude(monkeypatch, GOOD, model="claude-sonnet-5")     # server-side refusal fallback ran
+    assert writer.write(BUSY).model == "claude-sonnet-5"
+
+
+def test_claude_ungrounded_gets_one_retry_then_gemini(monkeypatch, claude_on, gemini_on):
+    bad = {**GOOD, "risks": ["Heat index 112°F at 3 PM"]}
+    calls = fake_claude(monkeypatch, bad, GOOD)
+    w = writer.write(BUSY)
+    assert w.generator == "claude" and "112" in calls[1]
+    fake_claude(monkeypatch, bad, bad)
+    fake(monkeypatch, GOOD)
+    assert writer.write(BUSY).generator == "gemini"
+
+
+def test_claude_failure_falls_to_gemini_then_template(monkeypatch, claude_on, gemini_on):
+    for failure in (_http(401), _http(400), writer.Refused("general_harms"), ValueError("bad JSON")):
+        fake_claude(monkeypatch, failure)
+        fake(monkeypatch, GOOD)
+        assert writer.write(BUSY).generator == "gemini", failure
+    fake_claude(monkeypatch, _http(401))
+    fake(monkeypatch, TimeoutError(), TimeoutError())
+    assert writer.write(BUSY).generator == "template"
+
+
+def test_claude_short_rate_limit_or_overload_waits_once(monkeypatch, claude_on):
+    monkeypatch.setattr(writer.time, "sleep", lambda s: None)
+    for failure in (_http(429, "3"), _http(529), _http(500)):
+        calls = fake_claude(monkeypatch, failure, GOOD)
+        assert writer.write(BUSY).generator == "claude" and len(calls) == 2
+    calls = fake_claude(monkeypatch, _http(429, "600"), GOOD)    # long wait: go on to the next writer
+    assert writer.write(BUSY).generator == "template" and len(calls) == 1
+
+
+def test_claude_timeout_retries_once(monkeypatch, claude_on):
+    calls = fake_claude(monkeypatch, TimeoutError(), GOOD)
+    assert writer.write(BUSY).generator == "claude" and len(calls) == 2
+    fake_claude(monkeypatch, TimeoutError(), TimeoutError())
+    assert writer.write(BUSY).generator == "template"
+
+
+class _Response:
+    def __init__(self, data): self.data = json.dumps(data).encode()
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def read(self, *a): return self.data
+
+
+def test_claude_request_and_response_shape(monkeypatch):
+    sent = {}
+
+    def urlopen(request, timeout):
+        sent.update(body=json.loads(request.data), headers=dict(request.header_items()))
+        return _Response({"model": "claude-sonnet-5-5", "stop_reason": "end_turn",
+                          "content": [{"type": "text", "text": json.dumps(GOOD)}]})
+    monkeypatch.setattr(writer.urllib.request, "urlopen", urlopen)
+    out, model = writer._call_claude(BUSY, "k", "claude-sonnet-5-5", "too long")
+    body = sent["body"]
+    assert out == GOOD and model == "claude-sonnet-5-5"
+    assert body["model"] == "claude-sonnet-5-5" and body["system"] == writer.SYSTEM
+    assert body["output_config"]["format"] == {"type": "json_schema", "schema": writer.CLAUDE_SCHEMA}
+    assert "temperature" not in body and "thinking" not in body     # Sonnet 5.5 rejects both forms
+    assert "too long" in body["messages"][0]["content"]
+    assert sent["headers"]["Anthropic-version"] == "2023-06-01"
+
+    monkeypatch.setattr(writer.urllib.request, "urlopen", lambda r, timeout: _Response(
+        {"stop_reason": "refusal", "stop_details": {"category": "general_harms"}, "content": []}))
+    with pytest.raises(writer.Refused):
+        writer._call_claude(BUSY, "k", "claude-sonnet-5-5", None)
+

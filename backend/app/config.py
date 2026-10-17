@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", extra="ignore")
 
     database_url: str = ""
+    anthropic_api_key: str = ""
     gemini_api_key: str = ""
     firms_map_key: str = ""
     auth0_domain: str = ""
@@ -27,8 +28,11 @@ class Settings(BaseSettings):
     # Evening briefings: generated at BRIEFING_HOUR site-local time for the next day.
     briefing_enabled: bool = True
     briefing_hour: int = 18
+    # Briefing writers, in order: Claude, then Gemini, then the template (briefing/writer.py).
+    claude_model: str = "claude-sonnet-5-5"
     gemini_model: str = "gemini-3.8-flash"
     gemini_min_interval_seconds: float = 4.0   # ~15 requests/minute
+    briefing_concurrency: int = 4              # briefings written at once (model calls are slow)
     # Contact info sent in the User-Agent to NWS, FEMA, iNaturalist, etc. (NWS requires one).
     nws_contact: str = "https://github.com/jazrs1/planit-control"
 

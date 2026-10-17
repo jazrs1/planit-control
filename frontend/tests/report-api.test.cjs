@@ -8,13 +8,21 @@ const vm = require("node:vm");
 const ts = require("typescript");
 
 function loadApi(overrides = {}) {
+  return loadModule("api", overrides);
+}
+
+/** Transpile frontend/lib/<name>.ts into a sandbox; "@/lib/*" imports load the same way. */
+function loadModule(name, overrides = {}) {
   const exports = {};
-  const source = fs.readFileSync(path.join(__dirname, "../lib/api.ts"), "utf8");
+  const source = fs.readFileSync(path.join(__dirname, `../lib/${name}.ts`), "utf8");
   const sandbox = {
     exports, File, DOMException, AbortSignal, Response,
     process: { env: { NEXT_PUBLIC_API_URL: "http://api.test" } },
     console: { warn() {} },
-    require(name) { return require(path.join(__dirname, "../../shared", name.replace("@shared/", ""))); },
+    require(id) {
+      if (id.startsWith("@/lib/")) return loadModule(id.slice("@/lib/".length), overrides);
+      return require(path.join(__dirname, "../../shared", id.replace("@shared/", "")));
+    },
     ...overrides,
   };
   vm.runInNewContext(ts.transpileModule(source, {
@@ -83,7 +91,7 @@ test("abort cancels an in-flight upload", async () => {
 });
 
 test("creates a report using the exact contract fields and uploaded photo URL", async () => {
-  const body = { site_id: null, photo_url: "http://api.test/uploads/photo.png", lat: 27.8, lon: -82.4, category: "wildlife", note: "Snake: near gate", reporter_role: "crew_member" };
+  const body = { site_id: null, photo_url: "http://api.test/uploads/photo.png", lat: 27.8, lon: -82.4, category: "wildlife", note: "near gate", reporter_role: "crew_member", species: "Snake" };
   const api = loadApi({ fetch: async (url, options) => {
     assert.equal(url, "http://api.test/reports");
     assert.equal(options.method, "POST");

@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import type { Alert, ReplayStatus } from "@shared/types";
 import { DEMO_DATA, getAlerts, getReplayStatus } from "@/lib/api";
+import { getConnectionSnapshot, getServerConnectionSnapshot, outageStartsAt, subscribeConnection } from "@/lib/connection";
 import { usePolling } from "@/lib/usePolling";
 
 /** The backend's clock: real time normally, the simulated replay clock while a replay runs. */
@@ -25,7 +26,23 @@ type AlertsState = {
   replay: ReplayStatus | null;
 };
 
+/**
+ * online:  the backend is answering.
+ * offline: the latest request failed; pages show their last known data greyed with "?".
+ * outage:  no successful response for 2 minutes (OUTAGE_AFTER_MS); every page shows
+ *          "Status unknown" with its last known data dimmed underneath.
+ */
+export type ConnectionLevel = "online" | "offline" | "outage";
+
+export type Connection = {
+  level: ConnectionLevel;
+  /** Last successful response from the backend (any request), or null if none since page load. */
+  lastSuccessAt: number | null;
+};
+
 type AlertsContextValue = AlertsState & {
+  /** Shared by every page: derived from every request made through lib/api.ts. Demo mode is always online. */
+  connection: Connection;
   /** Refetch alerts and replay status now (e.g. right after starting or stopping a replay). */
   refresh: () => Promise<void>;
   setDemo: (on: boolean) => void;
@@ -88,11 +105,40 @@ export function AlertsProvider({ initialAlerts, children }: { initialAlerts: Ale
       : UNKNOWN);
   }, []);
 
-  const loaded = state.alerts !== null && state.status !== "demo";
-  const pollMs = state.status === "demo" ? null : !loaded ? RETRY_MS : state.replay?.running ? REPLAY_MS : LIVE_MS;
+  // Connection level: offline as soon as a request fails; outage once 2 minutes pass without a success.
+  const snapshot = useSyncExternalStore(subscribeConnection, getConnectionSnapshot, getServerConnectionSnapshot);
+  const [pageLoadedAt] = useState(() => Date.now());
+  const [outage, setOutage] = useState(false);
+  useEffect(() => {
+    const startsAt = outageStartsAt(snapshot, pageLoadedAt);
+    if (startsAt === null) { setOutage(false); return; }
+    const wait = startsAt - Date.now();
+    if (wait <= 0) { setOutage(true); return; }
+    setOutage(false);
+    const timer = window.setTimeout(() => setOutage(true), wait);
+    return () => window.clearTimeout(timer);
+  }, [snapshot, pageLoadedAt]);
+  const demoMode = state.status === "demo";
+  const offline = !demoMode && snapshot.failingSince !== null;
+  const connection = useMemo<Connection>(
+    () => ({ level: !offline ? "online" : outage ? "outage" : "offline", lastSuccessAt: snapshot.lastSuccessAt }),
+    [offline, outage, snapshot.lastSuccessAt],
+  );
+
+  const loaded = state.alerts !== null && !demoMode;
+  // Offline: retry every 5 s, so the app notices the backend is back within seconds.
+  const pollMs = demoMode ? null : state.replay?.running ? REPLAY_MS : !loaded || offline ? RETRY_MS : LIVE_MS;
   usePolling(refresh, pollMs);
 
-  const value = useMemo(() => ({ ...state, refresh, setDemo }), [state, refresh, setDemo]);
+  // Any failed request means the alerts may be out of date too, even before the alerts poll itself
+  // fails: the nav badge, countdowns and every page switch to "last known" together.
+  const shared = useMemo<AlertsState>(() => {
+    if (!offline || state.status !== "live") return state;
+    const since = snapshot.lastSuccessAt ?? snapshot.failingSince;
+    return { ...state, status: "stale", staleSince: since === null ? null : new Date(since) };
+  }, [state, offline, snapshot.lastSuccessAt, snapshot.failingSince]);
+
+  const value = useMemo(() => ({ ...shared, connection, refresh, setDemo }), [shared, connection, refresh, setDemo]);
   return <AlertsContext.Provider value={value}>{children}</AlertsContext.Provider>;
 }
 

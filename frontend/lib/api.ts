@@ -1,21 +1,40 @@
-import type { Alert, ApiError, Briefing, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, SiteDetail, StartReplayRequest } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningFlash, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
+import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
+import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
 
 import mockReports from "@shared/mocks/reports.json";
-import mockSiteDetails from "@shared/mocks/site_details.json";
-import mockBriefings from "@shared/mocks/briefings.json";
+import { markFailure, markSuccess } from "@/lib/connection";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+/** The backend answered with an error status (as opposed to being unreachable). */
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
 
 /** Request the backend and throw if it's unreachable or returns an error. Never falls back to mocks:
  *  safety data the UI can't verify must show as unknown, not as sample values. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
+  // Reads report failures to the shared connection state; a failed write (e.g. a 503 from a POST)
+  // is the action's error, not proof the backend is down.
+  const read = (init?.method ?? "GET") === "GET";
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
+  } catch (err) {
+    if (read) markFailure();
+    throw err;
+  }
+  if (res.status < 500) markSuccess();
+  else if (read) markFailure();
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null;
-    throw new Error(body?.detail ?? `${res.status} ${res.statusText}`);
+    throw new ApiRequestError(body?.detail ?? `${res.status} ${res.statusText}`, res.status);
   }
   return (await res.json()) as T;
 }
@@ -32,10 +51,16 @@ export async function orNull<T>(promise: Promise<T>): Promise<T | null> {
 
 export const getReports = () => request<HazardReport[]>("/reports");
 export const getSites = () => request<Site[]>("/sites");
-export const getSiteDetail = (id: Site["id"]) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
-export const getBriefing = (id: Site["id"]) => request<Briefing>(`/briefing/${encodeURIComponent(id)}`);
+export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
+/** Latest briefing for every site in one request (cached on the server). */
+export const getBriefings = () => request<BriefingsResponse>("/briefings");
+/** 404 means the site has no briefing yet (see ApiRequestError.status). */
+export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
+/** One site: generated right away. All sites (no site_id): queued in the background. */
+export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
+  request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
 export const startReplay = (body: StartReplayRequest = {}) =>
   request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -43,12 +68,14 @@ export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: 
 
 /** shared/mocks, for the explicit "Demo data" mode only. Anything showing these must say so. */
 export const DEMO_DATA = {
-  siteDetails: mockSiteDetails as Record<string, SiteDetail>,
-  briefings: mockBriefings as Record<string, Briefing>,
   reports: mockReports as HazardReport[],
   sites: mockSites as Site[],
   alerts: mockAlerts as Alert[],
   lightning: mockLightning as LightningFlash[],
+  /** Keyed by site id; only the 6 mock sites have one. */
+  siteDetails: mockSiteDetails as Record<string, SiteDetail>,
+  /** Keyed by site id; only the 6 mock sites have one. */
+  briefings: mockBriefings as Record<string, Briefing>,
 };
 
 export function validatePhoto(file: File): string | null {

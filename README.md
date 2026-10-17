@@ -32,7 +32,7 @@ uvicorn app.main:app --reload --port 8000
 - Interactive docs: http://localhost:8000/docs
 - Health check (includes the database): `curl localhost:8000/health`
 
-`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json` with live hazard data (see **Hazard data sources** below); `hazard_index` is a temporary rule-based score until the ML model exists. Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts and briefings still come from `shared/mocks/`. Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
+`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json` with live hazard data (see **Hazard data sources** below); `hazard_index` is a temporary rule-based score until the ML model exists. Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts come from the alert engine (`backend/alerts/`) and the 6 PM briefings from `backend/briefing/` (written by Claude, then Gemini, then a template; see `CLAUDE.md`). Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
 
 ### Hazard data sources
 
@@ -107,6 +107,7 @@ Other commands: `npm run typecheck`, `npm run build`.
 | POST | `/reports` | Create a hazard report |
 | POST | `/uploads` | Upload a report photo (raw image body); returns `photo_url` |
 | GET | `/briefing/{site_id}` | Latest next-day briefing (generated 6 PM site time) and key numbers |
+| GET | `/briefings` | Latest briefing for every site in one response |
 | POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`) or all |
 
 Shapes: [`shared/types.ts`](shared/types.ts).

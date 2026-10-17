@@ -122,6 +122,22 @@ export interface WildlifeSummary extends HazardCard {
   crew_reports_2mi: number;
 }
 
+/** One crew report within 2 miles of the site in the last 48 hours. */
+export interface CrewReportNote {
+  id: string;
+  category: ReportCategory;
+  species?: string | null;
+  reported_at: string;
+  distance_mi: number;
+}
+
+/** Crew-reported hazards near the site (last 48 h, within 2 mi). Danger for a downed line,
+ *  watch for "other"; flooding, heat illness, unsafe ground, fire and wildlife reports also raise
+ *  their own hazard card to at least watch and lead its reading with "Crew report: …". */
+export interface CrewHazards extends HazardCard {
+  reports: CrewReportNote[];
+}
+
 export interface SiteConditions {
   heat: HeatConditions;
   lightning: LightningConditions;
@@ -130,6 +146,7 @@ export interface SiteConditions {
   wildfire: WildfireConditions;
   wildlife: WildlifeSighting[];
   wildlife_summary?: WildlifeSummary | null;
+  crew_hazards?: CrewHazards | null;
 }
 
 /** An active National Weather Service alert covering the site. */
@@ -196,6 +213,8 @@ export interface CreateReportRequest {
   category: ReportCategory;
   note: string;
   reporter_role: ReporterRole;
+  /** Wildlife reports only, e.g. "Snake" or "Alligator"; omit or null otherwise. */
+  species?: string | null;
 }
 
 export interface HazardReport extends CreateReportRequest {
@@ -245,12 +264,19 @@ export interface Briefing {
   actions?: string[] | null;
   /** Tomorrow's top contributing factors behind key_numbers.hazard_index. */
   top_factors?: ContributingFactor[] | null;
-  /** "gemini" when the model wrote it and it passed the grounding check, else "template". */
-  generator?: "gemini" | "template" | null;
+  /** Which writer produced it: "claude" or "gemini" when that model wrote it and it passed the
+   *  grounding check (tried in that order), else "template". */
+  generator?: "claude" | "gemini" | "template" | null;
+  /** The model that answered, e.g. "claude-sonnet-5-5"; null for the template. */
   model?: string | null;
   /** key_numbers fields with no live data behind them (their value is 0), e.g. wildfire without a FIRMS key. */
   unavailable?: (keyof BriefingKeyNumbers)[] | null;
 }
+
+// ---------- GET /briefings ----------
+
+/** The latest briefing for every site that has one, largest plant first. */
+export type BriefingsResponse = Briefing[];
 
 // ---------- POST /briefing/send-now ----------
 

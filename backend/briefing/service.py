@@ -7,8 +7,8 @@ it starts. Uses real time, not the replay clock.
 """
 
 import asyncio
-
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -47,34 +47,60 @@ def key_numbers(inputs: dict) -> tuple[dict, list[str]]:
     }, unavailable
 
 
+def _store(pool: ConnectionPool, site_id: str, inputs: dict, factors: list[dict], written, now: datetime) -> None:
+    numbers, unavailable = key_numbers(inputs)
+    with pool.connection() as conn:
+        conn.execute(
+            """INSERT INTO briefings (site_id, for_date, text, created_at, go_status, top_hazard, headline, risks,
+                                      actions, top_factors, key_numbers, unavailable, inputs, generator, model)
+               VALUES (%(site)s, %(for_date)s, %(text)s, %(now)s, %(go)s, %(top)s, %(headline)s, %(risks)s,
+                       %(actions)s, %(factors)s, %(numbers)s, %(unavailable)s, %(inputs)s, %(generator)s, %(model)s)
+               ON CONFLICT (site_id, for_date) DO UPDATE SET
+                   text = EXCLUDED.text, created_at = EXCLUDED.created_at, go_status = EXCLUDED.go_status,
+                   top_hazard = EXCLUDED.top_hazard, headline = EXCLUDED.headline, risks = EXCLUDED.risks,
+                   actions = EXCLUDED.actions, top_factors = EXCLUDED.top_factors,
+                   key_numbers = EXCLUDED.key_numbers, unavailable = EXCLUDED.unavailable,
+                   inputs = EXCLUDED.inputs, generator = EXCLUDED.generator, model = EXCLUDED.model""",
+            {"site": site_id, "for_date": inputs["for_date"], "text": written.text, "now": now,
+             "go": inputs["go_status"], "top": inputs["top_hazard"], "headline": written.headline,
+             "risks": Jsonb(written.risks), "actions": Jsonb(written.actions), "factors": Jsonb(factors),
+             "numbers": Jsonb(numbers), "unavailable": unavailable, "inputs": Jsonb(inputs),
+             "generator": written.generator, "model": written.model})
+    from app.cache import api_cache
+
+    api_cache.invalidate()   # GET /briefings shows it on the next request
+
+
 def generate(pool: ConnectionPool, site_ids: list[str] | None = None, now: datetime | None = None) -> list[str]:
-    """Build inputs, write, and store briefings for tomorrow. Returns the site ids done."""
+    """Build inputs, write, and store briefings for tomorrow. Returns the site ids done.
+
+    Model calls are slow (Gemini took up to ~90 s), so BRIEFING_CONCURRENCY are written at once,
+    and each briefing is stored as soon as it's written, so they appear one by one instead of all
+    at the end.
+    """
     now = now or datetime.now(timezone.utc)
     built = briefing_inputs.build_all(pool, site_ids, now)
-    done = []
-    for site_id, (inputs, factors) in built.items():
-        written = write(inputs)
-        numbers, unavailable = key_numbers(inputs)
-        with pool.connection() as conn:
-            conn.execute(
-                """INSERT INTO briefings (site_id, for_date, text, created_at, go_status, top_hazard, headline, risks,
-                                          actions, top_factors, key_numbers, unavailable, inputs, generator, model)
-                   VALUES (%(site)s, %(for_date)s, %(text)s, %(now)s, %(go)s, %(top)s, %(headline)s, %(risks)s,
-                           %(actions)s, %(factors)s, %(numbers)s, %(unavailable)s, %(inputs)s, %(generator)s, %(model)s)
-                   ON CONFLICT (site_id, for_date) DO UPDATE SET
-                       text = EXCLUDED.text, created_at = EXCLUDED.created_at, go_status = EXCLUDED.go_status,
-                       top_hazard = EXCLUDED.top_hazard, headline = EXCLUDED.headline, risks = EXCLUDED.risks,
-                       actions = EXCLUDED.actions, top_factors = EXCLUDED.top_factors,
-                       key_numbers = EXCLUDED.key_numbers, unavailable = EXCLUDED.unavailable,
-                       inputs = EXCLUDED.inputs, generator = EXCLUDED.generator, model = EXCLUDED.model""",
-                {"site": site_id, "for_date": inputs["for_date"], "text": written.text, "now": now,
-                 "go": inputs["go_status"], "top": inputs["top_hazard"], "headline": written.headline,
-                 "risks": Jsonb(written.risks), "actions": Jsonb(written.actions), "factors": Jsonb(factors),
-                 "numbers": Jsonb(numbers), "unavailable": unavailable, "inputs": Jsonb(inputs),
-                 "generator": written.generator, "model": written.model})
-        done.append(site_id)
+
+    def write_and_store(item: tuple[str, tuple[dict, list[dict]]]) -> str:
+        site_id, (inputs, factors) = item
+        _store(pool, site_id, inputs, factors, write(inputs), now)
+        return site_id
+
+    with ThreadPoolExecutor(max_workers=get_settings().briefing_concurrency) as workers:
+        done = list(workers.map(write_and_store, built.items()))
     log.info("Briefings generated for %d sites", len(done))
     return done
+
+
+def latest_all(pool: ConnectionPool) -> list[dict]:
+    """The latest briefing for every site that has one, largest plant first (like /sites)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            f"""SELECT * FROM (
+                    SELECT DISTINCT ON (b.site_id) {COLUMNS}, s.capacity_mw
+                    FROM briefings b JOIN sites s ON s.id = b.site_id
+                    ORDER BY b.site_id, b.for_date DESC, b.created_at DESC) latest
+                ORDER BY capacity_mw DESC, site_id""").fetchall()
 
 
 def latest(pool: ConnectionPool, site_id: str) -> dict | None:
@@ -125,6 +151,7 @@ async def run_loop(pool: ConnectionPool) -> None:
 
 def to_response(row: dict) -> dict:
     """DB row -> Briefing (shared/types.ts)."""
+    row = {k: v for k, v in row.items() if k != "capacity_mw"}
     return {**row, "for_date": row["for_date"].isoformat(), "unavailable": row["unavailable"] or []}
 
 

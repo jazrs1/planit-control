@@ -12,7 +12,7 @@ export default async function AlertsPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-brand">Active alerts</h1>
         <p className="mt-1 text-sm text-muted">
-          Stop-work notices and live lightning all-clear countdowns.
+          Lightning stop-work countdowns and flood-risk notices.
         </p>
       </header>
       <AlertsList sites={sites} />

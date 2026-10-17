@@ -22,5 +22,7 @@ export function formatAlertTime(started_at: Alert["started_at"], timezone?: Site
 
 export function floodReason(conditions?: FloodConditions): string {
   if (!conditions?.hazard_status || !conditions.as_of) return "Reason unavailable";
-  return conditions.reading?.trim() || conditions.source?.trim() || "Reason unavailable";
+  const reason = conditions.reading?.trim() || conditions.source?.trim() || "Reason unavailable";
+  // The banner already says FLOOD RISK; the card reading may start with "Flood risk: ".
+  return reason.replace(/^flood risk:\s*/i, "").replace(/^./, (c) => c.toUpperCase());
 }

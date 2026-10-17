@@ -3,7 +3,11 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+ReportCategory = Literal[
+    "downed_line", "flooding", "wildlife", "fire_smoke", "heat_illness", "unsafe_ground", "other"
+]
 
 HazardType = Literal["heat", "lightning", "flood", "soil_saturation", "wildfire", "wildlife"]
 HazardIndex = Annotated[float, Field(ge=0, le=10)]
@@ -81,6 +85,18 @@ class WildlifeSummary(HazardCard):
     crew_reports_2mi: int
 
 
+class CrewReportNote(BaseModel):
+    id: str
+    category: ReportCategory
+    species: str | None = None
+    reported_at: datetime
+    distance_mi: float
+
+
+class CrewHazards(HazardCard):
+    reports: list[CrewReportNote]
+
+
 class SiteConditions(BaseModel):
     heat: HeatConditions
     lightning: LightningConditions
@@ -89,6 +105,7 @@ class SiteConditions(BaseModel):
     wildfire: WildfireConditions
     wildlife: list[WildlifeSighting]
     wildlife_summary: WildlifeSummary | None = None
+    crew_hazards: CrewHazards | None = None
 
 
 class NwsAlert(BaseModel):
@@ -122,9 +139,6 @@ class Alert(BaseModel):
     last_strike_distance_mi: float | None
 
 
-ReportCategory = Literal[
-    "downed_line", "flooding", "wildlife", "fire_smoke", "heat_illness", "unsafe_ground", "other"
-]
 
 
 class CreateReportRequest(BaseModel):
@@ -135,6 +149,15 @@ class CreateReportRequest(BaseModel):
     category: ReportCategory
     note: str
     reporter_role: Literal["crew_member", "foreman", "safety_officer"]
+    # Wildlife only, e.g. "Snake", "Alligator". Optional; blank is stored as null.
+    species: str | None = Field(None, max_length=60)
+
+    @model_validator(mode="after")
+    def _species_for_wildlife_only(self):
+        self.species = (self.species or "").strip() or None
+        if self.species and self.category != "wildlife":
+            raise ValueError("species is only for category 'wildlife'")
+        return self
 
 
 class UploadResponse(BaseModel):
@@ -168,7 +191,7 @@ class Briefing(BaseModel):
     risks: list[str] | None = None
     actions: list[str] | None = None
     top_factors: list[ContributingFactor] | None = None
-    generator: Literal["gemini", "template"] | None = None
+    generator: Literal["claude", "gemini", "template"] | None = None
     model: str | None = None
     unavailable: list[str] | None = None
 
