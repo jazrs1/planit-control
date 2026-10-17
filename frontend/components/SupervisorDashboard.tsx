@@ -22,6 +22,8 @@ const SITES_MS = 30_000;
 const LIGHTNING_MS = 10_000;
 const RETRY_MS = 5_000;
 const REPORTS_MS = 60_000;
+/** Older than this in real time, a flash is from a replay (real flashes are at most 15 min old). */
+const REPLAY_FLASH_AGE_MS = 3 * 60 * 60_000;
 /** FIRMS is polled every 30 min on the server and iNaturalist every 6 h: no need to ask more often. */
 const FIRES_MS = 5 * 60_000;
 const WILDLIFE_MS = 30 * 60_000;
@@ -61,16 +63,13 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const replaying = replay?.running ?? false;
   const sites = demo ? DEMO_DATA.sites : liveSites;
   const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
-  // During a replay /lightning/recent runs on the simulated clock, so its flashes are the replay's:
-  // they're drawn blue and counted apart. Real flashes can't be fetched at the same time.
-  const replayFrom = replay?.running && replay.window_start ? Date.parse(replay.window_start) - 60 * 60_000 : null;
-  const replayTo = replay?.running && replay.quiet_until ? Date.parse(replay.quiet_until) : null;
+  // During a replay /lightning/recent runs on the simulated clock, so it returns only the replay's
+  // flashes, timestamped in the recorded storm. A real flash is never more than minutes old in real
+  // time, so a flash hours older than real time can only be a replay one: drawn blue, counted apart.
   const isReplayFlash = useCallback((flash: LightningFlash) => {
-    if (!replay?.running) return false;
-    if (replayFrom === null || replayTo === null) return true;
     const ts = Date.parse(flash.ts);
-    return ts >= replayFrom && ts <= replayTo;
-  }, [replay?.running, replayFrom, replayTo]);
+    return Number.isFinite(ts) && Date.now() - ts > REPLAY_FLASH_AGE_MS;
+  }, []);
   const cells = demo ? DEMO_DATA.lightningCells : liveCells;
   // Fade by age on the backend clock (simulated during replay, the demo clock in demo mode).
   // Offline, freeze the fade where it was: with no new data, letting flashes drain away would make
@@ -198,7 +197,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const stat = (label: string, value: number, solid?: string) => {
     const shown = alertsKnown ? `${value}${alertsStale ? "?" : ""}` : "—";
     const style = countUnknown ? "text-muted" : solid && value > 0 ? solid : "";
-    return <div className={`grid content-between gap-1 px-2 py-1.5 ${style}`}><dt className={`text-xs font-medium ${style ? "" : "text-muted"}`}>{label}</dt><dd className="text-3xl font-bold leading-none tracking-[-0.02em]">{shown}</dd></div>;
+    return <div className={`grid content-between gap-1.5 rounded-[6px] px-2 py-2 ${style}`}><dt className={`text-xs ${style ? "" : "text-muted"}`}>{label}</dt><dd className="text-[2rem] font-normal leading-none tracking-[-0.02em] tabular-nums">{shown}</dd></div>;
   };
   const layerRow = (key: keyof MapLayers | null, label: string, detail: string, swatch: string) => (
     <li key={label}>
@@ -206,7 +205,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
         <input type="checkbox" className="size-4 shrink-0 accent-(--pc-ink)" disabled={!key} checked={key ? layers[key] : false}
           onChange={key ? (event) => setLayers((value) => ({ ...value, [key]: event.target.checked })) : undefined} />
         <span aria-hidden="true" className={`size-3 shrink-0 ${swatch}`} />
-        <span className="grid leading-tight"><span className="text-[0.8125rem] font-semibold">{label}</span><span className="text-[0.6875rem] text-muted">{detail}</span></span>
+        <span className="grid leading-tight"><span className="text-sm font-semibold">{label}</span><span className="text-[0.6875rem] text-muted">{detail}</span></span>
       </label>
     </li>
   );
@@ -251,7 +250,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
             <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} focusKey={focusKey} isReplayFlash={isReplayFlash} callouts />
             <details ref={layersPanel} data-map-avoid className="pc-float group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)]">
               <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3">
-                <span className="flex items-center gap-2 text-[0.8125rem] font-bold">
+                <span className="flex items-center gap-2 text-sm font-semibold">
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4"><path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
                   Layers
                 </span>
@@ -295,10 +294,10 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
           </div>
 
           <section aria-labelledby="sites-heading" data-map-avoid className="z-20 flex min-h-0 flex-col bg-surface max-lg:order-2 lg:pc-float lg:absolute lg:inset-bs-3 lg:inset-be-3 lg:inset-e-3 lg:w-(--pc-rail-width)">
-            <div className="shrink-0 space-y-3 border-be border-border px-5 py-4">
+            <div className="shrink-0 space-y-4 border-be border-border px-5 pbs-5 pbe-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h1 id="sites-heading" className="text-xl font-bold tracking-[-0.01em]">Sites by risk</h1>
+                  <h1 id="sites-heading" className="text-xl font-semibold tracking-[-0.01em]">Sites by risk</h1>
                   <InfoButton id="sites-help" label="About these counts and the order">
                     <p>Counts are real alerts only. A storm replay&apos;s counts are on the replay panel.</p>
                     <p>Real stop-work sites first, then replay stop-work, then the highest live hazard index. Select a site for details.</p>
@@ -325,7 +324,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
             </div>
             {/* relative: contains the cards' absolutely positioned screen-reader text, which otherwise escapes
                 the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
-            <ul className="relative divide-y divide-border lg:overflow-y-auto lg:overscroll-contain">
+            <ul className="relative divide-y divide-border/70 lg:overflow-y-auto lg:overscroll-contain">
               {sorted.map((site, index) => <li key={site.id} className={!showAll && index >= PHONE_SITES ? "max-lg:hidden" : ""} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }}>
                 <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} realNowMs={replaying ? Date.now() : serverNow()} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
                   onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />

@@ -51,32 +51,29 @@ export function replayWindowLabel(replay: Pick<ReplayStatus, "window" | "window_
 type Span = { t0: number; t1: number; now: number };
 const at = (span: Span, ms: number) => Math.max(0, Math.min(100, ((ms - span.t0) / (span.t1 - span.t0)) * 100));
 
-/** Quiet bars on the window's time axis, one color, a baseline and nothing else. */
-function FlashBars({ bins, span }: { bins: ReplaySeriesBin[]; span: Span }) {
-  const max = Math.max(1, ...bins.map((bin) => bin.flashes));
-  const slot = (BIN_MS / (span.t1 - span.t0)) * 100;
+/** A thin line with a soft area under it, on the window's time axis; a baseline and nothing else. */
+function AreaLine({ values, span, max, step = false }: { values: { start: number; value: number }[]; span: Span; max: number; step?: boolean }) {
+  const y = (v: number) => 39 - (v / Math.max(1, max)) * 36;
+  let d = "";
+  values.forEach((point, i) => {
+    const x0 = at(span, point.start), x1 = at(span, Math.min(point.start + BIN_MS, span.now));
+    d += step ? `${i ? "L" : "M"}${x0} ${y(point.value)} H${x1} ` : `${i ? "L" : "M"}${(x0 + x1) / 2} ${y(point.value)} `;
+  });
+  const first = values[0], last = values.at(-1);
+  const area = first && last ? `${d}L${step ? at(span, Math.min(last.start + BIN_MS, span.now)) : (at(span, last.start) + at(span, Math.min(last.start + BIN_MS, span.now))) / 2} 40 L${step ? at(span, first.start) : (at(span, first.start) + at(span, Math.min(first.start + BIN_MS, span.now))) / 2} 40 Z` : "";
   return <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="block h-9 w-full" aria-hidden="true">
-    {bins.map((bin) => {
-      const h = Math.max(0.5, (bin.flashes / max) * 38);
-      return <rect key={bin.start} x={at(span, Date.parse(bin.start)) + slot * 0.3} y={40 - h} width={slot * 0.4} height={h} className="fill-muted" />;
-    })}
     <line x1="0" x2="100" y1="39.5" y2="39.5" className="stroke-instrument-line" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+    {area && <path d={area} className="fill-muted" opacity={0.18} />}
+    {d && <path d={d} fill="none" className="stroke-text" strokeWidth="1.25" strokeLinejoin="round" vectorEffect="non-scaling-stroke" opacity={0.85} />}
   </svg>;
 }
 
-/** A thin step line of sites in stop-work at the end of each bin, same color as the bars. */
+function FlashBars({ bins, span }: { bins: ReplaySeriesBin[]; span: Span }) {
+  return <AreaLine values={bins.map((bin) => ({ start: Date.parse(bin.start), value: bin.flashes }))} span={span} max={Math.max(1, ...bins.map((bin) => bin.flashes))} />;
+}
+
 function StopSteps({ bins, span }: { bins: ReplaySeriesBin[]; span: Span }) {
-  const max = Math.max(4, ...bins.map((bin) => bin.sites_in_stop_work));
-  const y = (count: number) => 39 - (count / max) * 36;
-  let d = "";
-  bins.forEach((bin, i) => {
-    const start = at(span, Date.parse(bin.start)), end = at(span, Math.min(Date.parse(bin.start) + BIN_MS, span.now));
-    d += `${i ? "L" : "M"}${start} ${y(bin.sites_in_stop_work)} H${end} `;
-  });
-  return <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="block h-9 w-full" aria-hidden="true">
-    <line x1="0" x2="100" y1="39.5" y2="39.5" className="stroke-instrument-line" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-    {d && <path d={d} fill="none" className="stroke-muted" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
-  </svg>;
+  return <AreaLine step values={bins.map((bin) => ({ start: Date.parse(bin.start), value: bin.sites_in_stop_work }))} span={span} max={Math.max(4, ...bins.map((bin) => bin.sites_in_stop_work))} />;
 }
 
 type ReplayTimelineProps = {
@@ -117,8 +114,8 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
 
   if (!running) {
     return (
-      <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 bg-instrument px-4 py-2.5 text-text shadow-float">
-        <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
+      <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-instrument px-4 py-2 text-text shadow-float">
+        <h2 id="replay-heading" className="text-sm font-semibold">Storm replay</h2>
         <p className="min-w-0 flex-1 basis-56 text-xs text-muted sm:truncate">{replayWindowLabel(replay)} · plays a recorded storm through the live pipeline</p>
         <ReplayControl />
       </section>
@@ -139,10 +136,10 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
   };
 
   return (
-    <section data-theme="dark" aria-labelledby="replay-heading" className={`pc-reveal grid bg-instrument text-text shadow-float lg:grid-cols-[minmax(0,1fr)_16rem] ${stale ? "grayscale" : ""}`}>
+    <section data-theme="dark" aria-labelledby="replay-heading" className={`pc-reveal grid overflow-clip rounded-card bg-instrument text-text shadow-float lg:grid-cols-[minmax(0,1fr)_16rem] ${stale ? "grayscale" : ""}`}>
       <div className="grid min-w-0 gap-3 p-4">
         <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
+          <h2 id="replay-heading" className="text-sm font-semibold">Storm replay</h2>
           <span className="pc-chip pc-chip--replay">REPLAY</span>
           <span className="text-xs text-muted">{replayWindowLabel(replay)}</span>
           <span className="ms-auto text-xs">
@@ -189,7 +186,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
 
       <details ref={details} className="group min-w-0 border-bs border-instrument-line p-4 lg:border-bs-0 lg:border-s">
         <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2">
-          <span className="text-sm font-bold">Key events</span>
+          <span className="text-sm font-semibold">Key events</span>
           <span className="flex items-center gap-2 text-xs text-muted"><span className="font-mono">{timeline.events === null ? "…" : events.length}</span><span aria-hidden="true" className="motion-safe:transition-[rotate] group-open:rotate-180">▾</span></span>
         </summary>
         {events.length === 0
