@@ -86,14 +86,26 @@ if ! as_app ssh-keygen -F github.com -f "$KNOWN" >/dev/null 2>&1; then
     || fail "github.com's host key doesn't match GitHub's published fingerprint"
   echo "$scanned" | as_app tee -a "$KNOWN" >/dev/null
 fi
+shown=0
 until as_app git ls-remote "$REPO" HEAD >/dev/null 2>&1; do
-  echo
-  echo "Add this key as a read-only deploy key (no write access):"
-  echo "  https://github.com/jazrs1/planit-control/settings/keys/new"
-  echo
-  cat "$KEY.pub"
-  echo
-  read -rp "Press Enter once it's added (Ctrl-C to stop)... "
+  if (( ! shown )); then
+    echo
+    echo "Add this key as a read-only deploy key (no write access):"
+    echo "  https://github.com/jazrs1/planit-control/settings/keys/new"
+    echo "  or from a machine with gh: gh repo deploy-key add KEYFILE -R jazrs1/planit-control -t <title>"
+    echo
+    cat "$KEY.pub"
+    echo
+    shown=1
+  fi
+  if [[ -t 0 ]]; then
+    read -rp "Press Enter once it's added (Ctrl-C to stop)... "
+  else
+    # No terminal (e.g. ssh without -t, or run by another script): wait for the key instead of
+    # exiting at the prompt.
+    echo "Waiting for the deploy key (checking every 10 s; Ctrl-C to stop)..."
+    sleep 10
+  fi
 done
 echo "GitHub access OK"
 
