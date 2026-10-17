@@ -19,5 +19,12 @@
     "seconds_to_all_clear": null,
     "minutes_to_arrival": null,
     "as_of": "2025-08-04T22:30:00Z"
+  },
+  "unknown": {
+    "site_id": "sanford",
+    "state": "unknown",
+    "seconds_to_all_clear": null,
+    "minutes_to_arrival": null,
+    "as_of": "2025-08-04T22:30:00Z"
   }
 }

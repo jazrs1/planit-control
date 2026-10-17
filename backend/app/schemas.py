@@ -356,7 +356,7 @@ class LightningCell(BaseModel):
 
 class Beacon(BaseModel):
     site_id: str
-    state: Literal["stop", "approaching", "flood", "clear"]
+    state: Literal["stop", "approaching", "flood", "clear", "unknown"]
     seconds_to_all_clear: int | None
     minutes_to_arrival: int | None
     as_of: datetime

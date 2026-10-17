@@ -10,6 +10,7 @@ from app.cache import api_cache
 from app.db import get_pool, get_pool_optional
 from app.schemas import Beacon, ScoreHistory, Site, SiteDetail
 from hazards import model_scores
+from lightning import health
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 
@@ -59,10 +60,11 @@ def score_history(site_id: str, pool: ConnectionPool | None = Depends(get_pool_o
 
 @router.get("/{site_id}/beacon", response_model=Beacon)
 def site_beacon(site_id: str, pool: ConnectionPool = Depends(get_pool)):
-    """Tiny state for a hardware alarm: stop > approaching > flood > clear, with seconds to the
-    lightning all-clear or minutes until the storm arrives. App clock (simulated during replay),
+    """Tiny state for a hardware alarm: stop > unknown > approaching > flood > clear, with seconds to
+    the lightning all-clear or minutes until the storm arrives. App clock (simulated during replay),
     except that a real stop-work always wins: during a replay a live stop-work is reported on real time.
-    Cached like /alerts; alert and advisory changes clear the cache."""
+    "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on that clock
+    (lightning/health.py). Cached like /alerts; alert and advisory changes clear the cache."""
     if site_data.known_site(site_id) is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
 
@@ -76,7 +78,8 @@ def site_beacon(site_id: str, pool: ConnectionPool = Depends(get_pool)):
                     return _json(_beacon, approach.beacon(site_id, live, None, real_now))
             alerts = engine.active_alerts(conn, now, replay, site_id=site_id)
             advisories = approach.active_advisories(conn, replay, site_id=site_id)
-        return _json(_beacon, approach.beacon(site_id, alerts, advisories[0] if advisories else None, now))
+        current = health.is_current(now, replay=replay)
+        return _json(_beacon, approach.beacon(site_id, alerts, advisories[0] if advisories else None, now, current))
 
     return Response(api_cache.get_or_compute(("beacon", site_id, clock.is_simulated()), compute),
                     media_type="application/json")

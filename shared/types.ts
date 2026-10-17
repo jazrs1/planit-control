@@ -368,8 +368,12 @@ export type LightningCellsResponse = LightningCell[];
 
 // ---------- GET /sites/{id}/beacon ----------
 
-/** Tiny state for a hardware alarm. Priority: stop > approaching > flood > clear. */
-export type BeaconState = "stop" | "approaching" | "flood" | "clear";
+/**
+ * Tiny state for a hardware alarm. Priority: stop > unknown > approaching > flood > clear.
+ * "unknown": lightning ingestion hasn't succeeded in the last 2 minutes (replay: on the replay clock),
+ * so the site must not be shown as clear.
+ */
+export type BeaconState = "stop" | "approaching" | "flood" | "clear" | "unknown";
 
 export interface Beacon {
   site_id: string;

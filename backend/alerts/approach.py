@@ -191,13 +191,18 @@ def view(adv: dict | None, now: datetime) -> dict | None:
             "issued_at": adv["started_at"], "updated_at": adv["updated_at"]}
 
 
-def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetime) -> dict:
+def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetime, current: bool = True) -> dict:
     """State for a hardware alarm, from the site's alerts in effect at `now` and its open advisory.
-    Priority: stop (lightning stop-work) > approaching > flood (our flood-risk alert) > clear."""
+    Priority: stop (lightning stop-work) > unknown > approaching > flood (our flood-risk alert) > clear.
+    `current`: lightning ingestion succeeded recently (lightning/health.py). When it hasn't, anything
+    short of a stop-work is "unknown": no data must never read as clear."""
     stop = next((a for a in alerts if a["type"] == engine.ALERT_TYPE), None)
     if stop:
         return {"site_id": site_id, "state": "stop", "minutes_to_arrival": None, "as_of": now,
                 "seconds_to_all_clear": max(0, math.ceil((stop["all_clear_at"] - now).total_seconds()))}
+    if not current:
+        return {"site_id": site_id, "state": "unknown", "seconds_to_all_clear": None, "minutes_to_arrival": None,
+                "as_of": now}
     if advisory:
         return {"site_id": site_id, "state": "approaching", "seconds_to_all_clear": None, "as_of": now,
                 "minutes_to_arrival": max(0, math.ceil((advisory["arrival_at"] - now).total_seconds() / 60))}
