@@ -66,7 +66,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
       </section>}
       {stale && <p role="alert" className="rounded-card border border-border bg-surface p-3 font-medium text-muted">Connection lost · Reports not confirmed. Showing the last real reports; new reports may be missing.</p>}
       {!unknown && <div className={stale ? "space-y-4 grayscale opacity-60" : "space-y-4"}>
-      <ReportMap reports={sorted} selectedId={selectedId} onSelect={selectFromMap} />
+      <ReportMap reports={sorted} selectedId={selectedId} onSelect={selectFromMap} emptyText={sorted.length === 0 && !stale ? "No reports yet" : undefined} />
       {sorted.length === 0 ? <p className="rounded-card border border-border bg-surface p-4 text-muted">{stale ? "The last loaded list was empty. Current reports are unknown." : "No crew hazard reports yet."}</p> : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {sorted.map((report) => {

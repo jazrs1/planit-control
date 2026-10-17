@@ -90,7 +90,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
         ? <h2 className="text-base"><button type="button" onClick={onSelect} aria-expanded={selected} className="flex min-h-14 w-full items-center gap-3 px-4 py-2 focus-visible:outline-2 focus-visible:-outline-offset-2 hover:bg-surface-2/60">{row}</button></h2>
         : <h2 className="flex min-h-14 items-center gap-3 px-4 py-2 text-base">{row}</h2>}
 
-      {selected && <div className="flex flex-col gap-3 px-4 pbe-4">
+      {selected && <div className="pc-reveal flex flex-col gap-3 px-4 pbe-4">
         <p className="text-xs text-muted">{site.county} County · {timeZoneAbbr(site.timezone)} · Top hazard: <span className="text-text">{HAZARD_LABEL[site.top_hazard]}</span></p>
         {alerts.map((alert) => <AlertBanner key={alert.id} alert={alert} site={site} flood={flood} compact unconfirmed={alertsUnconfirmed} />)}
         <LightningApproachChip approach={site.lightning_approach} stopWork={!!lightning} unconfirmed={approachUnconfirmed} nowMs={approachNow} demo={demo} />
