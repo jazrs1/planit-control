@@ -339,16 +339,20 @@ def test_beacon_is_unknown_not_clear_when_lightning_ingestion_is_stale(conn, mon
     assert state(real - timedelta(minutes=3)) == "unknown"          # nothing ingested for 3 min
     assert state(None) == "unknown"                                 # never since the API started
 
-    # During a replay, the replay's own cycles are judged on the replay clock.
+    # During a replay, replay cycles are judged on the replay clock and live ones on real time; either
+    # being stale makes the beacon unknown.
     sim = datetime(2025, 8, 4, 22, 5, tzinfo=timezone.utc)
     monkeypatch.setattr(clock, "is_simulated", lambda: True)
     monkeypatch.setattr(clock, "now", lambda: sim)
-    route.api_cache.invalidate()
-    monkeypatch.setattr(health, "_last_success", {True: sim - timedelta(seconds=20), False: real - timedelta(hours=1)})
-    assert json.loads(route.site_beacon("sanford", FakePool(conn)).body)["state"] == "clear"
-    route.api_cache.invalidate()
-    monkeypatch.setattr(health, "_last_success", {True: sim - timedelta(minutes=5), False: real})
-    assert json.loads(route.site_beacon("sanford", FakePool(conn)).body)["state"] == "unknown"
+
+    def replay_state(last):
+        route.api_cache.invalidate()
+        monkeypatch.setattr(health, "_last_success", last)
+        return json.loads(route.site_beacon("sanford", FakePool(conn)).body)["state"]
+
+    assert replay_state({True: sim - timedelta(seconds=20), False: real - timedelta(seconds=20)}) == "clear"
+    assert replay_state({True: sim - timedelta(minutes=5), False: real}) == "unknown"
+    assert replay_state({True: sim, False: real - timedelta(hours=1)}) == "unknown"     # real data stale
 
 
 def test_beacon_priority_with_stale_data():
@@ -360,6 +364,96 @@ def test_beacon_priority_with_stale_data():
     for alerts, adv in (([], None), ([flood], None), ([], advisory)):
         b = approach.beacon("s", alerts, adv, now, current=False)
         assert b["state"] == "unknown" and b["seconds_to_all_clear"] is None and b["minutes_to_arrival"] is None
+
+
+def test_combined_beacon_highest_priority_wins():
+    def b(state, seconds=None, minutes=None):
+        return {"site_id": "s", "state": state, "seconds_to_all_clear": seconds, "minutes_to_arrival": minutes,
+                "as_of": None}
+    assert approach.combine_beacons([b("clear"), b("stop", 600)])["state"] == "stop"
+    assert approach.combine_beacons([b("flood"), b("clear")])["state"] == "flood"
+    assert approach.combine_beacons([b("approaching", minutes=20), b("flood")])["state"] == "approaching"
+    assert approach.combine_beacons([b("clear"), b("unknown")])["state"] == "unknown"
+    assert approach.combine_beacons([b("unknown"), b("stop", 60)])["state"] == "stop"
+    assert approach.combine_beacons([b("stop", 300), b("stop", 1200)])["seconds_to_all_clear"] == 1200   # longer wait
+    assert approach.combine_beacons([b("approaching", minutes=25), b("approaching", minutes=8)])["minutes_to_arrival"] == 8
+
+
+def test_beacon_during_a_replay_keeps_real_flood_and_real_advisories(conn, monkeypatch):  # noqa: F811
+    import json
+
+    from app import clock
+    from app.cache import TTLCache
+    from app.routers import sites as route
+    from tests.test_crew_reports import FakePool
+    _ensure_table(conn)
+    monkeypatch.setattr(route, "api_cache", TTLCache())
+    real = datetime.now(timezone.utc)
+    sim = datetime(2025, 8, 4, 22, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr(clock, "is_simulated", lambda: True)
+    monkeypatch.setattr(clock, "now", lambda: sim)
+    monkeypatch.setattr(health, "_last_success", {True: sim, False: real})
+    conn.execute("DELETE FROM alerts WHERE site_id = 'sanford' AND status = 'active'")
+    conn.execute("DELETE FROM lightning_advisories WHERE site_id = 'sanford'")
+
+    def state():
+        route.api_cache.invalidate()
+        return json.loads(route.site_beacon("sanford", FakePool(conn)).body)
+
+    assert state()["state"] == "clear"
+    conn.execute("INSERT INTO alerts (site_id, type, started_at, replay) VALUES ('sanford', 'flood', %s, false)",
+                 (real - timedelta(hours=1),))
+    assert state()["state"] == "flood" and state()["replay"] is False      # a real flood alert, replay is quiet
+    conn.execute("""INSERT INTO lightning_advisories (site_id, replay, started_at, updated_at, arrival_at, first_arrival_at,
+                                                      from_bearing_deg, heading_deg, speed_mph, distance_mi, cell_flashes)
+                    VALUES ('sanford', false, %s, %s, %s, %s, 250, 70, 22, 18.5, 140)""",
+                 (real - timedelta(minutes=4), real, real + timedelta(minutes=9, seconds=30), real + timedelta(minutes=12)))
+    body = state()
+    assert body["state"] == "approaching" and body["minutes_to_arrival"] == 10   # real advisory, on real time
+    conn.execute("""INSERT INTO alerts (site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay)
+                    VALUES ('sanford', 'lightning', %s, %s, %s, 3.0, true)""",
+                 (sim - timedelta(minutes=2), sim + timedelta(minutes=28), sim - timedelta(minutes=2)))
+    body = state()
+    assert body["state"] == "stop" and body["seconds_to_all_clear"] == 28 * 60    # the replay's stop-work wins
+    assert body["replay"] is True                                                 # its countdown is simulated
+
+
+def test_sites_during_a_replay_still_show_real_stop_work_and_flood_alerts(conn, monkeypatch):  # noqa: F811
+    from app import clock, site_data
+    from tests.test_crew_reports import FakePool
+    _ensure_table(conn)
+    real = datetime.now(timezone.utc)
+    sim = datetime(2025, 8, 4, 22, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr(clock, "is_simulated", lambda: True)
+    monkeypatch.setattr(clock, "now", lambda: sim)
+    conn.execute("DELETE FROM alerts WHERE site_id IN ('sanford', 'big-bend', 'polk') AND status = 'active'")
+    conn.execute("DELETE FROM lightning_advisories WHERE site_id IN ('sanford', 'big-bend', 'polk')")
+    lightning = """INSERT INTO alerts (site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay)
+                   VALUES (%s, 'lightning', %s, %s, %s, %s, %s)"""
+    conn.execute(lightning, ("sanford", real - timedelta(minutes=5), real + timedelta(minutes=25),
+                             real - timedelta(minutes=5), 4.2, False))                      # real stop-work
+    conn.execute(lightning, ("big-bend", sim - timedelta(minutes=2), sim + timedelta(minutes=28),
+                             sim - timedelta(minutes=2), 7.7, True))                        # replayed stop-work
+    conn.execute(lightning, ("big-bend", real - timedelta(minutes=1), real + timedelta(minutes=29),
+                             real - timedelta(minutes=1), 2.1, False))                      # and a real one too
+    conn.execute("INSERT INTO alerts (site_id, type, started_at, replay) VALUES ('polk', 'flood', %s, false)",
+                 (real - timedelta(hours=1),))                                              # real flood alert
+
+    sanford = site_data.get_site_detail(FakePool(conn), "sanford")
+    assert sanford["hazard_index_today"] >= 9.0 and sanford["top_hazard"] == "lightning"
+    assert sanford["conditions"]["lightning"]["hazard_status"] == "danger"
+    assert "4.2 mi" in sanford["conditions"]["lightning"]["reading"]
+    big_bend = site_data.get_site_detail(FakePool(conn), "big-bend")
+    assert "2.1 mi" in big_bend["conditions"]["lightning"]["reading"]                  # the real one wins
+    polk = site_data.get_site_detail(FakePool(conn), "polk")
+    assert polk["conditions"]["flood"]["hazard_status"] == "danger" and polk["hazard_index_today"] >= 4
+    listed = {s["id"]: s for s in site_data.list_sites(FakePool(conn))}
+    assert listed["sanford"]["hazard_index_today"] >= 9.0 and listed["big-bend"]["hazard_index_today"] >= 9.0
+
+    # Stored history (replay=False) never sees the replayed stop-work.
+    from hazards import snapshot
+    snap = snapshot.load(FakePool(conn), replay=False)
+    assert snap.inputs["big-bend"].lightning_alert["replay"] is False
 
 
 def test_health_window_and_reset():

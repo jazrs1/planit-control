@@ -384,6 +384,9 @@ export interface Beacon {
    * (optimistic: lightning can come sooner; not a countdown). */
   minutes_to_arrival: number | null;
   as_of: string;
+  /** true: the state comes from a lightning replay, so `seconds_to_all_clear` and `as_of` are on the
+   *  replay clock (simulated seconds). false: real, on real time, even while a replay runs. */
+  replay: boolean;
 }
 
 // ---------- POST /replay/start, POST /replay/stop, GET /replay/status ----------

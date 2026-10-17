@@ -44,9 +44,10 @@ The arrival time is when that edge first comes within 10 miles of the site, if i
 |---|---|
 | `GET /sites`, `GET /sites/{id}` | `lightning_approach` on each site: `arrival_at`, `minutes_to_arrival`, `from_direction` (e.g. "WSW"), `speed_mph`, `heading_deg`, `distance_mi`, `issued_at`, `updated_at`. `null` when nothing is approaching or the site is already in stop-work. |
 | `GET /lightning/cells` | Current storm cells, largest first: center, `radius_mi`, `flash_count` (20 min), `recent_flashes` (5 min), `tracked`, `speed_mph`, `heading_deg`, `moving_toward`. Ids are per response, not stable. |
-| `GET /sites/{id}/beacon` | Tiny JSON for a hardware alarm: `state` is `stop` > `approaching` > `flood` > `clear`, with `seconds_to_all_clear` (stop) or `minutes_to_arrival` (approaching). Cached like `/alerts`; every alert or advisory change clears the cache. |
+| `GET /sites/{id}/beacon` | Tiny JSON for a hardware alarm: `state` is `stop` > `unknown` > `approaching` > `flood` > `clear`, with `seconds_to_all_clear` (stop) or `minutes_to_arrival` (approaching), and `replay` (whose clock the countdown is on). Cached like `/alerts`; every alert or advisory change clears the cache. |
 
-`flood` is our own flood-risk alert (`alerts/flood.py`). It's live-only, so during a replay a beacon shows `stop`, `approaching` or `clear`, just as `/alerts` shows only replay alerts.
+- **`unknown`**: lightning ingestion hasn't succeeded in the last 2 minutes on that clock (`lightning/health.py`): no data never reads as clear. An active stop-work still shows `stop`.
+- **During a replay** the real state (real time) and the replay's state (replay clock) are both worked out and the higher one wins, so a real stop-work, advisory or flood alert (`alerts/flood.py`, live-only) is never hidden by a replay.
 
 ## How well it worked on the Aug 4, 2025 replay
 

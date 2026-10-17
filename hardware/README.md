@@ -99,13 +99,13 @@ UNKNOWN
 
 Before the demo, download the storm once: `cd backend && python -m scripts.find_replay_window`. The replay plays one real hour (6–7 PM Eastern, 22:00–23:00 UTC) at 30× speed, so the whole storm takes about 2 minutes. The bridge reads the speed from `GET /replay/status`, so the beacon's countdown runs at the same 30× and stays in step with the dashboard.
 
-Start the backend and frontend (repo `README.md`) and plug in the beacon. To start a replay, click **⚡ Replay storm** on the dashboard (http://localhost:3000), or:
+Start the backend and frontend (repo `README.md`) and plug in the beacon. To start a replay, click **⚡ Replay storm** on the dashboard (http://localhost:3000; it asks for the demo code, `ADMIN_TOKEN` in `backend/.env`), or:
 
 ```bash
-curl -X POST localhost:8000/replay/start -H "content-type: application/json" -d '{"speed": 30}'
+curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "content-type: application/json" -d '{"speed": 30}'
 ```
 
-Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop`; the beacon goes back to the live state. Flood alerts are live-only, so `FLOOD RISK` never appears during a replay.
+Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"`; the beacon goes back to the live state. During a replay the backend combines the real and replayed state for the site and the higher one wins (stop > unknown > approaching > flood > clear), so a real stop-work, storm warning or flood alert still shows. The beacon's `replay` field says whose countdown it is: only a replayed stop-work ticks at the replay speed.
 
 ### 1. Yellow, then red: Vandolah Power Station
 

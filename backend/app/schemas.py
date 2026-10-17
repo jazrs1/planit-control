@@ -360,3 +360,4 @@ class Beacon(BaseModel):
     seconds_to_all_clear: int | None
     minutes_to_arrival: int | None
     as_of: datetime
+    replay: bool = False   # the state comes from a replay: its countdown is in simulated seconds

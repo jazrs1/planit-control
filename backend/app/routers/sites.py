@@ -61,25 +61,29 @@ def score_history(site_id: str, pool: ConnectionPool | None = Depends(get_pool_o
 @router.get("/{site_id}/beacon", response_model=Beacon)
 def site_beacon(site_id: str, pool: ConnectionPool = Depends(get_pool)):
     """Tiny state for a hardware alarm: stop > unknown > approaching > flood > clear, with seconds to
-    the lightning all-clear or minutes until the storm arrives. App clock (simulated during replay),
-    except that a real stop-work always wins: during a replay a live stop-work is reported on real time.
-    "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on that clock
-    (lightning/health.py). Cached like /alerts; alert and advisory changes clear the cache."""
+    the lightning all-clear or minutes until the storm arrives. The real state is worked out on real
+    time; during a replay the replay's state is worked out on the replay clock too, and the higher
+    priority wins (approach.combine_beacons), so a real stop-work, advisory or flood alert is never
+    hidden by a replay. "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on
+    that clock (lightning/health.py). Cached like /alerts; alert and advisory changes clear the cache."""
     if site_data.known_site(site_id) is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
 
     def compute() -> bytes:
-        now, replay = clock.now(), clock.is_simulated()
         with pool.connection() as conn:
-            if replay:
-                real_now = clock.real_now()
-                live = engine.active_alerts(conn, real_now, False, site_id=site_id)
-                if any(a["type"] == engine.ALERT_TYPE for a in live):
-                    return _json(_beacon, approach.beacon(site_id, live, None, real_now))
-            alerts = engine.active_alerts(conn, now, replay, site_id=site_id)
-            advisories = approach.active_advisories(conn, replay, site_id=site_id)
-        current = health.is_current(now, replay=replay)
-        return _json(_beacon, approach.beacon(site_id, alerts, advisories[0] if advisories else None, now, current))
+            states = [_mode_beacon(conn, site_id, clock.real_now(), replay=False)]
+            if clock.is_simulated():
+                states.append(_mode_beacon(conn, site_id, clock.now(), replay=True))
+        return _json(_beacon, approach.combine_beacons(states))
 
     return Response(api_cache.get_or_compute(("beacon", site_id, clock.is_simulated()), compute),
                     media_type="application/json")
+
+
+def _mode_beacon(conn, site_id: str, now, *, replay: bool) -> dict:
+    """The beacon from one mode's alerts and advisory (real or replay), on that mode's clock."""
+    alerts = engine.active_alerts(conn, now, replay, site_id=site_id)
+    advisories = approach.active_advisories(conn, replay, site_id=site_id)
+    state = approach.beacon(site_id, alerts, advisories[0] if advisories else None, now,
+                            health.is_current(now, replay=replay))
+    return {**state, "replay": replay}
