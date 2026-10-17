@@ -98,7 +98,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
         : <p className="text-sm text-muted">Florida field operations · {replaying ? "Storm replay: refreshing every 3 seconds" : "Refreshes every 30 seconds, lightning every 10"}</p>;
 
   return (
-    <main className="flex min-h-[calc(100dvh-var(--pc-nav-height))] flex-col lg:h-[calc(100dvh-var(--pc-nav-height))] lg:overflow-hidden">
+    <main className="flex min-h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] flex-col lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] lg:overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-surface px-5 py-3">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold">Supervisor Dashboard</h1>
@@ -149,7 +149,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               {alertsStale && <p role="status" className="mt-2 text-center text-xs font-medium text-muted">? = last known before the connection was lost</p>}
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>
             </div>
-            <ul className="space-y-3 p-4 lg:overflow-y-auto">
+            {/* relative: contains the cards' absolutely positioned screen-reader text, which otherwise escapes
+                the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
+            <ul className="relative space-y-3 p-4 lg:overflow-y-auto">
               {sorted.map((site) => <li key={site.id} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }} onClick={() => setSelectedId(site.id)}>
                 <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
               </li>)}

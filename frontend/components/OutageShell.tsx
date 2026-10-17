@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useAlertsState } from "@/components/AlertsProvider";
 import { formatAgo } from "@/lib/time";
@@ -19,11 +19,25 @@ export default function OutageShell({ children }: { children: ReactNode }) {
     return () => window.clearInterval(timer);
   }, [outage]);
 
+  // Full-height pages (the dashboard) subtract the banner's height, like the nav's, so the banner
+  // never pushes their bottom edge (the map legend) off screen.
+  const banner = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = banner.current;
+    if (!outage || !el) { root.style.setProperty("--pc-outage-height", "0px"); return; }
+    const update = () => root.style.setProperty("--pc-outage-height", `${el.getBoundingClientRect().height}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => { observer.disconnect(); root.style.setProperty("--pc-outage-height", "0px"); };
+  }, [outage]);
+
   const last = connection.lastSuccessAt;
   return (
     <>
       {outage && (
-        <div role="alert" className="sticky top-0 z-40 border-b-2 border-risk-red bg-risk-red px-4 py-3 text-surface shadow-card">
+        <div ref={banner} role="alert" className="sticky top-0 z-40 border-b-2 border-risk-red bg-risk-red px-4 py-3 text-surface shadow-card">
           <div className="mx-auto max-w-5xl">
             <p className="text-lg font-bold">Status unknown · don&apos;t treat any site as clear</p>
             <p className="text-sm">
