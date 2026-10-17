@@ -102,12 +102,12 @@ test("missing, short (under 6 runs) and duplicate-only series show Not enough hi
 test("risk zones have fixed 0–10 geometry, latest point uses shared risk bands, and stale/demo states are explicit", () => {
   const html = renderChart({});
   for (const band of ["green", "amber", "red"]) assert.match(html, new RegExp(`fill-risk-${band}-bg`));
-  assert.match(html, /Latest 7\.0/);
+  assert.match(html, /3:00 PM run · 7\.0/, "a run label, never a bare 'Latest' that could contradict the row");
   assert.match(html, /r="4\.5" class="fill-risk-red stroke-surface"/);
   assert.match(html, /Oct 16, 3:00 PM CDT · 7\.0 \/ 10/);
   assert.match(html, /cx="592" cy="33\.2/);
   const stale = renderChart({ unconfirmed: true });
-  assert.match(stale, /Latest 7\.0 \?/);
+  assert.match(stale, /3:00 PM run · 7\.0 \?/);
   assert.match(stale, /Not confirmed/);
   assert.match(stale, /stroke-muted/);
   assert.doesNotMatch(stale, /fill-risk-(?:red|amber|green)/);

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Alert, FireDetection, HazardReport, LightningCell, LightningFlash, Site, WildlifeSightingPoint } from "@shared/types";
-import type { GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
+import type { ExpressionSpecification, GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 import { formatStrikeDistance } from "@/lib/alerts";
@@ -21,14 +21,15 @@ export const LIGHTNING_WINDOW_MIN = 15;
 const TILE_RECOVERY_MS = 3_000;
 
 /** Newest flash: opacity 1 and largest; a flash at the end of the window: faint (0.3) and small, but still findable. */
-function lightningGeoJson(flashes: LightningFlash[], nowMs: number): GeoJSON.FeatureCollection<GeoJSON.Point> {
+function lightningGeoJson(flashes: LightningFlash[], nowMs: number, isReplay: (flash: LightningFlash) => boolean): GeoJSON.FeatureCollection<GeoJSON.Point> {
   const windowMs = LIGHTNING_WINDOW_MIN * 60_000;
   const features = flashes.map((flash) => {
     const age = Math.min(1, Math.max(0, (nowMs - Date.parse(flash.ts)) / windowMs));
+    const replay = isReplay(flash);
     return {
       type: "Feature" as const,
       geometry: { type: "Point" as const, coordinates: [flash.lon, flash.lat] },
-      properties: { opacity: 1 - 0.7 * age, radius: 4.5 - 1.5 * age, age },
+      properties: { opacity: 1 - 0.7 * age, radius: 4.5 - 1.5 * age, age, replay },
     };
   });
   // Oldest first, so the newest flashes draw on top.
@@ -39,6 +40,24 @@ function lightningGeoJson(flashes: LightningFlash[], nowMs: number): GeoJSON.Fea
 /** Map layers the dashboard's layers panel can hide. */
 export type MapLayers = { lightning: boolean; cells: boolean; sites: boolean; reports: boolean; fires: boolean; wildlife: boolean };
 const ALL_LAYERS: MapLayers = { lightning: true, cells: true, sites: true, reports: true, fires: true, wildlife: false };
+
+const NO_REPLAY = () => false;
+/** A 20px (10 CSS px) triangle with a thin light rim, drawn once for the fire layer. */
+function fireIcon(color: string): ImageData {
+  const size = 20, canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext("2d")!;
+  g.beginPath(); g.moveTo(size / 2, 2); g.lineTo(size - 2, size - 3); g.lineTo(2, size - 3); g.closePath();
+  g.fillStyle = color; g.fill();
+  g.lineWidth = 2; g.strokeStyle = "rgba(255, 255, 255, 0.85)"; g.stroke();
+  return g.getImageData(0, 0, size, size);
+}
+
+/** A value that recedes at statewide zoom (scaled by `low` at zoom 5) and is full size from zoom 9.
+ *  MapLibre only allows zoom at the top of an expression, so the data value goes inside each stop. */
+function byZoom(value: ExpressionSpecification | number, low: number): ExpressionSpecification {
+  return ["interpolate", ["linear"], ["zoom"], 5, ["*", low, value], 9, value];
+}
 
 type SiteMapProps = {
   sites: Site[];
@@ -58,6 +77,8 @@ type SiteMapProps = {
   layers?: MapLayers;
   /** Crew hazard reports to pin on the map (newest first). */
   reports?: HazardReport[];
+  /** Which flashes belong to a storm replay (drawn blue, never as real lightning). */
+  isReplayFlash?: (flash: LightningFlash) => boolean;
   /** Satellite fire detections, last 24 h. */
   fires?: FireDetection[];
   /** Alligator and venomous-snake sightings and crew wildlife reports, last 30 days. */
@@ -79,7 +100,7 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0 }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0, isReplayFlash = NO_REPLAY }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -172,19 +193,19 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       filter: ["==", ["geometry-type"], "Polygon"],
       paint: {
         "fill-color": ["case", ["get", "uncertain"], muted, fill],
-        "fill-opacity": ["case", ["get", "uncertain"], 0.1, 0.18],
+        "fill-opacity": ["case", ["get", "uncertain"], 0.06, 0.1],
       },
     }, before);
     instance.addLayer({
       id: `${CELLS_SOURCE}-outline`, type: "line", source: CELLS_SOURCE,
       filter: ["==", ["geometry-type"], "Polygon"],
-      paint: { "line-color": ["case", ["get", "uncertain"], muted, fill], "line-width": 1.5, "line-opacity": 0.8 },
+      paint: { "line-color": ["case", ["get", "uncertain"], muted, fill], "line-width": 1, "line-opacity": 0.5 },
     }, before);
     instance.addLayer({
       id: `${CELLS_SOURCE}-arrows`, type: "line", source: CELLS_SOURCE,
       filter: ["==", ["geometry-type"], "LineString"],
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 2 },
+      paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 1.5, "line-opacity": 0.7 },
     }, before);
   }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs]);
 
@@ -192,16 +213,12 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   useEffect(() => {
     const instance = map.current;
     if (!styleLoaded || !instance) return;
-    const data = lightningGeoJson(flashes, flashNowMs);
-    const flash = resolveColor("--pc-lightning"), ring = resolveColor("--pc-lightning-ring");
+    const data = lightningGeoJson(flashes, flashNowMs, isReplayFlash);
+    // Replay flashes are blue like every replay mark; real ones keep the lightning yellow.
+    const flash: ExpressionSpecification = ["case", ["get", "replay"], resolveColor("--pc-lightning-replay"), resolveColor("--pc-lightning")];
+    const ring = resolveColor("--pc-lightning-ring");
     const source = instance.getSource<GeoJSONSource>(LIGHTNING_SOURCE);
-    if (source) {
-      void source.setData(data);
-      instance.setPaintProperty(`${LIGHTNING_SOURCE}-glow`, "circle-color", flash);
-      instance.setPaintProperty(LIGHTNING_SOURCE, "circle-color", flash);
-      instance.setPaintProperty(LIGHTNING_SOURCE, "circle-stroke-color", ring);
-      return;
-    }
+    if (source) { void source.setData(data); return; }
     instance.addSource(LIGHTNING_SOURCE, { type: "geojson", data });
     // A soft glow under each flash that fades with age, like the dot itself.
     instance.addLayer({
@@ -210,9 +227,9 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       source: LIGHTNING_SOURCE,
       paint: {
         "circle-color": flash,
-        "circle-radius": ["*", 3.2, ["get", "radius"]],
+        "circle-radius": byZoom(["*", 3.2, ["get", "radius"]], 0.45),
         "circle-blur": 1,
-        "circle-opacity": ["*", 0.55, ["get", "opacity"]],
+        "circle-opacity": byZoom(["*", 0.4, ["get", "opacity"]], 0.45),
       },
     });
     instance.addLayer({
@@ -222,14 +239,15 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       paint: {
         "circle-color": flash,
         "circle-stroke-color": ring,
-        "circle-stroke-width": 1,
-        "circle-radius": ["get", "radius"],
-        "circle-opacity": ["get", "opacity"],
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 5, 0.4, 9, 1],
+        // Smaller and fainter statewide so site markers lead; full size zoomed in.
+        "circle-radius": byZoom(["get", "radius"], 0.5),
+        "circle-opacity": byZoom(["get", "opacity"], 0.55),
         // A faint ring keeps dots visible on the light basemap without muddying dense clusters.
         "circle-stroke-opacity": ["*", 0.7, ["get", "opacity"]],
       },
     });
-  }, [styleLoaded, flashes, flashNowMs]);
+  }, [styleLoaded, flashes, flashNowMs, isReplayFlash]);
 
   // The layers panel hides whole layers; the data keeps updating underneath.
   useEffect(() => {
@@ -298,8 +316,8 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         const lead = group.items[0].site;
         const el = document.createElement("div");
         el.className = "site-callout";
-        el.innerHTML = group.items.slice(0, 4).map((row) => `<span class="site-callout__row site-callout__row--${row.tone}"><b>${escapeHtml(row.site.name)}</b><span>${row.tone === "replay" ? '<span class="pc-chip pc-chip--replay">REPLAY</span>' : ""}${row.text}</span></span>`).join("")
-          + (group.items.length > 4 ? `<span class="site-callout__more">+${group.items.length - 4} more</span>` : "");
+        el.innerHTML = group.items.slice(0, 3).map((row) => `<span class="site-callout__row site-callout__row--${row.tone}"><b>${escapeHtml(row.site.name)}</b><span>${row.tone === "replay" ? '<span class="pc-chip pc-chip--replay">REPLAY</span>' : ""}${row.text}</span></span>`).join("")
+          + (group.items.length > 3 ? `<span class="site-callout__more">+${group.items.length - 3} more</span>` : "");
         let fitted = false;
         for (const placement of PLACEMENTS) {
           el.dataset.side = placement.side;
@@ -371,16 +389,13 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     };
     const source = instance.getSource<GeoJSONSource>(FIRES_SOURCE);
     if (source) { void source.setData(data); return; }
+    if (!instance.hasImage("pc-fire")) instance.addImage("pc-fire", fireIcon(resolveColor("--pc-fire")), { pixelRatio: 2 });
     instance.addSource(FIRES_SOURCE, { type: "geojson", data });
+    // Under the site markers and quieter than them: a small dark-orange triangle, never a stop-work red.
     instance.addLayer({
-      id: FIRES_SOURCE, type: "circle", source: FIRES_SOURCE,
-      paint: {
-        "circle-color": resolveColor("--pc-risk-red-solid"),
-        "circle-radius": ["case", ["get", "confirmed"], 5, 3.5],
-        "circle-opacity": ["case", ["get", "confirmed"], 0.95, 0.55],
-        "circle-stroke-color": resolveColor("--pc-surface"),
-        "circle-stroke-width": 1.5,
-      },
+      id: FIRES_SOURCE, type: "symbol", source: FIRES_SOURCE,
+      layout: { "icon-image": "pc-fire", "icon-size": byZoom(["case", ["get", "confirmed"], 1, 0.75], 0.7), "icon-allow-overlap": true },
+      paint: { "icon-opacity": ["case", ["get", "confirmed"], 0.9, 0.5] },
     });
   }, [styleLoaded, fires]);
 

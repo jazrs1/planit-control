@@ -40,6 +40,8 @@
   --color-on-risk-red: var(--pc-on-risk-red);
   --color-lightning: var(--pc-lightning);
   --color-lightning-ring: var(--pc-lightning-ring);
+  --color-lightning-replay: var(--pc-lightning-replay);
+  --color-fire: var(--pc-fire);
 
   --radius-card: var(--pc-radius-card);
   --radius-chip: var(--pc-radius-chip);
@@ -47,6 +49,9 @@
   --shadow-card: var(--pc-shadow-card);
   --shadow-float: var(--pc-shadow-float);
 
+  /* Body text is 15px at 1.5 line height: text-sm is the body size here. */
+  --text-sm: var(--pc-text-body);
+  --text-sm--line-height: 1.5;
   --font-sans: var(--pc-font-sans);
   --font-mono: var(--pc-font-mono);
   --text-title: var(--pc-text-title);
@@ -69,6 +74,8 @@
     background: var(--pc-page);
     color: var(--pc-text);
     font-family: var(--pc-font-sans);
+    font-size: var(--pc-text-body);
+    line-height: 1.5;
     /* Numbers line up everywhere: counts, countdowns, readings, times. */
     font-variant-numeric: tabular-nums;
   }
@@ -105,8 +112,11 @@
 
 /* Laid over the map: hairline, soft shadow. A utility, so it takes variants (lg:pc-float). */
 @utility pc-float {
-  background: var(--pc-surface);
-  border: 1px solid var(--pc-border);
+  background: color-mix(in oklch, var(--pc-surface) 95%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid color-mix(in oklch, var(--pc-border) 70%, transparent);
+  border-radius: var(--pc-radius-card);
   box-shadow: var(--pc-shadow-float);
 }
 
@@ -145,8 +155,11 @@
   .pc-panel {
     background: var(--pc-surface);
     border: 1px solid var(--pc-border);
+    border-radius: var(--pc-radius-card);
+    box-shadow: var(--pc-shadow-card);
   }
-  .pc-panel--heavy { border: var(--pc-rule-heavy) solid var(--pc-rule); }
+  /* A safety sign (the crew view's stop-work): square, heavy black rule, no shadow. */
+  .pc-panel--heavy { border: var(--pc-rule-heavy) solid var(--pc-rule); border-radius: 0; box-shadow: none; }
 
   /* Unknown, last known or no data: dashed and grey, never a safety color. */
   .pc-panel--unknown {
@@ -198,6 +211,7 @@
 
   /* Buttons */
   .pc-btn {
+    font-size: 0.875rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -208,8 +222,8 @@
     border-radius: var(--pc-radius-card);
     background: var(--pc-surface);
     color: var(--pc-text);
-    font-weight: 800;
-    letter-spacing: 0.02em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     text-align: center;
     cursor: pointer;
     user-select: none;
@@ -218,7 +232,29 @@
   .pc-btn > svg { flex: none; inline-size: 1.1em; block-size: 1.1em; }
   .pc-btn--primary { background: var(--pc-ink); border-color: var(--pc-ink); color: var(--pc-on-ink); }
   /* Calm secondary button for the dashboard and other non-safety pages. */
-  .pc-btn--quiet { border-width: 1px; border-color: var(--pc-border-strong); font-weight: 700; letter-spacing: 0; }
+  .pc-btn--quiet { border-width: 1px; border-color: var(--pc-border-strong); font-weight: 600; letter-spacing: 0; }
+  /* A secondary action as a text link ("Site details →"). */
+  .pc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    min-block-size: 2.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--pc-text);
+    text-decoration: underline;
+    text-decoration-color: var(--pc-border-strong);
+    text-underline-offset: 0.25em;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .pc-link:active { opacity: 0.7; }
+  .pc-link:focus-visible { outline: 2px solid var(--pc-notice); outline-offset: 2px; }
+  @media (hover: hover) and (pointer: fine) {
+    .pc-link:hover { text-decoration-color: currentColor; }
+  }
   .pc-btn--danger { color: var(--pc-risk-red); border-color: var(--pc-risk-red); }
   .pc-btn--large { min-block-size: 4rem; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
   .pc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -255,18 +291,20 @@
 .site-marker {
   display: grid;
   place-items: center;
-  inline-size: 26px;
-  block-size: 26px;
+  inline-size: 24px;
+  block-size: 24px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
-  font-size: 17px;
+  font-size: 13px;
 }
+/* A thin white outline and a faint shadow lift the shape off the basemap. */
 .site-marker .pc-shape {
   filter:
-    drop-shadow(1.5px 0 0 var(--pc-rule)) drop-shadow(-1.5px 0 0 var(--pc-rule))
-    drop-shadow(0 1.5px 0 var(--pc-rule)) drop-shadow(0 -1.5px 0 var(--pc-rule));
+    drop-shadow(1px 0 0 white) drop-shadow(-1px 0 0 white)
+    drop-shadow(0 1px 0 white) drop-shadow(0 -1px 0 white)
+    drop-shadow(0 1px 1.5px oklch(0 0 none / 0.35));
 }
 .site-marker[aria-pressed="true"], .site-marker:focus-visible {
   outline: 3px solid var(--pc-notice);
@@ -278,7 +316,7 @@
 .site-marker--lightning::after {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -3px;
   border: 2px solid var(--pc-risk-red-solid);
   border-radius: var(--pc-radius-pill);
   pointer-events: none;
@@ -295,7 +333,7 @@
 .site-marker--replay::after {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -3px;
   border: 2px dashed var(--pc-notice);
   border-radius: var(--pc-radius-pill);
   pointer-events: none;
@@ -336,6 +374,20 @@
   outline-offset: 3px;
 }
 
+/* Info popovers (InfoButton): open next to their button where anchoring is supported, centered
+   otherwise; they fade in. */
+.pc-popover { opacity: 0; transition: opacity 160ms var(--pc-ease-out), display 160ms allow-discrete, overlay 160ms allow-discrete; }
+.pc-popover:popover-open { opacity: 1; }
+@starting-style { .pc-popover:popover-open { opacity: 0; } }
+@supports (position-area: block-end) {
+  .pc-popover {
+    margin: 0;
+    margin-block-start: 0.5rem;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  }
+}
+
 /* Map callouts for stop-work and flood sites (SiteMap). A rule toward the site on the near side. */
 .site-callout {
   display: grid;
@@ -345,7 +397,8 @@
   max-inline-size: 15rem;
   background: var(--pc-surface);
   color: var(--pc-text);
-  border: 1px solid var(--pc-border);
+  border: 1px solid color-mix(in oklch, var(--pc-border) 70%, transparent);
+  border-radius: 6px;
   font-size: 0.75rem;
   line-height: 1.25;
   pointer-events: none;
@@ -361,8 +414,8 @@
 .site-callout[data-side="north"]::before { inset-block-start: 100%; inset-inline-start: 50%; inline-size: 2px; block-size: 18px; }
 .site-callout[data-side="south"]::before { inset-block-end: 100%; inset-inline-start: 50%; inline-size: 2px; block-size: 18px; }
 .site-callout__row { display: grid; padding-inline-start: 0.45rem; border-inline-start: 4px solid var(--pc-risk-red-solid); }
-.site-callout__row b { font-weight: 800; overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
-.site-callout__row > span { display: flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--pc-risk-red); }
+.site-callout__row b { font-weight: 600; overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
+.site-callout__row > span { display: flex; align-items: center; gap: 0.3rem; font-weight: 600; color: var(--pc-risk-red); }
 .site-callout__row--replay { border-inline-start: 4px dashed var(--pc-notice); }
 .site-callout__row--replay > span { color: var(--pc-text); }
 .site-callout__row--flood { border-inline-start-color: var(--pc-risk-amber-solid); }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Alert, FloodConditions, Site } from "@shared/types";
-import AlertBanner, { ReplayTag } from "@/components/AlertBanner";
+import AlertBanner from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { HAZARD_LABEL, liveHazardIndex, replayRaised, riskLevel } from "@/lib/risk";
@@ -58,17 +58,17 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
   // Unknown after a dropped connection: the tag keeps its state and says so, in words.
   const lastKnown = alertsUnconfirmed && <span className="pc-label text-muted">Last known</span>;
 
-  // Right side of the row: the most important state, or the risk band when there's none. Whether an
+  // Right side of the row: one badge for the most important state (plus a countdown for a stop-work),
+  // or the risk band when there's none. Replay badges are blue and dashed and say REPLAY. Whether an
   // advisory is confirmed is shown in the expanded row, not here.
   const status = lightning
-    ? <span className="flex items-center gap-1">
-      {lightning.replay && <ReplayTag />}
-      <span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : lightning.replay ? "pc-chip--replay-stop" : "pc-chip--stop"}`}>Stop work</span>
+    ? <span className="flex items-center gap-1.5">
+      <span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : lightning.replay ? "pc-chip--replay-stop" : "pc-chip--stop"}`}>{lightning.replay ? "REPLAY STOP WORK" : "Stop work"}</span>
       {lastKnown}
       {!selected && <StopWorkCountdown all_clear_at={lightning.all_clear_at} replay={lightning.replay} inline />}
     </span>
-    : floodAlert ? <span className="flex items-center gap-1">{floodAlert.replay && <ReplayTag />}<span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : "pc-chip--flood"}`}>Flood risk</span>{lastKnown}</span>
-    : approach ? <span className="flex items-center gap-1">{approach.replay && <ReplayTag />}<span className={`pc-chip ${approach.replay ? "pc-chip--replay-stop" : "pc-chip--approach"}`}>Lightning possible</span></span>
+    : floodAlert ? <span className="flex items-center gap-1.5"><span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : floodAlert.replay ? "pc-chip--replay-stop" : "pc-chip--flood"}`}>{floodAlert.replay ? "REPLAY FLOOD RISK" : "Flood risk"}</span>{lastKnown}</span>
+    : approach ? <span className={`pc-chip ${approach.replay ? "pc-chip--replay-stop" : "pc-chip--approach"}`}>{approach.replay ? "REPLAY LIGHTNING POSSIBLE" : "Lightning possible"}</span>
     : <span className={`text-xs font-semibold ${risk.text}`}>{risk.label}</span>;
 
   const row = <>
@@ -78,7 +78,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
       <span className="sr-only">Hazard index {index.toFixed(1)} of 10, {risk.label} risk{raised ? ", raised by a storm replay" : ""}.</span>
     </span>
     <span className="min-w-0 flex-1 text-start">
-      <span className="block truncate text-sm font-bold leading-tight text-text">{site.name}</span>
+      <span title={site.name} className={`block text-sm font-bold leading-tight text-text ${selected ? "" : "truncate"}`}>{site.name}</span>
       <span className="block truncate text-xs font-normal text-muted">{site.county} · {HAZARD_LABEL[site.top_hazard]}</span>
     </span>
     <span className="flex shrink-0 items-center">{status}</span>
@@ -87,8 +87,8 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
   return (
     <article className={`border-s-4 ${edge} ${selected ? "shadow-[inset_0_0_0_2px_var(--pc-notice)]" : ""}`}>
       {onSelect
-        ? <h2 className="text-base"><button type="button" onClick={onSelect} aria-expanded={selected} className="flex min-h-14 w-full items-center gap-3 px-4 py-2 focus-visible:outline-2 focus-visible:-outline-offset-2 hover:bg-surface-2/60">{row}</button></h2>
-        : <h2 className="flex min-h-14 items-center gap-3 px-4 py-2 text-base">{row}</h2>}
+        ? <h2 className="text-base"><button type="button" onClick={onSelect} aria-expanded={selected} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 hover:bg-surface-2/60">{row}</button></h2>
+        : <h2 className="flex min-h-16 items-center gap-3 px-4 py-3 text-base">{row}</h2>}
 
       {selected && <div className="pc-reveal flex flex-col gap-3 px-4 pbe-4">
         <p className="text-xs text-muted">{site.county} County · {timeZoneAbbr(site.timezone)} · Top hazard: <span className="text-text">{HAZARD_LABEL[site.top_hazard]}</span></p>
