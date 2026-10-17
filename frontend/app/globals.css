@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 @import "../styles/tokens.css";
 
 /* Expose tokens as Tailwind utilities: bg-surface, text-muted, text-risk-red, rounded-card, ... */
@@ -29,6 +30,40 @@ body {
   background: var(--pc-bg);
   color: var(--pc-text);
   font-family: var(--pc-font-sans);
+}
+
+.site-marker {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--pc-surface);
+  border-radius: var(--pc-radius-pill);
+  background: var(--site-risk);
+  cursor: pointer;
+  box-shadow: var(--pc-shadow-card);
+}
+.site-marker--green { --site-risk: var(--pc-risk-green); }
+.site-marker--amber { --site-risk: var(--pc-risk-amber); }
+.site-marker--red { --site-risk: var(--pc-risk-red); }
+.site-marker[aria-pressed="true"], .site-marker:focus-visible {
+  outline: 3px solid var(--pc-brand);
+  outline-offset: 4px;
+  z-index: 2;
+}
+.site-marker--lightning::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2px solid var(--pc-risk-red);
+  border-radius: var(--pc-radius-pill);
+  animation: lightning-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes lightning-pulse {
+  from { scale: 0.8; opacity: 1; }
+  to { scale: 1.7; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-marker--lightning::after { animation: none; }
 }
 
 /* Three brief flashes make a new lightning strike visible without constant motion. */

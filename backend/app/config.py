@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     auth0_client_id: str = ""
     auth0_client_secret: str = ""
     cors_origins: str = "http://localhost:3000"
+    lightning_ingest_enabled: bool = True
+    lightning_poll_seconds: float = 20.0
 
     @property
     def cors_origin_list(self) -> list[str]:

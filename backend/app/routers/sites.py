@@ -1,19 +1,21 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from psycopg_pool import ConnectionPool
 
 from app import site_data
+from app.db import get_pool_optional
 from app.schemas import Site, SiteDetail
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 
 
 @router.get("", response_model=list[Site])
-def list_sites():
-    return site_data.list_sites()
+def list_sites(pool: ConnectionPool | None = Depends(get_pool_optional)):
+    return site_data.list_sites(pool)
 
 
 @router.get("/{site_id}", response_model=SiteDetail)
-def get_site(site_id: str):
-    detail = site_data.get_site_detail(site_id)
+def get_site(site_id: str, pool: ConnectionPool | None = Depends(get_pool_optional)):
+    detail = site_data.get_site_detail(pool, site_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
     return detail

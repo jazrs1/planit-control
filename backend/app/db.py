@@ -49,6 +49,11 @@ def get_pool() -> ConnectionPool:
     return _pool
 
 
+def get_pool_optional() -> ConnectionPool | None:
+    """For routes that still work without a database (e.g. /sites falls back to no live data)."""
+    return _pool
+
+
 def ping(timeout: float = 5.0) -> str:
     """'ok', 'not_configured', or 'unreachable'. Never includes connection details."""
     if _pool is None:
