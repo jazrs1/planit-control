@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     lightning_ingest_enabled: bool = True
     lightning_poll_seconds: float = 20.0
     hazard_polling_enabled: bool = True
+    # Open-Meteo models update at most hourly; polling faster only re-fetches the same forecast.
+    weather_poll_minutes: int = 60
     # Seconds to cache GET /sites, /sites/{id}, /alerts (0 disables). Alert changes bypass it.
     api_cache_seconds: float = 2.5
     # Evening briefings: generated at BRIEFING_HOUR site-local time for the next day.

@@ -1,6 +1,7 @@
 """Background polling of hazard sources (started from app/main.py's lifespan).
 
-  weather (Open-Meteo)   every 15 min   heat, rain, soil
+  weather (Open-Meteo)   every 60 min   heat, rain, soil (WEATHER_POLL_MINUTES; its models update
+                                        at most hourly, so polling faster only repeats data)
   NWS alerts             every  5 min
   FIRMS fires            every 30 min   (skipped without FIRMS_MAP_KEY)
   iNaturalist wildlife   every  6 h
@@ -20,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from psycopg_pool import ConnectionPool
 
 from alerts import flood
+from app.config import get_settings
 from hazards.sources import firms, flood_maps, inaturalist, nws, open_meteo
 from hazards.store import last_success, mark_source
 
@@ -52,7 +54,7 @@ def _lookups(pool, now):
 
 JOBS: list[tuple[str, timedelta, Callable]] = [
     ("site-lookups", timedelta(hours=1), _lookups),
-    (open_meteo.NAME, timedelta(minutes=15), _weather),
+    (open_meteo.NAME, timedelta(minutes=get_settings().weather_poll_minutes), _weather),
     (nws.NAME, timedelta(minutes=5), _nws),
     (firms.NAME, timedelta(minutes=30), lambda pool, now: firms.poll(pool, _sites(pool), now)),
     (inaturalist.NAME, timedelta(hours=6), lambda pool, now: inaturalist.poll(pool, _sites(pool), now)),
