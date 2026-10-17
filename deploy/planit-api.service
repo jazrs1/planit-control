@@ -1,0 +1,35 @@
+# PlanIT Control API. Installed by deploy/setup.sh to /etc/systemd/system/planit-api.service.
+#   systemctl status planit-api · systemctl restart planit-api · journalctl -u planit-api -f
+[Unit]
+Description=PlanIT Control API (uvicorn, one worker)
+After=network-online.target
+Wants=network-online.target
+# Never stop retrying after repeated crashes (a database outage shouldn't leave the API down).
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=planit
+Group=planit
+WorkingDirectory=/opt/planit/app/backend
+Environment=PYTHONUNBUFFERED=1
+# Report photos live outside the checkout so deploys and rollbacks never touch them. Overrides backend/.env.
+Environment=UPLOADS_DIR=/var/lib/planit/uploads
+# Exactly ONE worker: the API cache, the replay clock and the pollers (lightning, hazards, briefings)
+# live in this process. A second worker would poll twice and run its own clock and cache.
+# Caddy on 127.0.0.1 sets X-Forwarded-Proto, so photo URLs come out as https://. Caddy logs requests.
+ExecStart=/opt/planit/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 \
+    --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-access-log
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=planit-api
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

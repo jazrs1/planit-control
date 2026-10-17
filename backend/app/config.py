@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     auth0_client_id: str = ""
     auth0_client_secret: str = ""
     cors_origins: str = "http://localhost:3000"
+    # Optional regex for extra allowed origins, e.g. Vercel preview URLs (empty: none).
+    cors_origin_regex: str = ""
     lightning_ingest_enabled: bool = True
     lightning_poll_seconds: float = 20.0
     hazard_polling_enabled: bool = True
@@ -35,10 +37,17 @@ class Settings(BaseSettings):
     briefing_concurrency: int = 4              # briefings written at once (model calls are slow)
     # Contact info sent in the User-Agent to NWS, FEMA, iNaturalist, etc. (NWS requires one).
     nws_contact: str = "https://github.com/jazrs1/planit-control"
+    # Where report photos are stored (empty: backend/uploads). The server uses a folder outside the checkout.
+    uploads_dir: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # Browsers send Origin without a trailing slash, so "https://x.vercel.app/" would never match.
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def uploads_path(self) -> Path:
+        return Path(self.uploads_dir).expanduser() if self.uploads_dir else BACKEND_DIR / "uploads"
 
 
 @lru_cache

@@ -1,4 +1,4 @@
-"""Photo uploads for hazard reports. Stored in backend/uploads/ and served at /uploads/<file>.
+"""Photo uploads for hazard reports. Stored in backend/uploads/ (or UPLOADS_DIR) and served at /uploads/<file>.
 
 Send the raw image as the request body with its Content-Type, e.g.
     fetch(`${API}/uploads`, { method: "POST", headers: { "Content-Type": file.type }, body: file })
@@ -9,12 +9,12 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.config import BACKEND_DIR
+from app.config import get_settings
 from app.schemas import UploadResponse
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
-UPLOADS_DIR = BACKEND_DIR / "uploads"
+UPLOADS_DIR = get_settings().uploads_path
 MAX_BYTES = 10 * 1024 * 1024
 EXTENSIONS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/heic": ".heic"}
 
