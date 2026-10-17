@@ -9,7 +9,7 @@ import SiteScoreHistory from "@/components/SiteScoreHistory";
 import SiteMap, { LIGHTNING_WINDOW_MIN, type MapLayers } from "@/components/SiteMap";
 import { DEMO_DATA, getFires, getLightningCells, getLightningRecent, getReports, getSites, getWildlife } from "@/lib/api";
 import { cellUnconfirmed } from "@/lib/lightning";
-import { liveHazardIndex, replayRaised, riskLevel } from "@/lib/risk";
+import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
 import { countAlerts, realAlerts } from "@/lib/alerts";
 import { useReplayTimeline } from "@/lib/useReplayTimeline";
@@ -75,6 +75,12 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const alertsKnown = knownAlerts !== null;
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
+  // The replay panel freezes too: /replay/events lists the whole storm, so a clock that kept running
+  // offline would reveal stop-works and all clears that haven't happened yet.
+  const replayStale = !demo && (offline || alertsStale);
+  const lastReplayNow = useRef<number | null>(null);
+  const replayNowMs = replayStale && lastReplayNow.current !== null ? lastReplayNow.current : serverNow();
+  useEffect(() => { if (!replayStale) lastReplayNow.current = replayNowMs; });
   const alerts = useMemo(() => knownAlerts ?? [], [knownAlerts]);
   // Real alerts only, like the nav badge: replay counts are on the replay timeline.
   const real = useMemo(() => realAlerts(alerts), [alerts]);
@@ -129,7 +135,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     Number(realStops.has(b.id)) - Number(realStops.has(a.id)) || Number(lightning.has(b.id)) - Number(lightning.has(a.id))
     || liveHazardIndex(b) - liveHazardIndex(a) || a.name.localeCompare(b.name)), [sites, lightning, realStops]);
   // Real only, like every count here: a replay-raised index is never real high risk.
-  const highRisk = (sites ?? []).filter((s) => riskLevel(liveHazardIndex(s)) === "red" && !replayRaised(s, alertsBySite.get(s.id) ?? [])).length;
+  // Real risk only: hazard_index_live already leaves out replay overrides, so a site that is red on its
+  // own (e.g. a nearby fire) still counts while a replay stop-work also sits on it.
+  const highRisk = (sites ?? []).filter((s) => riskLevel(liveHazardIndex(s)) === "red").length;
   const stopWork = new Set(real.filter((a) => a.type === "lightning").map((a) => a.site_id)).size;
   const [layers, setLayers] = useState<MapLayers>({ lightning: true, cells: true, sites: true, reports: true, fires: true, wildlife: false });
   const [focusKey, setFocusKey] = useState(0);
@@ -241,7 +249,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               </span>
             </div>
             <div className="w-full max-lg:order-3">
-              <ReplayTimeline replay={replay} alerts={alerts} sites={sites} timeline={replayTimeline} nowMs={serverNow()} stale={!demo && (offline || alertsStale)} />
+              <ReplayTimeline replay={replay} alerts={alerts} sites={sites} timeline={replayTimeline} nowMs={replayNowMs} stale={replayStale} />
             </div>
           </div>
 

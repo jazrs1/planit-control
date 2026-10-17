@@ -158,6 +158,15 @@ test("a factor with no hazard type (a downed-line crew report) is labeled Crew h
   assert.equal(risk.factorHazardLabel("lightning"), "Lightning");
 });
 
+test("real risk uses hazard_index_live: a replay can't raise it or hide a site that is red on its own", () => {
+  const risk = load("lib/risk.ts");
+  const raisedOnly = { hazard_index: 9, hazard_index_live: 2.4, replay_override: true };   // replay stop-work only
+  const redAnyway = { hazard_index: 9, hazard_index_live: 8, replay_override: true };      // a fire nearby, plus a replay stop-work
+  assert.equal(risk.riskLevel(risk.liveHazardIndex(raisedOnly)), "green");
+  assert.equal(risk.riskLevel(risk.liveHazardIndex(redAnyway)), "red");                     // still counts as High risk
+  assert.equal(risk.liveHazardIndex({ hazard_index: 5.1 }), 5.1);                            // backend without the field
+});
+
 test("replay alerts carry a REPLAY tag; real alerts don't", () => {
   assert.match(render(Banner, { alert: { ...lightning, replay: true }, site }), /REPLAY/);
   assert.doesNotMatch(render(Banner, { alert: { ...lightning, replay: false }, site }), /REPLAY/);
