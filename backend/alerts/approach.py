@@ -188,7 +188,8 @@ def view(adv: dict | None, now: datetime) -> dict | None:
             "minutes_to_arrival": max(0, math.ceil((adv["arrival_at"] - now).total_seconds() / 60)),
             "from_direction": cellmod.compass(adv["from_bearing_deg"]), "from_bearing_deg": adv["from_bearing_deg"],
             "heading_deg": adv["heading_deg"], "speed_mph": adv["speed_mph"], "distance_mi": adv["distance_mi"],
-            "issued_at": adv["started_at"], "updated_at": adv["updated_at"]}
+            "issued_at": adv["started_at"], "updated_at": adv["updated_at"],
+            "replay": bool(adv.get("replay", False))}
 
 
 def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetime, current: bool = True) -> dict:
@@ -249,6 +250,21 @@ def summarize(rows: list[dict]) -> dict:
         median = leads[mid] if len(leads) % 2 else round((leads[mid - 1] + leads[mid]) / 2, 1)
     return {"stop_works": n, "warned": len(leads), "warned_share": round(len(leads) / n, 3) if n else None,
             "median_lead_min": median}
+
+
+def replay_approach_starts(conn: Connection) -> list[dict]:
+    """GET /replay/events' approach_start events: every advisory the app stored during the replay
+    (replay = true; replay start clears the previous run's). distance_mi is the leading-edge distance at
+    the advisory's last update: the distance when it was issued isn't stored. [] before migration 008."""
+    try:
+        with conn.transaction():   # savepoint, so a missing table can't abort the caller's transaction
+            rows = conn.execute(
+                """SELECT id, started_at, site_id, distance_mi FROM lightning_advisories
+                   WHERE replay ORDER BY started_at, id""").fetchall()
+    except psycopg.errors.UndefinedTable:
+        return []
+    return [{"id": r["id"], "at": r["started_at"], "kind": "approach_start", "site_id": r["site_id"],
+             "distance_mi": round(r["distance_mi"], 1)} for r in rows]
 
 
 def replay_report(conn: Connection) -> dict:

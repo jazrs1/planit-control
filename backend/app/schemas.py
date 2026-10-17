@@ -25,6 +25,7 @@ class LightningApproach(BaseModel):
     distance_mi: float
     issued_at: datetime
     updated_at: datetime
+    replay: bool = False
 
 
 class Site(BaseModel):
@@ -244,6 +245,31 @@ class ReplayStatus(BaseModel):
     files_total: int
     files_done: int
     flashes_ingested: int
+    window_start: datetime | None = None
+    window_end: datetime | None = None
+    quiet_until: datetime | None = None
+
+
+ReplayEventKind = Literal["stop_work_start", "approach_start", "all_clear", "flood_start"]
+
+
+class ReplayEvent(BaseModel):
+    id: str
+    at: datetime
+    kind: ReplayEventKind
+    site_id: str
+    distance_mi: float | None
+
+
+class ReplaySeriesBin(BaseModel):
+    start: datetime
+    flashes: int
+    sites_in_stop_work: int
+
+
+class ReplaySeries(BaseModel):
+    bin_minutes: Literal[5] = 5
+    bins: list[ReplaySeriesBin]
 
 
 # ---------- GET /sites/{id}/score-history ----------
@@ -423,3 +449,21 @@ class PushNotification(BaseModel):
     url: str
     tag: str
     sent_at: datetime
+
+
+# ---------- GET /fires/recent, GET /wildlife/recent (map layers) ----------
+
+class FireDetection(BaseModel):
+    lat: float
+    lon: float
+    detected_at: datetime
+    confidence: Literal["low", "nominal", "high"]
+    passes_24h: int
+
+
+class WildlifeSightingPoint(BaseModel):
+    lat: float
+    lon: float
+    species: str | None
+    seen_at: datetime
+    source: Literal["inaturalist", "crew"]

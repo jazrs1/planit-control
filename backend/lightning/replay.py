@@ -14,7 +14,7 @@ GET /alerts shows both.
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import psycopg
@@ -22,16 +22,15 @@ from psycopg_pool import ConnectionPool
 
 from app import clock
 from app.cache import api_cache
-from app.config import BACKEND_DIR
-from lightning import glm, health
+from lightning import glm, health, timeline
 
 log = logging.getLogger(__name__)
 
-REPLAY_DIR = BACKEND_DIR / "data" / "replay"
+REPLAY_DIR = timeline.REPLAY_DIR
 
 # After the last file, keep cycling with no new flashes (like live does on a quiet night) long
 # enough for every 30-minute all-clear countdown to finish.
-QUIET_TAIL = timedelta(minutes=31)
+QUIET_TAIL = timeline.QUIET_TAIL   # lightning/timeline.py simulates the same tail
 FILE_PERIOD = timedelta(seconds=glm.FILE_SECONDS)
 
 def available_windows() -> list[str]:
@@ -48,6 +47,8 @@ class ReplayRunner:
         self.files_total = 0
         self.files_done = 0
         self.flashes_ingested = 0
+        self.times: dict | None = None            # window_start, window_end, quiet_until (lightning/timeline.py)
+        self.ended_at: datetime | None = None     # simulated time when the last run stopped or finished
 
     @property
     def running(self) -> bool:
@@ -61,6 +62,8 @@ class ReplayRunner:
             raise FileNotFoundError(f"No GLM files in data/replay/{window}")
         self.window, self.speed = window, speed
         self.files_total, self.files_done, self.flashes_ingested = len(files), 0, 0
+        self.times, self.ended_at = timeline.window_times(window), None
+        timeline.ensure(window)   # the whole storm's events for GET /replay/events (background, cached)
         self._task = asyncio.create_task(self._run(pool, files))
 
     async def stop(self) -> None:
@@ -80,7 +83,16 @@ class ReplayRunner:
             "files_total": self.files_total,
             "files_done": self.files_done,
             "flashes_ingested": self.flashes_ingested,
+            "window_start": self.times["window_start"] if self.times else None,
+            "window_end": self.times["window_end"] if self.times else None,
+            "quiet_until": self.times["quiet_until"] if self.times else None,
         }
+
+    def simulated_until(self) -> datetime | None:
+        """How far the current or most recent run has got: simulated now, or where it stopped or ended."""
+        if self.running and clock.is_simulated():
+            return clock.now()
+        return self.ended_at
 
     async def _run(self, pool: ConnectionPool, files: list[Path]) -> None:
         names = [p.name for p in files]
@@ -122,6 +134,7 @@ class ReplayRunner:
         except Exception:  # noqa: BLE001 - a broken replay must not take the API down
             log.exception("Replay %s failed", self.window)
         finally:
+            self.ended_at = clock.now() if clock.is_simulated() else None
             clock.stop_simulation()
             api_cache.invalidate()
 
