@@ -803,3 +803,11 @@ def test_briefing_inputs_cross_check_rain_with_nws_end_to_end():
     for i in (low, high):
         w = writer.template(i)
         assert writer.problems(w.text, i) == [] and writer.template_audit(i) == []
+
+
+
+def test_briefing_rewrites_a_range_label_to_its_own_rain_figure():
+    from briefing.inputs import _RAIN_LABEL
+    assert _RAIN_LABEL.sub("2.3 in of rain forecast", "0.9-9.6 in of rain forecast (forecasts disagree)") == \
+        "2.3 in of rain forecast"
+    assert _RAIN_LABEL.sub("2.3 in of rain forecast", "9.6 in of rain forecast tomorrow") == "2.3 in of rain forecast tomorrow"

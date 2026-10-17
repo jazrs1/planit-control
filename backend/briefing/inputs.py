@@ -17,7 +17,7 @@ from alerts.engine import ALL_CLEAR_AFTER, STOP_WORK_RADIUS_MI
 from hazards import http, snapshot
 from hazards.heat import heat_index_f, osha_risk_band
 from hazards.risk import predict
-from hazards.scoring import SOIL_READING, ago, crew_label, soil_level
+from hazards.scoring import SOIL_READING, ago, crew_label, rain_disagreement, soil_level
 from hazards.sources import nws_qpf, open_meteo
 from hazards.sources.nws import FIRE_LEVELS, FLOOD_LEVELS, HEAT_LEVELS, STORM_LEVELS
 from hazards.store import write_readings
@@ -40,8 +40,8 @@ HARD_STOP_WARNINGS = {"Hurricane Warning", "Tropical Storm Warning", "Tornado Wa
 RED_FLAG_FIRE_MI = 10
 FIRE_STOP_MI = 5
 HEAVY_RAIN_STOP_IN = 3.0   # rain forecast during work hours, by BOTH our forecast and NWS (the lower of the two)
-DISAGREE_RATIO, DISAGREE_IN = 2.0, 1.0   # forecasts disagree: more than 2x apart and more than 1 in apart
-_RAIN_LABEL = re.compile(r"\d+(?:\.\d+)? in of rain forecast")
+# Rain forecast amounts in factor labels, including a range already marked "(forecasts disagree)".
+_RAIN_LABEL = re.compile(r"\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)? in of rain forecast(?: \(forecasts disagree\))?")
 HARD_STOP_CREW = ("Downed line", "Flooding or washout")
 
 
@@ -112,14 +112,6 @@ def go_status(inputs: dict) -> str:
             or any(c.startswith("Heat illness") for c in crew)):
         return "caution"
     return "go"
-
-
-def rain_disagreement(ours: float, nws: float | None) -> str | None:
-    """'0.9-9.6 in' when our forecast and NWS differ by more than 2x and by more than 1 in, else None."""
-    if nws is None:
-        return None
-    lo, hi = sorted((ours, nws))
-    return f"{lo}-{hi} in" if hi > DISAGREE_RATIO * lo and hi - lo > DISAGREE_IN else None
 
 
 def _window(start: datetime, end: datetime, tz: ZoneInfo) -> str:
@@ -316,11 +308,21 @@ def build_all(pool: ConnectionPool, site_ids: list[str] | None, now: datetime) -
 
 def fetch_nws_rain(pool: ConnectionPool, sites: list[dict], now: datetime) -> dict[str, list | None]:
     """{site_id: NWS hourly rain forecast or None}: one gridpoint request per site (hazards/sources/nws_qpf),
-    8 at a time. Stores each site's next-24-h NWS total (flood/rain_next_24h_nws_in) for /sites/{id}."""
+    8 at a time. Stores each site's NWS totals for the next 24 h and site-local today and tomorrow
+    (flood/rain_*_nws_in), so cards and factor labels apply the same disagreement rule."""
     with ThreadPoolExecutor(max_workers=8) as workers:
         series = dict(zip((s["id"] for s in sites), workers.map(nws_qpf.forecast, sites)))
-    rows = [(sid, now, "flood", "rain_next_24h_nws_in", round(nws_qpf.total(v, now, now + timedelta(hours=24)), 2),
-             nws_qpf.NAME) for sid, v in series.items() if v is not None]
+    rows = []
+    for s in sites:
+        v = series[s["id"]]
+        if v is None:
+            continue
+        tz = ZoneInfo(s["timezone"])
+        today = datetime.combine(now.astimezone(tz).date(), time(0), tz)
+        for metric, start, end in (("rain_next_24h_nws_in", now, now + timedelta(hours=24)),
+                                   ("rain_today_nws_in", today, today + timedelta(days=1)),
+                                   ("rain_tomorrow_nws_in", today + timedelta(days=1), today + timedelta(days=2))):
+            rows.append((s["id"], now, "flood", metric, round(nws_qpf.total(v, start, end), 2), nws_qpf.NAME))
     if rows:
         write_readings(pool, rows)
     failed = sum(v is None for v in series.values())
