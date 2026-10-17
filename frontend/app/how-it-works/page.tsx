@@ -40,7 +40,7 @@ const SOURCES: Source[] = [
 const SUB_SCORES: { hazard: HazardType; rules: string }[] = [
   { hazard: "lightning", rules: "Active stop-work 9 · Severe Thunderstorm Watch 4 · Severe Thunderstorm or Tornado Warning 7" },
   { hazard: "heat", rules: "OSHA heat index band: lower 0–2, moderate 5, high 7.5, very high 9.5 · NWS Heat Advisory 6, Heat Warning 8" },
-  { hazard: "flood", rules: "Rain in 24 h: 1 in → 3, 2 in → 6 (+1 in a flood zone or near a river) · NWS advisory 4, watch 5, warning 8 · flood-risk alert 7" },
+  { hazard: "flood", rules: "High-risk FEMA zone 1 · rain in past 24 h: 1 in → 3, 2 in → 6 (+1 in a flood zone or near a river) · next 24 h: 1 in → 3, 2 in → 5 · NWS advisory 4, watch 5, warning 8 · flood-risk alert 7" },
   { hazard: "soil_saturation", rules: "Dry 0 · moist 2 · saturated 5 (+2 after 2 in of rain in 24 h)" },
   { hazard: "wildfire", rules: "Fire within 5 mi 8, 10 mi 6, 25 mi 4 · Fire Weather Watch 3 · Red Flag Warning 5" },
   { hazard: "wildlife", rules: "Crew report nearby 5 · venomous snake 4 · alligator 2 · +1 with 5 or more sightings (max 6)" },
@@ -285,7 +285,7 @@ export default function HowItWorksPage() {
         </ul>
       </Section>
 
-      <Section id="replay" title="Replay mode" takeaway="A real recorded storm, played through the real pipeline, at up to 60× speed.">
+      <Section id="replay" title="Replay mode" takeaway="A real recorded storm, played through the real pipeline, at 30× speed.">
         <p>Lightning doesn&apos;t strike on cue for a demo. Replay takes an hour of real GOES-19 satellite files from a past Florida storm and feeds them, one by one, through the <strong>same code</strong> the live system uses. A simulated clock starts at the storm&apos;s first file and runs 30× faster, so an hour of lightning plays in about two minutes.</p>
         <div role="img" aria-label="Live satellite files every 20 seconds, or recorded storm files in replay, go through the same ingestion, the same stop-work engine and the same API to the dashboard." className="flex flex-col gap-2 sm:flex-row">
           <div className="flex flex-1 flex-col gap-2">

@@ -32,9 +32,8 @@ export default function TopNavigation() {
         <Link href="/crew" aria-current={pathname === "/crew" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2"><span className="sm:hidden">Crew</span><span className="hidden sm:inline">Crew view</span></Link>
         <Link href="/briefings" aria-current={pathname === "/briefings" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Briefings</Link>
         <Link href="/reports" className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Reports</Link>
-        <Link href="/how-it-works" aria-label="How it works" aria-current={pathname === "/how-it-works" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">
-          <span className="sm:hidden">About</span><span className="hidden sm:inline">How it works</span>
-        </Link>
+        {/* Desktop only: a sixth link on a phone pushes the Alerts label out of the bar. */}
+        <Link href="/how-it-works" aria-current={pathname === "/how-it-works" ? "page" : undefined} className="hidden min-h-11 items-center px-2 text-sm font-semibold text-brand sm:flex">How it works</Link>
         <Link
           href="/alerts"
           className="flex min-h-11 min-w-0 flex-col justify-center rounded-card px-1.5 text-sm font-semibold text-text sm:px-2 focus-visible:outline-2 focus-visible:outline-brand"
