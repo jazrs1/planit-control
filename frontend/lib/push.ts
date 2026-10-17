@@ -28,6 +28,18 @@ export function iphoneInstallNeeded(): boolean {
   return ios && safari && !standalone;
 }
 
+/** A plain message when the server refused a subscription for a limit (429: too many new devices on this
+ * network this hour; 503: subscriptions full, or push off on the server); null for any other error. */
+export function refusedMessage(error: unknown): string | null {
+  if (!(error instanceof ApiRequestError)) return null;
+  if (error.status === 429) return "Too many devices on this network turned on alerts in the last hour. Try again later.";
+  if (error.status === 503) return "Device alerts aren't available on the server right now. Try again later.";
+  return null;
+}
+
+/** 409: the server already has this browser's keys under another endpoint. */
+const keysTaken = (error: unknown) => error instanceof ApiRequestError && error.status === 409;
+
 function readPreferences(): { preferences: PushPreferences; disabled: boolean } | null {
   try {
     const value = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null");
@@ -64,7 +76,7 @@ export class DevicePush {
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) throw new Error("The browser returned an incomplete subscription.");
     return json as WebPushSubscription;
   }
-  private async save(preferences: PushPreferences, renew = false) {
+  private async save(preferences: PushPreferences, renew = false): Promise<void> {
     this.check();
     if (Notification.permission !== "granted") throw new Error("Allow notifications in your browser settings, then try again.");
     if (this.pendingRemoval) {
@@ -88,7 +100,14 @@ export class DevicePush {
     this.check();
     this.update({ canUnsubscribe: true, preferences, restored: true });
     this.remember(preferences, false);
-    const info = await subscribePush({ subscription: this.serialize(this.subscription), ...preferences });
+    let info: PushSubscriptionInfo;
+    try {
+      info = await subscribePush({ subscription: this.serialize(this.subscription), ...preferences });
+    } catch (error) {
+      // Make a fresh browser subscription (new keys) and post it, once.
+      if (keysTaken(error) && !renew) return this.save(preferences, true);
+      throw error;
+    }
     this.check();
     this.update({ phase: "registered", info, preferences: { site_ids: info.site_ids, role: info.role }, restored: true, message: "This device is registered for your chosen alerts." });
   }
@@ -108,12 +127,19 @@ export class DevicePush {
       this.update({ canUnsubscribe: this.subscription !== null });
       if (Notification.permission === "denied") this.update({ phase: "blocked", message: "Notifications are blocked. Allow them in browser or device settings to try again." });
       else if (this.subscription && !saved?.disabled) {
-        // Quietly refresh the server's copy. Never request permission or create a subscription on load.
-        const info = await subscribePush({ subscription: this.serialize(this.subscription), ...this.state.preferences });
-        this.check();
-        this.update({ phase: "registered", info, preferences: { site_ids: info.site_ids, role: info.role }, restored: true, message: "This device's alert registration was refreshed." });
+        // Quietly refresh the server's copy. Never request permission or create a subscription on load
+        // (except to replace one the server refused with 409; permission is already granted).
+        try {
+          const info = await subscribePush({ subscription: this.serialize(this.subscription), ...this.state.preferences });
+          this.check();
+          this.update({ phase: "registered", info, preferences: { site_ids: info.site_ids, role: info.role }, restored: true, message: "This device's alert registration was refreshed." });
+        } catch (error) {
+          if (!keysTaken(error)) throw error;
+          await this.save(this.state.preferences, true);
+          this.update({ message: "This device's alert registration was renewed." });
+        }
       } else this.update(this.subscription && saved?.disabled ? { phase: "unconfirmed", message: "Unsubscribe was not completed. Retry Unsubscribe to stop device alerts." } : { phase: "off", message: "Device alerts are off." });
-    } catch { this.update({ phase: "unconfirmed", message: "Device registration is not confirmed. Use Get alerts on this device to retry." }); }
+    } catch (error) { this.update({ phase: "unconfirmed", message: refusedMessage(error) ?? "Device registration is not confirmed. Use Get alerts on this device to retry." }); }
     finally { this.update({ busy: false }); }
   }
   async enable(preferences: PushPreferences) {
@@ -126,7 +152,7 @@ export class DevicePush {
       this.check();
       if (permission !== "granted") { this.update({ phase: permission === "denied" ? "blocked" : "off", message: permission === "denied" ? "Notifications are blocked. Allow them in browser or device settings." : "Permission was not granted. Device alerts remain off." }); return; }
       await this.save(preferences);
-    } catch { this.update({ phase: "unconfirmed", message: "Could not confirm device registration. Your changes may not be saved. Try again." }); }
+    } catch (error) { this.update({ phase: "unconfirmed", message: refusedMessage(error) ?? "Could not confirm device registration. Your changes may not be saved. Try again." }); }
     finally { this.update({ busy: false }); }
   }
   async sendTest() {
@@ -143,7 +169,7 @@ export class DevicePush {
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 404) {
         try { await this.save(this.state.preferences); this.update({ message: "Registration restored. Send another test to check delivery." }); }
-        catch { this.update({ phase: "unconfirmed", message: "Registration could not be restored. Please try enabling alerts again." }); }
+        catch (restoreError) { this.update({ phase: "unconfirmed", message: refusedMessage(restoreError) ?? "Registration could not be restored. Please try enabling alerts again." }); }
       } else this.update({ message: error instanceof ApiRequestError && error.status === 429 ? "Wait at least 10 seconds between test notifications, then try again." : "The test failed. Delivery is not confirmed; try again." });
     } finally { this.update({ busy: false }); }
   }

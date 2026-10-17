@@ -2,17 +2,22 @@
 
 The frontend: GET /push/public-key, then PushManager.subscribe({userVisibleOnly: true,
 applicationServerKey: <that key>}), then POST /push/subscribe with subscription.toJSON(), the sites
-and the role. All routes answer 503 until VAPID keys are set and migration 009 is applied.
+and the role. All routes answer 503 until VAPID keys are set and migrations 009-010 are applied.
+
+Limits: new subscriptions at most NEW_PER_CLIENT per hour per client network (429) and
+webpush.MAX_SUBSCRIPTIONS in total (503); re-subscribing an existing endpoint is an update (200), never
+a new one; another endpoint's keys are refused (409). Only 404/410 from the push service deletes one
+right away (webpush.py).
 """
 
 from contextlib import contextmanager
 
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from psycopg_pool import ConnectionPool
 
-from app import site_data
-from app.admin import RateLimit
+from app import clock, site_data
+from app.admin import RateLimit, WindowLimit, client_key
 from app.config import get_settings
 from app.db import get_pool
 from app.schemas import (PushEndpointRequest, PushPublicKey, PushSubscribeRequest, PushSubscriptionInfo,
@@ -21,6 +26,8 @@ from push import notify, webpush
 
 router = APIRouter(prefix="/push", tags=["push"])
 test_limit = RateLimit(10)   # per subscription
+NEW_PER_CLIENT = 100
+new_per_client = WindowLimit(NEW_PER_CLIENT, 3600)   # new subscriptions per client network per hour
 
 
 def _require_configured() -> None:
@@ -37,7 +44,9 @@ def _connection(pool: ConnectionPool):
         try:
             yield conn
         except psycopg.errors.UndefinedTable:
-            raise HTTPException(503, "Push notifications need migration 009: python -m scripts.migrate")
+            raise HTTPException(503, "Push notifications need migrations 009-010: python -m scripts.migrate")
+        except psycopg.errors.UndefinedColumn:
+            raise HTTPException(503, "Push notifications need migration 010: python -m scripts.migrate")
 
 
 @router.get("/public-key", response_model=PushPublicKey)
@@ -47,10 +56,12 @@ def public_key():
     return {"public_key": get_settings().vapid_public_key}
 
 
-@router.post("/subscribe", response_model=PushSubscriptionInfo, status_code=status.HTTP_201_CREATED)
-def subscribe(body: PushSubscribeRequest, pool: ConnectionPool = Depends(get_pool)):
-    """Save this browser's subscription. site_ids null means every site. Subscribing the same
-    endpoint again replaces its sites and role."""
+@router.post("/subscribe", response_model=PushSubscriptionInfo, status_code=status.HTTP_201_CREATED,
+             responses={200: {"description": "Already subscribed: sites and role updated"}})
+def subscribe(body: PushSubscribeRequest, request: Request, response: Response,
+              pool: ConnectionPool = Depends(get_pool)):
+    """Save this browser's subscription (201). site_ids null means every site. The same endpoint again
+    updates its sites and role and keeps it alive (200): re-subscribe on every page load."""
     sub = body.subscription
     if not webpush.endpoint_allowed(sub.endpoint):
         raise HTTPException(422, "endpoint must be an https URL at a browser push service")
@@ -62,8 +73,22 @@ def subscribe(body: PushSubscribeRequest, pool: ConnectionPool = Depends(get_poo
             raise HTTPException(422, f"Unknown site ids: {', '.join(unknown)}")
         if not site_ids:
             raise HTTPException(422, "site_ids is empty: pass null for all sites, or unsubscribe")
+    client = client_key(request.client.host if request.client else None)
     with _connection(pool) as conn:
-        return webpush.upsert(conn, sub.endpoint, sub.keys.model_dump(), site_ids, body.role)
+        if webpush.find(conn, sub.endpoint) is None:
+            new_per_client.check(client)
+        try:
+            row, created = webpush.subscribe(conn, sub.endpoint, sub.keys.model_dump(), site_ids, body.role,
+                                             clock.real_now())
+        except webpush.SubscriptionLimitReached:
+            raise HTTPException(503, f"Push subscriptions are full ({webpush.MAX_SUBSCRIPTIONS}); try again later.")
+        except webpush.DuplicateKeys:
+            raise HTTPException(409, "These keys belong to another subscription: subscribe again from the browser.")
+    if created:
+        new_per_client.add(client)
+    else:
+        response.status_code = status.HTTP_200_OK
+    return row
 
 
 @router.post("/unsubscribe", response_model=PushUnsubscribeResponse)
@@ -83,5 +108,6 @@ def send_test(body: PushEndpointRequest, pool: ConnectionPool = Depends(get_pool
     test_limit.hit(sub["id"])
     outcome = webpush.send(sub, notify.test_message())
     with _connection(pool) as conn:
+        webpush.seen(conn, sub["id"], clock.real_now())
         webpush.record(conn, {sub["id"]: outcome})
     return {"sent": outcome == "sent", "removed": outcome == "gone"}

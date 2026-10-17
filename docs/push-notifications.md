@@ -33,24 +33,48 @@ Phones and browsers get a notification when a site's safety state changes, even 
   A claimed key is never sent again, across retries, restarts or a second API process. The tradeoff: a send that fails isn't retried.
 - **Missed calls are caught.** A sweep every minute picks up events from the last 10 minutes (60 simulated minutes during a replay) that nobody claimed, e.g. after a restart right after a commit. Older events are never pushed, so a server that was down doesn't send stale alerts.
 - **"Restart" all clears are skipped.** The engine sometimes closes an expired countdown and opens a new stop-work in the same cycle. The all clear is then skipped, so a phone doesn't get "All clear" and "STOP WORK" in the same second.
-- **Dead subscriptions are removed.** When a push service answers 404 or 410, the subscription is deleted. Other failures are logged with the subscription id (never the endpoint, which works like a password) and counted in `failures`.
+- **Dead subscriptions are removed.** When a push service answers 404 or 410, the subscription is deleted. Nothing else deletes one on the spot. Timeouts, 5xx answers and sends cut off by the deadline are logged with the subscription id (never the endpoint, which works like a password) and counted in `failures`; a delivery resets the count. A push service having a bad hour never costs a crew its alerts.
+- **One slow subscription can't hold up the others.**
+  - **Parallel:** every send of a notification runs at the same time, up to 32 at once.
+  - **Short timeouts:** each request to the push service has a 4 s timeout, and the whole fan-out stops waiting after 15 s. Whatever hasn't answered by then counts as a failure, and the next notification goes out straight away.
+  - **Healthy first:** subscriptions with no recent failures are sent to before failing ones.
 - **The server only posts to real push services.** It POSTs to the endpoint the browser gave it, so `POST /push/subscribe` accepts only https endpoints on the browser push services: FCM `*.googleapis.com` (Chrome, Edge, Android, Samsung, Brave, Opera), Mozilla `*.mozilla.com`, Apple `*.push.apple.com` and WNS `*.notify.windows.com`.
+
+## Subscription limits
+
+| Limit | Value | Response |
+|---|---|---|
+| New subscriptions per client network | 100 per hour (an IPv4 address, or an IPv6 /64), enough for a crew yard behind one NAT | 429 with `Retry-After` |
+| Subscriptions in total | 1,000 | 503 "Push subscriptions are full" |
+| The same push keys under a second endpoint | refused: a browser makes fresh keys for every subscription | 409 |
+| The push service answers 404 or 410 | deleted right away | — |
+| Still failing, with nothing delivered for 7 days | deleted by the hourly prune | — |
+
+**What counts:**
+- **Duplicates never count.** Re-subscribing an existing endpoint is an update (200, same `id`): it never makes a second row and never counts against the caps. Only new endpoints count, and only when they're saved.
+- **Quiet weeks are safe.** The 7-day rule only applies to a subscription that is failing (`failures > 0`). One with nothing to send, or one whose browser never opens the app, is never deleted for that.
+- **What resets the 7 days:** a delivered notification, a subscribe or re-subscribe, or a test.
+
+**How it's implemented:**
+- **The per-client limit** is kept in memory, since the API runs one worker (`docs/deploy.md`); it starts over on a restart. Behind Caddy, uvicorn's `--proxy-headers` gives the real client address.
+- **The total cap** is checked under a database lock, so two requests at once can't both take the last place.
+- **The numbers** are constants: `NEW_PER_CLIENT` in `app/routers/push.py`, and the rest in `push/webpush.py` and `push/notify.py`.
 
 ## Setup
 
 1. **Keys, once:** `cd backend && python -m scripts.generate_vapid_keys`. This writes `VAPID_PRIVATE_KEY` and `VAPID_PUBLIC_KEY` into `backend/.env` and prints only the public key. Never regenerate them after devices subscribe: every subscription is tied to the public key.
 2. **Contact:** set `VAPID_SUBJECT` to the frontend's origin (e.g. `https://planit.example.com`) or `mailto:name@host`. An https URL **with a path is rejected** by pywebpush, and an invalid subject turns push off (routes answer 503).
-3. **Migration:** `python -m scripts.migrate` (009).
+3. **Migrations:** `python -m scripts.migrate` (009 and 010).
 4. **The server:** gets the same keys through `deploy/copy-to-server.sh`, which also forces `PUSH_ENABLED=true` there. Set `PUSH_ENABLED=false` on every other machine that uses the shared database (`docs/deploy.md`).
 
-Without the keys or the migration, the `/push/*` routes answer 503 and nothing is sent. Alerts work as before.
+Without the keys or the migrations, the `/push/*` routes answer 503 and nothing is sent. Alerts work as before.
 
 ## API
 
 | Method | Path | Body → response |
 |---|---|---|
 | GET | `/push/public-key` | → `PushPublicKey` `{public_key}`: base64url, for `applicationServerKey` |
-| POST | `/push/subscribe` | `PushSubscribeRequest` `{subscription, site_ids, role}` → 201 `PushSubscriptionInfo`. `site_ids: null` means all sites. Subscribing the same endpoint again replaces its sites and role. 422 for an unknown site, an empty list, or an endpoint that isn't a browser push service |
+| POST | `/push/subscribe` | `PushSubscribeRequest` `{subscription, site_ids, role}` → 201 `PushSubscriptionInfo` (new) or 200 (an endpoint that's already subscribed: its sites and role are replaced). `site_ids: null` means all sites. 422 for an unknown site, an empty list, or an endpoint that isn't a browser push service; 409 for another subscription's keys; 429 and 503 for the limits above |
 | POST | `/push/unsubscribe` | `{endpoint}` → `{removed}` |
 | POST | `/push/test` | `{endpoint}` → `{sent, removed}`: one test notification, at most every 10 s (429). `removed: true` means the push service said it's gone, so subscribe again. 404 for an unknown endpoint |
 
@@ -84,7 +108,7 @@ The frontend has a manifest (`app/manifest.ts`, `display: standalone`) but no se
    ```
    Decode `public_key` (base64url) into a `Uint8Array` before passing it: not every browser accepts the string.
 3. **Site choice:** "All sites", or a list, and the role (crew / supervisor). Keep the endpoint (`sub.endpoint`) to call `/push/unsubscribe` and `/push/test` later. **"Send test notification"** calls `/push/test`. If it returns `removed: true`, subscribe again.
-4. **Re-subscribe on load** if `pushManager.getSubscription()` returns one: POST it again. This is cheap, and it refreshes the server's copy if the browser rotated it.
+4. **Re-subscribe on every load** if `pushManager.getSubscription()` returns one: POST it again (200). It refreshes the server's copy if the browser rotated it. Show 429 ("too many new subscriptions from this network, try later") and 503 ("notifications are full") as plain messages. On 409, unsubscribe in the browser (`sub.unsubscribe()`) and subscribe again.
 5. **iPhone:** web push works only after **Add to Home Screen** (iOS 16.4+), from the installed app. Show that hint on iOS Safari when the app isn't installed.
 6. **Treat it as an extra, not the alert itself.** The app stays the source of truth. A notification can arrive late or not at all, because phones in battery saver delay pushes. Don't present "no notification" as "all clear".
 7. **Types** are in `shared/types.ts`: `PushPublicKey`, `PushSubscribeRequest`, `WebPushSubscription`, `PushSubscriptionInfo`, `PushEndpointRequest`, `PushUnsubscribeResponse`, `PushTestResponse`, `PushNotification`. In demo-data mode, use the matching mocks and don't subscribe.
@@ -93,4 +117,5 @@ The frontend has a manifest (`app/manifest.ts`, `display: standalone`) but no se
 
 - **No authentication on subscribe:** anyone who can reach the API can subscribe a browser, and get the same alerts the dashboard shows publicly.
 - **Delivery isn't guaranteed or ordered.** Push services batch and delay, especially on phones in battery saver. A failed send is logged, not retried.
-- **One sender thread.** Sends fan out to 8 at a time, each with a 10 s timeout. Hundreds of subscriptions would make a burst of stop-works slow to deliver.
+- **Big fan-outs are slower.** With 1,000 subscriptions and 32 sends at a time, a notification takes a few seconds to reach everyone, and notifications go out one after another.
+- **The per-client limit isn't airtight.** It's per process and resets on restart, and someone with many networks can get around it. The total cap is the real backstop.
