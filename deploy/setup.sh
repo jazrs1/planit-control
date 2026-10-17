@@ -35,6 +35,12 @@ as_app() { sudo -u "$APP_USER" -H "$@"; }
 export DEBIAN_FRONTEND=noninteractive
 cd /
 
+# Some providers (e.g. Vultr) set a hostname that isn't in /etc/hosts; sudo then warns
+# "unable to resolve host" on every call.
+if ! getent hosts "$(hostname)" >/dev/null; then
+  echo "127.0.1.1 $(hostname)" >> /etc/hosts
+fi
+
 step "System packages (git, libgomp1 for LightGBM, firewall)"
 apt-get update -q
 apt-get install -y -q git curl ca-certificates gnupg ufw libgomp1 sudo software-properties-common
@@ -141,8 +147,11 @@ systemctl enable planit-api >/dev/null
 
 step "Caddy reverse proxy for https://$DOMAIN"
 install -d -o caddy -g caddy /var/log/caddy
+chown -R caddy:caddy /var/log/caddy   # repair a log file left root-owned by an earlier run
 sed "s/API_DOMAIN/$DOMAIN/g" "$APP_DIR/deploy/Caddyfile" > /etc/caddy/Caddyfile
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+# Validate as the caddy user: validating opens the log file, and as root it would create it root-owned
+# (mode 600), so the caddy service couldn't write it and every reload would fail.
+sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
 systemctl enable caddy >/dev/null
 systemctl reload-or-restart caddy
 
