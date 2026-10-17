@@ -1,5 +1,4 @@
 import type { Alert, Site } from "@shared/types";
-import Link from "next/link";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 
 // Reference component: copy this structure for new cards.
@@ -43,7 +42,7 @@ export default function SiteCard({ site, lightningAlert, selected, onSelect }: S
     <article className={`flex flex-col gap-3 rounded-card border border-border bg-surface p-4 shadow-card ${selected ? "ring-2 ring-brand" : ""}`}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-text"><Link href={`/sites/${site.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-brand">{site.name}</Link></h2>
+          <h2 className="text-base font-semibold text-text">{site.name}</h2>
           <p className="text-sm text-muted">
             {site.county} County · {timeZoneAbbr(site.timezone)}
           </p>

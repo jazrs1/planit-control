@@ -11,17 +11,25 @@ export default function SupervisorDashboard({ initialSites, initialAlerts }: { i
   const [sites, setSites] = useState(initialSites);
   const [alerts, setAlerts] = useState(initialAlerts);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [staleSince, setStaleSince] = useState<Date | null>(null);
   const rows = useRef(new Map<string, HTMLLIElement>());
   useEffect(() => {
     let active = true;
+    let lastGood = new Date();
     const timer = window.setInterval(async () => {
-      const [nextSites, nextAlerts] = await Promise.all([getSites(), getAlerts()]);
-      if (active) { setSites(nextSites); setAlerts(nextAlerts); }
+      try {
+        // No mock fallback here: if the backend is down, keep the last real data and say so.
+        const [nextSites, nextAlerts] = await Promise.all([getSites({ fallbackToMocks: false }), getAlerts({ fallbackToMocks: false })]);
+        if (active) { setSites(nextSites); setAlerts(nextAlerts); setStaleSince(null); lastGood = new Date(); }
+      } catch {
+        if (active) setStaleSince(lastGood);
+      }
     }, 30_000);
     return () => { active = false; window.clearInterval(timer); };
   }, []);
-  const sorted = useMemo(() => [...sites].sort((a, b) => b.hazard_index - a.hazard_index || a.name.localeCompare(b.name)), [sites]);
   const lightning = useMemo(() => new Map(alerts.filter((a) => a.type === "lightning").map((a) => [a.site_id, a])), [alerts]);
+  // Active stop-work sites first: the hazard index doesn't reflect alerts yet.
+  const sorted = useMemo(() => [...sites].sort((a, b) => Number(lightning.has(b.id)) - Number(lightning.has(a.id)) || b.hazard_index - a.hazard_index || a.name.localeCompare(b.name)), [sites, lightning]);
   const selectFromMap = useCallback((id: string) => {
     setSelectedId(id);
     rows.current.get(id)?.scrollIntoView({ block: "nearest" });
@@ -30,7 +38,9 @@ export default function SupervisorDashboard({ initialSites, initialAlerts }: { i
     <main className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-5 py-4">
         <div><p className="text-sm font-bold tracking-wide text-brand">PlanIT Control</p><h1 className="text-xl font-semibold">Supervisor Dashboard</h1></div>
-        <p className="text-sm text-muted">Florida field operations · Refreshes every 30 seconds</p>
+        {staleSince
+          ? <p role="status" className="text-sm font-semibold text-risk-red">Connection lost · showing data from {staleSince.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</p>
+          : <p className="text-sm text-muted">Florida field operations · Refreshes every 30 seconds</p>}
       </header>
       <div className="grid flex-1 lg:min-h-0 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Florida site safety map" className="relative h-[55dvh] min-h-80 lg:h-full">
@@ -46,7 +56,7 @@ export default function SupervisorDashboard({ initialSites, initialAlerts }: { i
               <div><dt className="text-xs text-muted">High risk</dt><dd className="text-2xl font-bold text-risk-red">{sites.filter((s) => riskLevel(s.hazard_index) === "red").length}</dd></div>
               <div><dt className="text-xs text-muted">Stop work</dt><dd className="text-2xl font-bold text-risk-red">{sites.filter((s) => lightning.has(s.id)).length}</dd></div>
             </dl>
-            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Sites · Highest risk first</p>
+            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>
           </div>
           <ul className="space-y-3 p-4 lg:overflow-y-auto">
             {sorted.map((site) => <li key={site.id} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }} onClick={() => setSelectedId(site.id)}>

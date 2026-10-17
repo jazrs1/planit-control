@@ -17,6 +17,9 @@ export default function SiteMap({ sites, alerts, selectedId, onSelect }: { sites
     let observer: ResizeObserver | undefined;
     void import("maplibre-gl").then((lib) => {
       if (disposed || !container.current) return;
+      // maplibre builds its worker URL at runtime relative to its own chunk, which Next's bundler
+      // moves, so the worker 404s and no tiles render. A static new URL() lets the bundler emit it.
+      lib.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
       const instance = new lib.Map({ container: container.current, style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", center: [-83.5, 28.2], zoom: 5.5, attributionControl: { compact: false } });
       map.current = instance;
       instance.addControl(new lib.NavigationControl(), "top-right");
