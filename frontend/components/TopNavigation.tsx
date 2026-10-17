@@ -29,7 +29,7 @@ export default function TopNavigation() {
           <span className="sm:hidden">PlanIT</span><span className="hidden sm:inline">PlanIT Control</span>
         </Link>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-        <Link href="/crew" aria-current={pathname === "/crew" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Crew view</Link>
+        <Link href="/crew" aria-current={pathname === "/crew" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2"><span className="sm:hidden">Crew</span><span className="hidden sm:inline">Crew view</span></Link>
         <Link href="/briefings" aria-current={pathname === "/briefings" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Briefings</Link>
         <Link href="/reports" className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Reports</Link>
         <Link

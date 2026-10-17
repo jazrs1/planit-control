@@ -28,5 +28,7 @@ export function tomorrowAtSite(now: number, timezone: Site["timezone"]) {
 }
 
 export function briefingHeadline(briefing: Briefing) {
-  return briefing.headline?.trim() || briefing.text.split(/\n|(?<=\.)\s/)[0].trim() || "Headline unavailable";
+  const headline = briefing.headline?.trim() || briefing.text.split(/\n|(?<=\.)\s/)[0].trim() || "Headline unavailable";
+  // Template headlines follow "GO for <day>: " in the text, so they start lowercase on their own.
+  return headline.charAt(0).toUpperCase() + headline.slice(1);
 }
