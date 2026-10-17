@@ -279,7 +279,8 @@ def alerts_changed(now: datetime, *, replay: bool) -> None:
         if not _active():
             return
         with _state:
-            # Keep the latest: the flood rule and the forecast thread can report an older `now` than the engine.
+            # Keep the latest kick folded into this dispatch: the flood rule and the forecast thread can
+            # report an older `now` than the engine.
             _latest_now[replay] = max(now, _latest_now.get(replay, now))
             if _queued[replay]:
                 return
@@ -320,7 +321,7 @@ def briefings_ready(site_ids: list[str], since: datetime) -> None:
 def _run_alerts(replay: bool) -> None:
     with _state:
         _queued[replay] = False   # from here on, a new kick queues another run
-        now = _latest_now[replay]
+        now = _latest_now.pop(replay)   # the max is per dispatch: a new replay restarts its clock earlier
     _guard(dispatch_alerts, now, replay)
 
 
