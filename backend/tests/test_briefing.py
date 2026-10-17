@@ -57,9 +57,9 @@ def test_template_is_grounded_short_and_complete(inputs):
 
 def test_template_busy_day_has_timed_risks_and_concrete_actions():
     w = writer.template(BUSY)
-    assert any("2 PM" in r for r in w.risks + w.actions)                      # lightning stops after 2 PM
+    assert any("2 PM" in r for r in w.risks)                                   # thunderstorms likely from 2 PM
     assert any("Start at 6:41 AM" in a and "before 10 AM" in a for a in w.actions)
-    assert any("lightning stops after 2 PM" in a for a in w.actions)
+    assert writer.THUNDERSTORM_ACTION in w.actions                            # plan shelter; no stop-work order
 
 
 def test_go_status_rules():
@@ -512,7 +512,10 @@ def test_caution_raised_by_storms_names_the_storms():
     stormy["periods"][1]["thunderstorm_chance_pct"] = 45
     w = _check(stormy)
     assert "main factor: thunderstorms likely from 2 PM" in w.headline
-    assert w.risks[0].startswith("Thunderstorms likely from 2 PM") and "Expect lightning stops after 2 PM" in w.actions[0]
+    assert w.risks[0].startswith("Thunderstorms likely from 2 PM")
+    assert w.actions[0] == ("Thunderstorms are likely during work hours. Plan shelter in a vehicle or building and "
+                            "schedule exposed work early.")
+    assert not any("stop work" in a.lower() for a in w.actions)               # stop-work only from the live engine
 
 
 def test_caution_raised_by_an_nws_watch_names_the_watch():

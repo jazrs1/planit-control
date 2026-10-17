@@ -171,6 +171,9 @@ RAIN_THRESHOLD_IN = 0.25           # the flood line: rain expected tomorrow
 GUST_THRESHOLD_MPH = 30            # the wind line: peak gust during work hours
 SEVERE_WEATHER = "Higher than normal chance of severe weather"
 SEVERE_WEATHER_ACTION = "Check radar before starting and be ready to stop work."
+# A forecast plans the day; a stop-work order only ever comes from the live lightning engine.
+THUNDERSTORM_ACTION = ("Thunderstorms are likely during work hours. Plan shelter in a vehicle or building and "
+                       "schedule exposed work early.")
 LOCATION_LABEL = "Area with frequent past severe-weather reports"
 NO_RISKS = {True: "No significant weather or site hazards in the forecast.",    # GO
             False: "No reading crosses a hazard threshold on its own."}         # CAUTION / NO-GO from the model
@@ -218,9 +221,6 @@ def threshold_risks(inputs: dict) -> list[Risk]:
     """Every risk the input JSON supports, one per reading that crosses its threshold, in priority order:
     crew reports of a downed line or heat illness, other crew reports, then the hazards."""
     heat, soil, wild, wind = inputs.get("heat"), inputs.get("soil"), inputs["wildlife"], inputs.get("wind")
-    rules = inputs["rules"]
-    stop_rule = (f"stop work for strikes within {rules['lightning_stop_work_radius_mi']} mi and wait "
-                 f"{rules['lightning_all_clear_wait_min']} min after the last one.")
     crew, hazards = [], []
     for report in inputs.get("crew_reports_last_48_h_within_2_mi") or []:
         category = _crew_category(report)
@@ -235,7 +235,7 @@ def threshold_risks(inputs: dict) -> list[Risk]:
     if inputs.get("thunderstorms_likely_from"):
         t, pct = inputs["thunderstorms_likely_from"], inputs["thunderstorm_chance_work_hours_pct"]
         hazards.append(Risk("thunderstorms", "storm", f"Thunderstorms likely from {t} ({pct}% chance during work hours).",
-                            f"thunderstorms likely from {t}", f"Expect lightning stops after {t}: {stop_rule}"))
+                            f"thunderstorms likely from {t}", THUNDERSTORM_ACTION))
     if wind and wind["max_gust_mph"] >= GUST_THRESHOLD_MPH:
         hazards.append(Risk("gusts", "storm", f"Wind gusts up to {wind['max_gust_mph']} mph around {wind['peak_time']}.",
                             f"wind gusts up to {wind['max_gust_mph']} mph",
