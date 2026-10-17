@@ -1,4 +1,4 @@
-"""Demo code (ADMIN_TOKEN) on replay start/stop and send-now for all sites; send-now rate limits.
+"""Demo code (ADMIN_TOKEN) on replay start/stop and send-now (one site or all); send-now rate limits.
 
 Runs the real routes in a small app with a fake pool: no database, no model calls, no replay started.
 """
@@ -82,9 +82,12 @@ def test_send_all_is_refused_while_a_run_is_in_progress(client, monkeypatch):
     assert client.post("/briefing/send-now", json={}, headers=CODE).status_code == 409
 
 
-def test_one_site_needs_no_code_but_at_most_once_a_minute(client):
-    assert client.post("/briefing/send-now", json={"site_id": "sanford"}).status_code == 200
-    again = client.post("/briefing/send-now", json={"site_id": "sanford"})
+def test_one_site_needs_the_code_and_runs_at_most_once_a_minute(client):
+    assert client.post("/briefing/send-now", json={"site_id": "sanford"}).status_code == 401
+    assert client.post("/briefing/send-now", json={"site_id": "sanford"}, headers={"X-Admin-Token": "no"}).status_code == 401
+    assert client.generated == []                                             # no model call without the code
+    assert client.post("/briefing/send-now", json={"site_id": "sanford"}, headers=CODE).status_code == 200
+    again = client.post("/briefing/send-now", json={"site_id": "sanford"}, headers=CODE)
     assert again.status_code == 429 and 0 < int(again.headers["Retry-After"]) <= 60
-    assert client.post("/briefing/send-now", json={"site_id": "big-bend"}).status_code == 200   # per site
+    assert client.post("/briefing/send-now", json={"site_id": "big-bend"}, headers=CODE).status_code == 200   # per site
     assert client.generated == [["sanford"], ["big-bend"]]

@@ -110,7 +110,7 @@ def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -
         "hazard_index_tomorrow": scored["hazard_index_tomorrow"],
         "top_hazard": scored["top_hazard"],
         "top_factors": scored["top_factors"],
-        "lightning_approach": approach.view(snap.approaching.get(site["id"]), snap.clock_now or clock.now()),
+        "lightning_approach": approach.view(adv, adv["view_now"]) if (adv := snap.approaching.get(site["id"])) else None,
         "updated_at": max(as_of) if as_of else datetime.now(timezone.utc),
         "nws_alerts": [{"event": a["event"], "severity": a["severity"], "headline": a["headline"],
                         "ends_at": a["ends_at"]} for a in inputs.nws] if detail else [],
@@ -173,4 +173,8 @@ def get_site_detail(pool: ConnectionPool | None, site_id: str) -> dict | None:
     db_site = next((s for s in snap.sites if s["id"] == site_id), None)
     if db_site is None:
         return None
-    return _build(db_site, snap, _lightning_conditions(pool, db_site, clock.now()), detail=True)
+    # The lightning card's flashes on the clock of the site's stop-work: real time for a real one,
+    # even during a replay.
+    alert = snap.inputs[site_id].lightning_alert
+    now = clock.real_now() if alert is not None and not alert.get("replay") else clock.now()
+    return _build(db_site, snap, _lightning_conditions(pool, db_site, now), detail=True)

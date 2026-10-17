@@ -67,9 +67,10 @@ def beacon_line(beacon: dict, name: str, speed: int = 1) -> str:
         secs = beacon.get("seconds_to_all_clear")
         # No countdown known: "-" makes the beacon show STOP WORK without a time.
         count = str(max(0, int(secs))) if isinstance(secs, (int, float)) else "-"
-        # During a replay the countdown is in simulated seconds; " x<speed>" tells the
-        # beacon how fast to tick between updates.
-        return f"STOP {count} {name}" + (f" x{speed}" if speed > 1 else "")
+        # A replay's countdown is in simulated seconds; " x<speed>" tells the beacon how fast to tick
+        # between updates. A real stop-work during a replay (replay: false) counts in real seconds.
+        replayed = beacon.get("replay", True)   # backends before the field existed: replay state only
+        return f"STOP {count} {name}" + (f" x{speed}" if speed > 1 and replayed else "")
     if state == "approaching":
         # minutes_to_arrival is deliberately not sent: arrival estimates run late.
         return f"APPR {name}"

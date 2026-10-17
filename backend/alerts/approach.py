@@ -11,7 +11,12 @@ Safety rules:
     alerts; it has no code path that writes them, so it can't shorten, extend or clear one.
   - A site in stop-work gets no advisory; an open one is marked 'superseded' when the stop-work starts.
   - "Now" is the hook's `now` (simulated during replay); replay advisories are stored with replay = true.
-  - An advisory survives GRACE without a supporting projection, so one noisy cycle doesn't flicker it.
+  - Once raised, an advisory is held until HOLD after the later of the last cycle that supported it
+    and its estimated arrival (unless a stop-work supersedes it). Storm tracks come and go as cells
+    merge, split or weaken, and arrival estimates are rough, so a site must not flip to "clear" in the
+    minutes before lightning actually arrives. In the Aug 4, 2025 replay a 2-minute grace left 6 sites
+    "clear" for 1-18 min right before their stop-work; holding 15 min past the last valid cycle alone
+    still left Vandolah clear for 5 min (scripts/evaluate_lightning_forecast.py reports these gaps).
 Docs: docs/lightning-forecast.md.
 """
 
@@ -28,7 +33,7 @@ from lightning import cells as cellmod
 
 log = logging.getLogger(__name__)
 
-GRACE = timedelta(minutes=2)
+HOLD = timedelta(minutes=15)   # keep an advisory this long after it was last valid and after its arrival
 _warned_missing_table = False
 
 
@@ -63,7 +68,7 @@ def plan(arrivals: dict[str, cellmod.Arrival | None], stop_work: set[str],
         adv = active.get(site_id)
         if arr is not None:
             actions.append(Action("update" if adv else "create", site_id, arr, adv.id if adv else None))
-        elif adv is not None and now - adv.updated_at >= GRACE:
+        elif adv is not None and now - max(adv.updated_at, adv.arrival_at) >= HOLD:
             actions.append(Action("clear", site_id, advisory_id=adv.id))
     return actions
 
@@ -186,18 +191,38 @@ def view(adv: dict | None, now: datetime) -> dict | None:
             "issued_at": adv["started_at"], "updated_at": adv["updated_at"]}
 
 
-def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetime) -> dict:
+def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetime, current: bool = True) -> dict:
     """State for a hardware alarm, from the site's alerts in effect at `now` and its open advisory.
-    Priority: stop (lightning stop-work) > approaching > flood (our flood-risk alert) > clear."""
+    Priority: stop (lightning stop-work) > unknown > approaching > flood (our flood-risk alert) > clear.
+    `current`: lightning ingestion succeeded recently (lightning/health.py). When it hasn't, anything
+    short of a stop-work is "unknown": no data must never read as clear."""
     stop = next((a for a in alerts if a["type"] == engine.ALERT_TYPE), None)
     if stop:
         return {"site_id": site_id, "state": "stop", "minutes_to_arrival": None, "as_of": now,
                 "seconds_to_all_clear": max(0, math.ceil((stop["all_clear_at"] - now).total_seconds()))}
+    if not current:
+        return {"site_id": site_id, "state": "unknown", "seconds_to_all_clear": None, "minutes_to_arrival": None,
+                "as_of": now}
     if advisory:
         return {"site_id": site_id, "state": "approaching", "seconds_to_all_clear": None, "as_of": now,
                 "minutes_to_arrival": max(0, math.ceil((advisory["arrival_at"] - now).total_seconds() / 60))}
     state = "flood" if any(a["type"] == "flood" for a in alerts) else "clear"
     return {"site_id": site_id, "state": state, "seconds_to_all_clear": None, "minutes_to_arrival": None, "as_of": now}
+
+
+BEACON_PRIORITY = ("stop", "unknown", "approaching", "flood", "clear")
+
+
+def combine_beacons(beacons: list[dict]) -> dict:
+    """The highest-priority state of several beacons (real and replay): stop > unknown > approaching >
+    flood > clear. A real stop-work beats a replay one (its countdown is real time; the replay's is
+    simulated seconds); otherwise two stops: the longer wait wins; two approaching: the sooner arrival;
+    otherwise the first (real) one."""
+    def rank(b: dict) -> tuple:
+        return (BEACON_PRIORITY.index(b["state"]), b["state"] == "stop" and b.get("replay", False),
+                -(b["seconds_to_all_clear"] or 0),
+                b["minutes_to_arrival"] if b["minutes_to_arrival"] is not None else 0)
+    return min(beacons, key=rank)
 
 
 # ---------- replay lead times ----------

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { Briefing, BriefingKeyNumbers } from "@shared/types";
+import { useDemoCode } from "@/components/DemoCode";
 import { GO_LABEL, GO_STYLE, KEY_NUMBER_LABEL, briefingDay, formatForDate } from "@/lib/briefings";
 import { factorHazardLabel, riskLevel } from "@/lib/risk";
 import { formatAgo, formatSiteDateTime } from "@/lib/time";
@@ -51,13 +52,15 @@ type BriefingCardProps = {
 export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs, connectionLost = false, linkSite = false, onRegenerate }: BriefingCardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const demoCode = useDemoCode();
 
   async function regenerate() {
     if (!onRegenerate) return;
     setBusy(true);
     setError(null);
     try {
-      await onRegenerate();
+      // Regenerating calls a paid model, so it needs the demo code: on a 401 this asks for it, then retries.
+      await demoCode.call(onRegenerate, () => void regenerate());
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -179,6 +182,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
           </button>
         )}
       </footer>
+      {demoCode.form}
       {error && <p role="alert" className="text-sm text-risk-red">Couldn&apos;t regenerate: {error}</p>}
     </article>
   );

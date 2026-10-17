@@ -72,8 +72,8 @@ export const modelCalibrationUrl = (path: ModelInfo["calibration"]["plot_url"]) 
 export const getBriefings = () => request<BriefingsResponse>("/briefings");
 /** 404 means the site has no briefing yet (see ApiRequestError.status). */
 export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
-/** One site: generated right away. All sites (no site_id): queued in the background; needs the demo
- *  code (a 401 without it). Protected requests send the demo code when one has been entered. */
+/** One site: generated right away. All sites (no site_id): queued in the background. Both need the
+ *  demo code (a 401 without it). Protected requests send the demo code when one has been entered. */
 export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
   request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
