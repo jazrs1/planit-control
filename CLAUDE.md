@@ -34,6 +34,7 @@ Only change files in folders you own. If you need something in another folder (a
 | GET | `/alerts` | `Alert[]` (active only) | `alerts.json` |
 | GET | `/reports` | `HazardReport[]` (newest first) | `reports.json` |
 | POST | `/reports` | body `CreateReportRequest`, returns `HazardReport` (201) | `create_report_request.json` |
+| POST | `/uploads` | raw image body (`Content-Type: image/*`), returns `UploadResponse` (201) | — |
 | GET | `/briefing/{site_id}` | `Briefing` | `briefings.json` (keyed by site id) |
 
 Changing the contract: update `shared/types.ts`, `backend/app/schemas.py`, and the matching mock in **one PR**. Don't rename or remove fields the frontend already uses without telling the frontend team.
@@ -44,7 +45,7 @@ Changing the contract: update `shared/types.ts`, `backend/app/schemas.py`, and t
 2. **Risk bands for the hazard index (0–10) are fixed:** green 0–3, amber 4–6, red 7–10. Scores can be decimals, so the cutoffs are green `< 4`, amber `4` to `< 7`, red `>= 7`. In the frontend, always use `riskLevel()` from `frontend/lib/risk.ts`.
 3. **No new libraries without approval.** The approved stack is everything already in `backend/requirements.txt`, `backend/scripts/requirements.txt` (offline data scripts only), and `frontend/package.json`. Ask before adding to any of them.
 4. **Small PRs from personal branches.** Branch as `<name>/<short-topic>` (e.g. `maria/site-map`), keep each PR to one change, and never push directly to `main`.
-5. **Never commit secrets.** Real values go in `backend/.env` / `frontend/.env.local` (both gitignored). Add new keys to the matching `.env.example` with an empty or placeholder value.
+5. **Never commit secrets.** Real values go in `backend/.env` / `frontend/.env.local` (both gitignored). Add new keys to the matching `.env.example` with an empty or placeholder value. Never print, log, or paste `DATABASE_URL`.
 
 ## Conventions
 
@@ -58,7 +59,8 @@ Changing the contract: update `shared/types.ts`, `backend/app/schemas.py`, and t
 - **Frontend data:** fetch through `frontend/lib/api.ts`. If the backend can't be reached, it falls back to `shared/mocks`, so UI work never waits on the API.
 - **Next.js 16:** APIs have changed from older versions. Check `frontend/node_modules/next/dist/docs/` before using a Next API you're unsure of.
 - **Backend:** one router per resource in `backend/app/routers/`. Read config only through `get_settings()` in `backend/app/config.py`. Keep each route's response model the same when you swap in real data.
-- **Real vs placeholder data:** site locations are real (`backend/data/sites.json`). Hazard values are still placeholders borrowed from `shared/mocks`; each one is marked `TODO(<hazard>)` in `backend/app/site_data.py`. Alerts, reports, and briefings are fully mocked and only cover the 6 mock sites.
+- **Real vs placeholder data:** site locations are real (`backend/data/sites.json`). Hazard values are still placeholders borrowed from `shared/mocks`; each one is marked `TODO(<hazard>)` in `backend/app/site_data.py`. Reports are stored in the database; their photos are saved to `backend/uploads/` (gitignored) and served at `/uploads/<file>`. Alerts and briefings are still mocked and only cover the 6 mock sites.
+- **Database (Tiger Data / TimescaleDB):** schema changes are numbered SQL files in `backend/db/migrations/`, applied with `python -m scripts.migrate`. Never edit an applied migration; add the next number. Routes get connections from the pool with `Depends(get_pool)` (`backend/app/db.py`) and write SQL with `%s` / `%(name)s` parameters, never string formatting of values. Other tables reference sites by the API slug `sites.id`, not `plant_id`.
 - **Data downloads** (EIA workbooks, FIRMS CSVs, rasters, etc.) go in a `data/` folder, which is gitignored. Exception: `backend/data/sites.json` is committed so the app never downloads at runtime. Rebuild it with `cd backend && python -m scripts.load_sites`.
 
 ## Running locally

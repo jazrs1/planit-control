@@ -25,6 +25,9 @@ npm-debug.log*
 **/data/*
 !backend/data/sites.json
 
+# Uploaded report photos (local storage for now)
+uploads/
+
 # OS / editors
 .DS_Store
 .idea/

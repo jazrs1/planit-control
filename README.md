@@ -22,15 +22,17 @@ cd backend
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # fill in keys; mock routes run without them
+cp .env.example .env            # fill in keys (ask John for DATABASE_URL)
+python -m scripts.migrate       # create/upgrade the database schema
+python -m scripts.seed_sites    # load the 55 sites into the database
 uvicorn app.main:app --reload --port 8000
 ```
 
 - API: http://localhost:8000
 - Interactive docs: http://localhost:8000/docs
-- Health check: `curl localhost:8000/health`
+- Health check (includes the database): `curl localhost:8000/health`
 
-`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json`; their hazard values are still placeholders (see the `TODO(...)` markers in `app/site_data.py`). Alerts, reports, and briefings come from `shared/mocks/`. `POST /reports` keeps new reports in memory until restart.
+`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json`; their hazard values are still placeholders (see the `TODO(...)` markers in `app/site_data.py`). Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts and briefings still come from `shared/mocks/`. Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
 
 ### Rebuilding the site list
 
@@ -64,6 +66,7 @@ Other commands: `npm run typecheck`, `npm run build`.
 | GET | `/alerts` | Active alerts with all-clear countdown |
 | GET | `/reports` | Crew hazard reports |
 | POST | `/reports` | Create a hazard report |
+| POST | `/uploads` | Upload a report photo (raw image body); returns `photo_url` |
 | GET | `/briefing/{site_id}` | Next-day briefing text and key numbers |
 
 Shapes: [`shared/types.ts`](shared/types.ts).

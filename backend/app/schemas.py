@@ -102,6 +102,10 @@ class CreateReportRequest(BaseModel):
     reporter_role: Literal["crew_member", "foreman", "safety_officer"]
 
 
+class UploadResponse(BaseModel):
+    photo_url: str
+
+
 class HazardReport(CreateReportRequest):
     id: str
     created_at: datetime

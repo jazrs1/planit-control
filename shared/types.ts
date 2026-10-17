@@ -132,6 +132,7 @@ export type ReporterRole = "crew_member" | "foreman" | "safety_officer";
 export interface CreateReportRequest {
   /** Nearest site if known; null for reports away from a tracked site. */
   site_id: string | null;
+  /** From POST /uploads. */
   photo_url: string;
   lat: number;
   lon: number;
@@ -146,6 +147,14 @@ export interface HazardReport extends CreateReportRequest {
 }
 
 export type ReportsResponse = HazardReport[];
+
+// ---------- POST /uploads ----------
+// Request body: the raw image bytes with Content-Type image/jpeg, image/png, image/webp, or image/heic (max 10 MB).
+
+export interface UploadResponse {
+  /** Absolute URL of the stored photo; pass it as photo_url in POST /reports. */
+  photo_url: string;
+}
 
 // ---------- GET /briefing/{site_id} ----------
 
