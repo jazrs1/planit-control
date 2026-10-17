@@ -105,3 +105,8 @@ test("navigation breaks down alert types and chooses amber for flood-only alerts
   assert.doesNotMatch(nav([flood], "stale"), /bg-risk-amber-bg/);
   assert.match(nav([flood], "demo"), /Demo data/);
 });
+
+test("flood reason does not repeat the FLOOD RISK label", () => {
+  const reading = "Flood risk: heavy rain in a flood-prone area. 2.3 in of rain in 12 h";
+  assert.equal(helpers.floodReason({ ...conditions, reading }), "Heavy rain in a flood-prone area. 2.3 in of rain in 12 h");
+});
