@@ -47,7 +47,8 @@ The arrival time is when that edge first comes within 10 miles of the site, if i
 | `GET /sites/{id}/beacon` | Tiny JSON for a hardware alarm: `state` is `stop` > `unknown` > `approaching` > `flood` > `clear`, with `seconds_to_all_clear` (stop) or `minutes_to_arrival` (approaching), and `replay` (whose clock the countdown is on). Cached like `/alerts`; every alert or advisory change clears the cache. |
 
 - **`unknown`**: lightning ingestion hasn't succeeded in the last 2 minutes on that clock (`lightning/health.py`): no data never reads as clear. An active stop-work still shows `stop`.
-- **During a replay** the real state (real time) and the replay's state (replay clock) are both worked out and the higher one wins, so a real stop-work, advisory or flood alert (`alerts/flood.py`, live-only) is never hidden by a replay.
+- **During a replay** the real state (real time) and the replay's state (replay clock) are both worked out and the higher one wins, so a real stop-work, advisory or flood alert (`alerts/flood.py`, live-only) is never hidden by a replay. Two stop-works: the real one wins, with its real-time countdown and `replay: false`.
+- **Live ingestion turned off** (`LIGHTNING_INGEST_ENABLED=false`, e.g. a laptop after the server cutover): there is no real lightning layer, so during a replay only a real stop-work from the shared database counts and the replay's approaching / flood / clear show normally. Ingestion turned **on** but stalled is different: the real `unknown` stays above the replay's approaching and clear.
 
 ## How well it worked on the Aug 4, 2025 replay
 

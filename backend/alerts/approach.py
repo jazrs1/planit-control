@@ -215,10 +215,12 @@ BEACON_PRIORITY = ("stop", "unknown", "approaching", "flood", "clear")
 
 def combine_beacons(beacons: list[dict]) -> dict:
     """The highest-priority state of several beacons (real and replay): stop > unknown > approaching >
-    flood > clear. Two stops: the longer wait wins; two approaching: the sooner arrival; otherwise
-    the first (real) one."""
+    flood > clear. A real stop-work beats a replay one (its countdown is real time; the replay's is
+    simulated seconds); otherwise two stops: the longer wait wins; two approaching: the sooner arrival;
+    otherwise the first (real) one."""
     def rank(b: dict) -> tuple:
-        return (BEACON_PRIORITY.index(b["state"]), -(b["seconds_to_all_clear"] or 0),
+        return (BEACON_PRIORITY.index(b["state"]), b["state"] == "stop" and b.get("replay", False),
+                -(b["seconds_to_all_clear"] or 0),
                 b["minutes_to_arrival"] if b["minutes_to_arrival"] is not None else 0)
     return min(beacons, key=rank)
 

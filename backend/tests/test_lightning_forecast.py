@@ -320,6 +320,7 @@ def test_beacon_is_unknown_not_clear_when_lightning_ingestion_is_stale(conn, mon
     import json
 
     from app import clock
+    from app.config import get_settings
     from app.cache import TTLCache
     from app.routers import sites as route
     from tests.test_crew_reports import FakePool
@@ -328,6 +329,7 @@ def test_beacon_is_unknown_not_clear_when_lightning_ingestion_is_stale(conn, mon
     real = datetime.now(timezone.utc)
     conn.execute("DELETE FROM alerts WHERE site_id = 'sanford' AND status = 'active'")
     conn.execute("DELETE FROM lightning_advisories WHERE site_id = 'sanford'")
+    monkeypatch.setattr(get_settings(), "lightning_ingest_enabled", True)   # stale, not turned off
     monkeypatch.setattr(clock, "is_simulated", lambda: False)
 
     def state(last_live_success):
@@ -376,6 +378,9 @@ def test_combined_beacon_highest_priority_wins():
     assert approach.combine_beacons([b("clear"), b("unknown")])["state"] == "unknown"
     assert approach.combine_beacons([b("unknown"), b("stop", 60)])["state"] == "stop"
     assert approach.combine_beacons([b("stop", 300), b("stop", 1200)])["seconds_to_all_clear"] == 1200   # longer wait
+    real_stop, replay_stop = {**b("stop", 600), "replay": False}, {**b("stop", 1500), "replay": True}
+    for pair in ([real_stop, replay_stop], [replay_stop, real_stop]):   # 1500 simulated s is 50 real s at 30x
+        assert approach.combine_beacons(pair) is real_stop
     assert approach.combine_beacons([b("approaching", minutes=25), b("approaching", minutes=8)])["minutes_to_arrival"] == 8
 
 
@@ -383,6 +388,7 @@ def test_beacon_during_a_replay_keeps_real_flood_and_real_advisories(conn, monke
     import json
 
     from app import clock
+    from app.config import get_settings
     from app.cache import TTLCache
     from app.routers import sites as route
     from tests.test_crew_reports import FakePool
@@ -393,6 +399,7 @@ def test_beacon_during_a_replay_keeps_real_flood_and_real_advisories(conn, monke
     monkeypatch.setattr(clock, "is_simulated", lambda: True)
     monkeypatch.setattr(clock, "now", lambda: sim)
     monkeypatch.setattr(health, "_last_success", {True: sim, False: real})
+    monkeypatch.setattr(get_settings(), "lightning_ingest_enabled", True)
     conn.execute("DELETE FROM alerts WHERE site_id = 'sanford' AND status = 'active'")
     conn.execute("DELETE FROM lightning_advisories WHERE site_id = 'sanford'")
 
@@ -491,3 +498,82 @@ def test_live_poll_counts_as_success_only_when_complete_and_fresh(monkeypatch):
 
 
 from tests.test_crew_reports import conn  # noqa: E402,F401 - the rolled-back DB fixture
+
+
+def _replay_beacon_setup(conn, monkeypatch, *, ingest_enabled: bool, last_success: dict):
+    """Sanford during a replay, with no active alerts or advisories; returns (state(), sim, real)."""
+    import json
+
+    from app import clock
+    from app.cache import TTLCache
+    from app.config import get_settings
+    from app.routers import sites as route
+    from tests.test_crew_reports import FakePool
+    _ensure_table(conn)
+    monkeypatch.setattr(route, "api_cache", TTLCache())
+    real = datetime.now(timezone.utc)
+    sim = datetime(2025, 8, 4, 22, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr(clock, "is_simulated", lambda: True)
+    monkeypatch.setattr(clock, "now", lambda: sim)
+    monkeypatch.setattr(get_settings(), "lightning_ingest_enabled", ingest_enabled)
+    monkeypatch.setattr(health, "_last_success", last_success(sim, real))
+    conn.execute("DELETE FROM alerts WHERE site_id = 'sanford' AND status = 'active'")
+    conn.execute("DELETE FROM lightning_advisories WHERE site_id = 'sanford'")
+
+    def state():
+        route.api_cache.invalidate()
+        return json.loads(route.site_beacon("sanford", FakePool(conn)).body)
+    return state, sim, real
+
+
+def _replay_advisory(conn, sim):
+    conn.execute("""INSERT INTO lightning_advisories (site_id, replay, started_at, updated_at, arrival_at, first_arrival_at,
+                                                      from_bearing_deg, heading_deg, speed_mph, distance_mi, cell_flashes)
+                    VALUES ('sanford', true, %s, %s, %s, %s, 250, 70, 22, 18.5, 140)""",
+                 (sim - timedelta(minutes=4), sim, sim + timedelta(minutes=9, seconds=30), sim + timedelta(minutes=12)))
+
+
+def _stop(conn, at, minutes_left, replay):
+    conn.execute("""INSERT INTO alerts (site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay)
+                    VALUES ('sanford', 'lightning', %s, %s, %s, 3.0, %s)""",
+                 (at - timedelta(minutes=2), at + timedelta(minutes=minutes_left), at - timedelta(minutes=2), replay))
+
+
+def test_beacon_with_live_ingestion_turned_off_shows_the_replay(conn, monkeypatch):  # noqa: F811
+    # No live cycle ever runs on this backend, so its real layer is always "unknown": that is "off by
+    # design", not a stalled feed, and must not hide the replay's clear / approaching.
+    state, sim, real = _replay_beacon_setup(conn, monkeypatch, ingest_enabled=False,
+                                            last_success=lambda sim, real: {True: sim})
+    assert state()["state"] == "clear" and state()["replay"] is True
+    _replay_advisory(conn, sim)
+    body = state()
+    assert body["state"] == "approaching" and body["minutes_to_arrival"] == 10 and body["replay"] is True
+    _stop(conn, real, 25, replay=False)        # a real stop-work in the shared DB (another backend's engine)
+    body = state()
+    assert body["state"] == "stop" and body["replay"] is False and 24 * 60 < body["seconds_to_all_clear"] <= 25 * 60
+
+
+def test_beacon_with_live_ingestion_stalled_stays_unknown_above_the_replay(conn, monkeypatch):  # noqa: F811
+    # Ingestion is on but hasn't succeeded for an hour: real data is unknown, which outranks the
+    # replay's clear and approaching (only a stop-work is higher).
+    state, sim, real = _replay_beacon_setup(conn, monkeypatch, ingest_enabled=True,
+                                            last_success=lambda sim, real: {True: sim, False: real - timedelta(hours=1)})
+    assert state()["state"] == "unknown"
+    _replay_advisory(conn, sim)
+    assert state()["state"] == "unknown"
+    _stop(conn, sim, 28, replay=True)
+    body = state()
+    assert body["state"] == "stop" and body["replay"] is True
+
+
+@pytest.mark.parametrize("ingest_enabled", [True, False])
+def test_beacon_real_stop_work_beats_an_overlapping_replay_one(conn, monkeypatch, ingest_enabled):  # noqa: F811
+    # Real: 10 real minutes left. Replay: 28 simulated minutes (under a real minute at 30x). The beacon
+    # shows the real wait on real time (replay false), so the bridge never speeds it up.
+    state, sim, real = _replay_beacon_setup(conn, monkeypatch, ingest_enabled=ingest_enabled,
+                                            last_success=lambda sim, real: {True: sim, False: real})
+    _stop(conn, sim, 28, replay=True)
+    _stop(conn, real, 10, replay=False)
+    body = state()
+    assert body["state"] == "stop" and body["replay"] is False
+    assert 9 * 60 < body["seconds_to_all_clear"] <= 10 * 60

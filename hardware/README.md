@@ -105,7 +105,7 @@ Start the backend and frontend (repo `README.md`) and plug in the beacon. To sta
 curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "content-type: application/json" -d '{"speed": 30}'
 ```
 
-Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"`; the beacon goes back to the live state. During a replay the backend combines the real and replayed state for the site and the higher one wins (stop > unknown > approaching > flood > clear), so a real stop-work, storm warning or flood alert still shows. The beacon's `replay` field says whose countdown it is: only a replayed stop-work ticks at the replay speed.
+Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"`; the beacon goes back to the live state. During a replay the backend combines the real and replayed state for the site and the higher one wins (stop > unknown > approaching > flood > clear), so a real stop-work, storm warning or flood alert still shows. The beacon's `replay` field says whose countdown it is: only a replayed stop-work ticks at the replay speed. If a real and a replayed stop-work overlap, the real one is shown. On a backend with `LIGHTNING_INGEST_ENABLED=false` the replay's yellow and green show normally; with ingestion on but stalled, the beacon shows `NO DATA` instead.
 
 ### 1. Yellow, then red: Vandolah Power Station
 

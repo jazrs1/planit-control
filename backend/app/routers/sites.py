@@ -7,6 +7,7 @@ from pydantic import TypeAdapter
 from alerts import approach, engine
 from app import clock, site_data
 from app.cache import api_cache
+from app.config import get_settings
 from app.db import get_pool, get_pool_optional
 from app.schemas import Beacon, ScoreHistory, Site, SiteDetail
 from hazards import model_scores
@@ -65,14 +66,21 @@ def site_beacon(site_id: str, pool: ConnectionPool = Depends(get_pool)):
     time; during a replay the replay's state is worked out on the replay clock too, and the higher
     priority wins (approach.combine_beacons), so a real stop-work, advisory or flood alert is never
     hidden by a replay. "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on
-    that clock (lightning/health.py). Cached like /alerts; alert and advisory changes clear the cache."""
+    that clock (lightning/health.py). A backend with live ingestion turned off (LIGHTNING_INGEST_ENABLED)
+    has no real lightning layer to report during a replay, so only a real stop-work counts there.
+    Cached like /alerts; alert and advisory changes clear the cache."""
     if site_data.known_site(site_id) is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
 
     def compute() -> bytes:
         with pool.connection() as conn:
-            states = [_mode_beacon(conn, site_id, clock.real_now(), replay=False)]
+            real = _mode_beacon(conn, site_id, clock.real_now(), replay=False)
+            states = [real]
             if clock.is_simulated():
+                # Ingestion off here means "no live data by design", not a stalled feed: its real "unknown"
+                # mustn't hide the replay. A real stop-work (written by another backend) still counts.
+                if not get_settings().lightning_ingest_enabled and real["state"] != "stop":
+                    states = []
                 states.append(_mode_beacon(conn, site_id, clock.now(), replay=True))
         return _json(_beacon, approach.combine_beacons(states))
 
