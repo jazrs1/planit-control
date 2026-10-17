@@ -1,0 +1,52 @@
+[
+  {
+    "title": "STOP WORK: Big Bend, lightning 3.2 mi away",
+    "body": "Shelter now. All clear no earlier than 4:12 PM EDT; every new strike within 10 mi resets the countdown.",
+    "kind": "stop_work",
+    "site_id": "big-bend",
+    "replay": false,
+    "url": "/sites/big-bend",
+    "tag": "lightning:big-bend",
+    "sent_at": "2026-10-17T15:42:20-04:00"
+  },
+  {
+    "title": "[REPLAY] Lightning possible within the hour at Sanford",
+    "body": "Storm to the WSW, moving about 18 mph. A heads-up, not a stop-work order.",
+    "kind": "approaching",
+    "site_id": "sanford",
+    "replay": true,
+    "url": "/sites/sanford",
+    "tag": "lightning:sanford",
+    "sent_at": "2026-10-17T15:40:02-04:00"
+  },
+  {
+    "title": "All clear at Big Bend",
+    "body": "No lightning within 10 mi for 30 minutes. The stop-work is lifted.",
+    "kind": "all_clear",
+    "site_id": "big-bend",
+    "replay": false,
+    "url": "/sites/big-bend",
+    "tag": "lightning:big-bend",
+    "sent_at": "2026-10-17T16:12:40-04:00"
+  },
+  {
+    "title": "Flood alert: Lansing Smith",
+    "body": "NWS flood warning until 9:00 PM CDT. Stay off low ground and flooded roads.",
+    "kind": "flood",
+    "site_id": "lansing-smith",
+    "replay": false,
+    "url": "/sites/lansing-smith",
+    "tag": "flood:lansing-smith",
+    "sent_at": "2026-10-17T14:05:00-05:00"
+  },
+  {
+    "title": "Tomorrow's safety briefings are ready",
+    "body": "No-go: Big Bend. Caution: 6 sites. Go: 47 sites.",
+    "kind": "briefings",
+    "site_id": null,
+    "replay": false,
+    "url": "/briefings",
+    "tag": "briefings",
+    "sent_at": "2026-10-17T18:03:30-04:00"
+  }
+]

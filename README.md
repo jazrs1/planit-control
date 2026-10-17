@@ -116,12 +116,14 @@ Other commands: `npm run typecheck`, `npm run build`.
 | POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`, at most once a minute per site) or all (needs `X-Admin-Token`, at most once per 15 min) |
 | GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
 | GET | `/sites/{id}/beacon` | Tiny alarm state: stop / approaching / flood / clear, with countdowns |
+| GET | `/push/public-key` | VAPID public key for web push |
+| POST | `/push/subscribe`, `/push/unsubscribe`, `/push/test` | Web push subscriptions (sites or all, crew or supervisor) and a test notification; see [`docs/push-notifications.md`](docs/push-notifications.md) |
 
 Shapes: [`shared/types.ts`](shared/types.ts).
 
 ## Deploying
 
-The API runs on a Vultr Ubuntu server (systemd, one uvicorn worker, Caddy for HTTPS) and the frontend on Vercel. Step by step, DNS records, health checks, restart and rollback: [`docs/deploy.md`](docs/deploy.md). Scripts: [`deploy/`](deploy/). Once the server runs, set `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED` and `BRIEFING_ENABLED` to `false` in your local `backend/.env`.
+The API runs on a Vultr Ubuntu server (systemd, one uvicorn worker, Caddy for HTTPS) and the frontend on Vercel. Step by step, DNS records, health checks, restart and rollback: [`docs/deploy.md`](docs/deploy.md). Scripts: [`deploy/`](deploy/). Once the server runs, set `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED`, `BRIEFING_ENABLED` and `PUSH_ENABLED` to `false` in your local `backend/.env`.
 
 ## Contributing
 

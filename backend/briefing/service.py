@@ -19,6 +19,7 @@ from app.config import get_settings
 from briefing import inputs as briefing_inputs
 from briefing.writer import write
 from hazards.store import mark_source
+from push import notify
 
 log = logging.getLogger(__name__)
 COLUMNS = """b.site_id, s.name AS site_name, b.for_date, b.created_at AS generated_at, b.top_hazard, b.text,
@@ -139,7 +140,8 @@ async def run_loop(pool: ConnectionPool) -> None:
         try:
             due = await asyncio.to_thread(due_sites, pool, now)
             if due:
-                await asyncio.to_thread(generate, pool, due, now)
+                done = await asyncio.to_thread(generate, pool, due, now)
+                notify.briefings_ready(done, now)   # one push summary per subscription; never raises
                 mark_source(pool, "briefings", now, detail=f"{len(due)} briefings generated")
         except Exception as err:  # noqa: BLE001 - try again later; the API must keep running
             log.warning("Briefing run failed, retrying in 10 min: %s: %s", type(err).__name__, err)

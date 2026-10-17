@@ -17,7 +17,10 @@ Rules for the engine:
 
 After the stop-work engine, the "lightning approaching" forecast (alerts/approach.py) runs on a
 background worker, in its own transaction and its own try/except: it sees this cycle's stop-work
-alerts, and a failure in it can never affect them. Ingestion never waits for it: if the previous
+alerts, and a failure in it can never affect them.
+
+Push notifications (push/notify.py) are queued after the stop-work engine and the forecast commit,
+on their own background thread: a push failure can't affect either. Ingestion never waits for it: if the previous
 cycle's forecast (same mode) is still running, this cycle's is skipped. Live cycles are 20 s apart,
 so live gets a forecast every cycle; a 30x replay cycles every 0.67 s, and a forecast takes
 0.3-0.45 s (reading up to ~6,000 flashes and clustering them), which used to slow the replay to ~20x.
@@ -43,8 +46,11 @@ _forecast_busy = {False: threading.Lock(), True: threading.Lock()}   # per mode:
 def on_new_flashes(flashes: list[Flash], now: datetime, *, replay: bool = False) -> None:
     from alerts import engine
 
+    from push import notify
+
     # Replay writes its own alerts (alerts.replay = true) so it never touches live ones.
-    engine.run(flashes, now, replay=replay)
+    summary = engine.run(flashes, now, replay=replay)
+    notify.stop_work_cycle(summary, now, replay=replay)   # committed; queues any push, never raises
     if _forecast_busy[replay].acquire(blocking=False):
         _forecast_pool.submit(_forecast, now, replay)
     else:
@@ -53,9 +59,10 @@ def on_new_flashes(flashes: list[Flash], now: datetime, *, replay: bool = False)
 
 def _forecast(now: datetime, replay: bool) -> None:
     from alerts import approach
+    from push import notify
 
     try:
-        approach.run(now, replay=replay)
+        notify.forecast_cycle(approach.run(now, replay=replay), now, replay=replay)
     except Exception:  # noqa: BLE001 - the forecast must never disturb stop-work alerts
         log.exception("Lightning approach forecast failed (stop-work alerts are unaffected)")
     finally:

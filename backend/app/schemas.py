@@ -360,3 +360,63 @@ class Beacon(BaseModel):
     seconds_to_all_clear: int | None
     minutes_to_arrival: int | None
     as_of: datetime
+
+
+# ---------- Web push: /push/* ----------
+
+PushRole = Literal["crew", "supervisor"]
+PushKind = Literal["stop_work", "approaching", "all_clear", "flood", "briefings", "test"]
+
+
+class PushPublicKey(BaseModel):
+    public_key: str
+
+
+class WebPushKeys(BaseModel):
+    p256dh: str = Field(min_length=1, max_length=256)
+    auth: str = Field(min_length=1, max_length=256)
+
+
+class WebPushSubscription(BaseModel):
+    """The browser's PushSubscription.toJSON() (its expirationTime is accepted and ignored)."""
+    endpoint: str = Field(min_length=1, max_length=2048)
+    keys: WebPushKeys
+
+
+class PushSubscribeRequest(BaseModel):
+    subscription: WebPushSubscription
+    site_ids: list[str] | None = None
+    role: PushRole
+
+
+class PushSubscriptionInfo(BaseModel):
+    id: str
+    site_ids: list[str] | None
+    role: PushRole
+    created_at: datetime
+    updated_at: datetime
+
+
+class PushEndpointRequest(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
+
+
+class PushUnsubscribeResponse(BaseModel):
+    removed: bool
+
+
+class PushTestResponse(BaseModel):
+    sent: bool
+    removed: bool
+
+
+class PushNotification(BaseModel):
+    """The JSON payload of every push (read by the frontend's service worker)."""
+    title: str
+    body: str
+    kind: PushKind
+    site_id: str | None
+    replay: bool
+    url: str
+    tag: str
+    sent_at: datetime
