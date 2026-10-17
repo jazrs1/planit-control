@@ -216,6 +216,8 @@ def flood(inp: Inputs) -> Hazard:
         "source": nws_alert["headline"] if nws_alert else (
             f"Rain rule: {r12:.1f} in in 12 h in a flood-prone area" if inp.flood_alert else zone_text),
         "rain_past_12h_in": r12, "rain_past_24h_in": r24, "rain_past_72h_in": r72, "rain_next_24h_in": nxt,
+        # NWS gridpoint forecast for the next 24 h, stored by the 6 PM briefing run (cross-check; not scored).
+        "rain_next_24h_nws_in": _value(inp, "flood", "rain_next_24h_nws_in"),
         "fema_flood_zone": zone, "in_special_flood_hazard_area": site.get("fema_sfha"),
         "near_river": site.get("near_river"),
         "hazard_status": status_for(today), "reading": reading, "as_of": _as_of(inp, "flood", "rain_past_12h_in"),

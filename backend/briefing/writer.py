@@ -61,7 +61,9 @@ matching action (stay clear of the line and treat it as energized; check on the 
 and rest). The go / caution / no-go word is decided for you from "hard_stops" (named reasons to stop
 work during "work_hours"): if "hard_stops" is not empty, the headline must name the first one with its
 time, e.g. "Flood Warning 7 AM-3 PM". Lead with the main hazard during work hours; for a hazard outside
-work hours (e.g. rain mostly after work), give a plan-ahead action, not a stop. If there is little risk,
+work hours (e.g. rain mostly after work), give a plan-ahead action, not a stop. If
+"rain_forecasts_disagree" is set (our forecast and NWS differ a lot), say "Forecasts disagree:" with that
+range and never state the higher figure as the forecast; use only the JSON's rain figures. If there is little risk,
 say so plainly instead of inventing risks. The whole briefing must be
 under {MAX_WORDS} words, so aim for about 110: the headline and each risk and action under 20 words."""
 
@@ -155,8 +157,56 @@ def unsupported_claims(text: str, inputs: dict) -> list[str]:
     return claims
 
 
+_TIME = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s?(AM|PM)\b")
+_RAIN_AMOUNT = re.compile(r"(\d+(?:\.\d+)?)\s?in(?:ches)? of rain(?! in the past)")
+
+
+def _times(text: str) -> list[str]:
+    """Clock times with AM/PM, normalized: '6:49 AM', '2 PM' -> '2:00 PM'."""
+    return [f"{int(h)}:{m or '00'} {ap}" for h, m, ap in _TIME.findall(text)]
+
+
+def impossible_times(text: str, inputs: dict) -> list[str]:
+    """Times that aren't in the input JSON with that AM/PM (e.g. 'sunset at 6:49 AM' when sunset is 6:49 PM),
+    and sunrise/sunset given a time that isn't the real one."""
+    known = set(_times(json.dumps(inputs)))
+    bad = [t for t in _times(text) if t not in known]
+    day = inputs.get("daylight") or {}
+    for event in ("sunrise", "sunset"):
+        real = _times(day.get(event) or "")
+        for m in re.finditer(rf"{event}\D{{0,12}}?(\d{{1,2}}(?::\d{{2}})?\s?(?:AM|PM))", text, re.I):
+            if real and _times(m.group(1)) != real:
+                bad.append(f"{event} {m.group(1)} (it is {day[event]})")
+    return bad
+
+
+def rain_figure_problems(text: str, inputs: dict) -> list[str]:
+    """Rain amounts must be the briefing's own figures; when the forecasts disagree, the higher one is never
+    stated as the forecast on its own."""
+    issues = []
+    disagree = inputs.get("rain_forecasts_disagree")
+    allowed = {str(v) for v in [inputs.get("rain_total_in"), inputs.get("rain_work_hours_in"),
+                                *(p["rain_in"] for p in inputs.get("periods") or []),
+                                *((inputs.get("rain_nws") or {}).values())] if v is not None}
+    allowed |= {x.rstrip("0").rstrip(".") for x in list(allowed) if "." in x}
+    rest = text.replace(disagree, "") if disagree else text
+    for amount in _RAIN_AMOUNT.findall(rest):
+        if amount not in allowed and amount.rstrip("0").rstrip(".") not in allowed:
+            issues.append(f"rain amount {amount} in isn't one of the briefing's rain figures")
+    if disagree:
+        hi = disagree.split("-")[1].split(" ")[0]
+        if re.search(rf"(?<![\d.-]){re.escape(hi)}\s?in", rest):
+            issues.append(f"the forecasts disagree ({disagree}): don't state {hi} in as the forecast")
+        if "rain" in text.lower() and disagree not in text:
+            issues.append(f"say the forecasts disagree: {disagree}")
+    return issues
+
+
 def problems(text: str, inputs: dict) -> list[str]:
     issues = []
+    if (bad := impossible_times(text, inputs)):
+        issues.append(f"impossible time: {', '.join(bad)} (use the times exactly as in the JSON)")
+    issues += rain_figure_problems(text, inputs)
     stops = inputs.get("hard_stops") or []
     if stops and stops[0]["name"].lower() not in text.lower():
         issues.append(f"a NO-GO must name its hard stop in the headline: {stops[0]['text']}")
@@ -183,6 +233,7 @@ THUNDERSTORM_ACTION = ("Thunderstorms are likely during work hours. Plan shelter
                        "schedule exposed work early.")
 LOCATION_LABEL = "Area with frequent past severe-weather reports"
 UNCONFIRMED_FIRE_ACTION = "Verify the fire report before staging; keep an exit route clear."
+RAIN_DISAGREE_ACTION = "Check the morning forecast before staging and plan for wet, soft ground."
 RAIN_PLAN_AHEAD = ("Most of the rain falls outside work hours: secure tools and materials before you leave, "
                    "and expect soft ground and standing water the next morning.")
 NO_RISKS = {True: "No significant weather or site hazards in the forecast.",    # GO
@@ -247,7 +298,14 @@ def threshold_risks(inputs: dict) -> list[Risk]:
         t, pct = inputs["thunderstorms_likely_from"], inputs["thunderstorm_chance_work_hours_pct"]
         hazards.append(Risk("thunderstorms", "storm", f"Thunderstorms likely from {t} ({pct}% chance during work hours).",
                             f"thunderstorms likely from {t}", THUNDERSTORM_ACTION))
-    if inputs["rain_total_in"] >= RAIN_THRESHOLD_IN:
+    disagree = inputs.get("rain_forecasts_disagree")
+    if disagree:
+        # Our forecast and NWS disagree: give the range, never the higher figure as the forecast.
+        nws_work = (inputs.get("rain_nws") or {}).get("work_hours_in", 0)
+        hazards.append(Risk("rain", "flood", f"Forecasts disagree: {disagree} of rain tomorrow.",
+                            f"forecasts disagree: {disagree} of rain", RAIN_DISAGREE_ACTION,
+                            work_hours=max(inputs.get("rain_work_hours_in", 0), nws_work) >= RAIN_THRESHOLD_IN))
+    elif inputs["rain_total_in"] >= RAIN_THRESHOLD_IN:
         wettest = max(inputs["periods"], key=lambda p: p["rain_in"])
         # Mostly outside work hours (e.g. 6 PM-12 AM): plan ahead, it isn't a work-hours hazard.
         outside = inputs.get("rain_work_hours_in", inputs["rain_total_in"]) < RAIN_THRESHOLD_IN
@@ -459,7 +517,8 @@ def _checked(inputs: dict, out: dict, generator: str, model: str) -> tuple[Writt
     text = compose(inputs["go_status"], inputs["day"], headline, risks, actions)
     issues = problems(text, inputs)
     if issues:
-        return None, "; ".join(issues), False
+        # An impossible time is a garbled answer: after the retry it goes to the template, like a review flag.
+        return None, "; ".join(issues), any(i.startswith("impossible time") for i in issues)
     if (flags := review(inputs, text)):
         return None, f"a reviewer found these statements wrong or garbled: {'; '.join(flags)}", True
     return Written(headline, risks, actions, text, generator, model), None, False

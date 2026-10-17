@@ -43,6 +43,7 @@ With `DATABASE_URL` set, the API polls these in the background (`HAZARD_POLLING_
 |---|---|---|
 | Open-Meteo | heat index (NWS formula) + OSHA band, rain past 12/24/72 h and next 24 h, soil moisture | 60 min (`WEATHER_POLL_MINUTES`) |
 | api.weather.gov | active NWS alerts at each site (heat, flood, severe storm, red flag) | 5 min |
+| NWS gridpoint forecast | Rain (QPF) for the 6 PM briefing's cross-check and `conditions.flood.rain_next_24h_nws_in`; one request per site per run, cached 30 min | 6 PM run |
 | NASA FIRMS | VIIRS fire detections over Florida, last 24 h. **Needs `FIRMS_MAP_KEY`** (free at firms.modaps.eosdis.nasa.gov/api/map_key); skipped without it | 30 min |
 | iNaturalist | alligator and venomous snake sightings within 5 km, last 30 days | 6 h |
 | FEMA NFHL, USGS NHD, NWS points | flood zone, river within 1 mile, NWS zones | once per site |

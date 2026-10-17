@@ -369,7 +369,8 @@ def test_each_briefing_gets_the_time_it_was_written(monkeypatch):
 
 # ---------- second check: the reviewer ----------
 
-GARBLED = {**GOOD, "actions": ["Finish before sunset at 6:41 AM is not needed; wrap up by 8:22 PM",
+# Garbled but every time is real (the impossible-time check can't catch it; the reviewer must).
+GARBLED = {**GOOD, "actions": ["Wrap up by 6:41 AM, after the 3 PM heat peak, is not needed; finish before 2 PM",
                                "Bring mats for vehicles"]}
 
 
@@ -555,19 +556,71 @@ def test_a_single_pass_fire_within_5_mi_is_caution_with_a_verify_action():
     assert w.actions[0] == "Verify the fire report before staging; keep an exit route clear."
 
 
-@pytest.mark.parametrize("work_rain, verdict_", [(3.0, "no_go"), (9.6, "no_go"), (2.9, "caution")])
-def test_three_inches_of_rain_during_work_hours_is_a_named_no_go(work_rain, verdict_):
-    wet = {**copy.deepcopy(CALM), "hazard_index": 5.0, "rain_total_in": 9.6, "rain_work_hours_in": work_rain,
-           "work_hours": "7 AM-5 PM", "top_factors": [{"hazard": "flood", "label": "9.6 in of rain forecast"}],
-           "periods": [{**p, "rain_in": 6.0 if p["period"] == "morning" else 1.8, "rain_chance_pct": 90}
-                       for p in CALM["periods"]]}
-    i = final(wet)
-    w = _check(i)
-    assert i["go_status"] == verdict_
-    if verdict_ == "no_go":
-        assert w.headline.startswith(f"Heavy rain: {work_rain} in expected 7 AM-5 PM")
-        assert w.text.startswith(f"NO-GO for Thursday, Jul 16: Heavy rain: {work_rain} in expected 7 AM-5 PM")
-        assert "flooded roads" in w.actions[0]
+def _wet(ours_work: float, ours_total: float, nws: dict | None) -> dict:
+    disagree = None
+    if nws is not None:
+        from briefing.inputs import rain_disagreement
+        disagree = rain_disagreement(ours_total, nws["total_in"])
+    return final({**copy.deepcopy(CALM), "hazard_index": 5.0, "rain_total_in": ours_total, "rain_work_hours_in": ours_work,
+                  "rain_nws": nws, "rain_forecasts_disagree": disagree, "work_hours": "7 AM-5 PM",
+                  "top_factors": [{"hazard": "flood", "label": f"{ours_total} in of rain forecast"}],
+                  "periods": [{**p, "rain_in": ours_work if p["period"] == "morning" else round(ours_total - ours_work, 1),
+                               "rain_chance_pct": 90} if p["period"] in ("morning", "evening") else {**p, "rain_in": 0.0}
+                              for p in CALM["periods"]]})
+
+
+def test_heavy_rain_stops_work_only_when_nws_agrees():
+    # Agree: both reach 3 in during work hours -> NO-GO named with the lower (agreed) amount.
+    agree = _wet(4.4, 5.0, {"total_in": 4.0, "work_hours_in": 3.2})
+    w = _check(agree)
+    assert agree["go_status"] == "no_go" and agree["rain_forecasts_disagree"] is None
+    assert w.text.startswith("NO-GO for Thursday, Jul 16: Heavy rain: 3.2 in expected 7 AM-5 PM")
+    assert "flooded roads" in w.actions[0]
+    # Exactly 3 in from both is enough; 2.9 from NWS is not.
+    assert _wet(3.0, 3.0, {"total_in": 3.0, "work_hours_in": 3.0})["go_status"] == "no_go"
+    assert _wet(3.0, 3.5, {"total_in": 2.9, "work_hours_in": 2.9})["go_status"] == "caution"
+
+
+def test_disagreeing_forecasts_give_caution_and_a_range_never_the_higher_value():
+    # Oct 18, 2026, Dania Beach: our model 9.6 in (6.0 in work hours), NWS 0.9 in (0.6 in work hours).
+    dania = _wet(6.0, 9.6, {"total_in": 0.9, "work_hours_in": 0.6})
+    w = _check(dania)
+    assert dania["rain_forecasts_disagree"] == "0.9-9.6 in"
+    assert dania["go_status"] == "caution" and dania["hard_stops"] == []
+    assert "Forecasts disagree: 0.9-9.6 in of rain tomorrow." in w.risks
+    assert "9.6 in" not in w.text.replace("0.9-9.6 in", "")              # never the higher value as fact
+    assert key_numbers(dania)[0]["rain_in"] == 0.9                       # key number: the lower one
+    assert writer.RAIN_DISAGREE_ACTION in w.actions
+    # A model answer that states 9.6 in as the forecast is rejected.
+    assert writer.rain_figure_problems("9.6 in of rain expected in the morning.", dania)
+    assert writer.rain_figure_problems("Forecasts disagree: 0.9-9.6 in of rain tomorrow.", dania) == []
+
+
+def test_without_nws_rain_alone_is_caution_never_no_go():
+    down = _wet(9.6, 9.6, None)
+    w = _check(down)
+    assert down["rain_nws"] is None and down["go_status"] == "caution" and down["hard_stops"] == []
+    assert w.risks[0].startswith("9.6 in of rain expected")
+
+
+def test_impossible_times_are_rejected_retried_once_then_template(monkeypatch, claude_on, gemini_on):
+    bad_time = {**GOOD, "actions": ["Finish before sunset at 6:41 AM is not needed; wrap up by 8:22 PM"]}
+    assert writer.impossible_times("finish before sunset at 6:41 AM", BUSY)      # sunrise time called sunset
+    assert writer.impossible_times("finish by 7:22 PM", BUSY)                   # not in the data at all
+    assert writer.impossible_times("start at 6:41 AM; sunset 8:22 PM", BUSY) == []
+    calls = fake_claude(monkeypatch, bad_time, GOOD)
+    assert writer.write(BUSY).generator == "claude" and "impossible time" in calls[1]
+    fake_claude(monkeypatch, bad_time, bad_time)
+    gemini = fake(monkeypatch, GOOD)
+    assert writer.write(BUSY).generator == "template" and gemini == []           # straight to the template
+
+
+def test_rain_amounts_in_a_briefing_come_from_one_source():
+    # Oct 18, 2026, Port Everglades: key numbers 3.3 in, but a risk said "3.6 in" (from an index factor label).
+    pe = {**copy.deepcopy(BUSY), "rain_total_in": 3.3}
+    assert writer.rain_figure_problems("Flooding from 3.6 in of rain forecast", pe)
+    assert writer.rain_figure_problems("Flooding from 3.3 in of rain forecast", pe) == []
+    assert writer.rain_figure_problems("1.8 in of rain in the past 3 days", pe) == []    # past rain is another quantity
 
 
 @pytest.mark.parametrize("category, what", [("Downed line", "a downed line"), ("Flooding or washout", "site flooding")])
@@ -712,3 +765,41 @@ def test_briefing_inputs_round_rain_and_keep_evening_rain_out_of_no_go():
     assert i["work_hours"] == "7 AM-5 PM"
     w = writer.template(i)
     assert writer.problems(w.text, i) == [] and writer.RAIN_PLAN_AHEAD in w.actions
+
+
+
+def test_briefing_inputs_cross_check_rain_with_nws_end_to_end():
+    """site_inputs with an NWS series: the range, the agreed hard stop, and one rain figure in factor labels."""
+    from datetime import timedelta as td
+    from types import SimpleNamespace
+    from briefing.inputs import site_inputs
+    from hazards.scoring import Inputs
+    tz = ZoneInfo("America/New_York")
+    site = {"id": "s", "name": "Test", "county": "Broward", "timezone": "America/New_York", "lat": 26.07, "lon": -80.2,
+            "fema_flood_zone": "X", "fema_sfha": False, "near_river": False, "river_name": None}
+    now = datetime(2026, 10, 17, 22, 0, tzinfo=timezone.utc)
+    hours = [datetime(2026, 10, 17, 0, 0, tzinfo=tz) + td(hours=k) for k in range(72)]
+    ours = [0.6 if h.day == 18 and 7 <= h.hour < 17 else 0.36 if h.day == 18 and 17 <= h.hour < 24 else 0.0 for h in hours]
+    forecast = {"hourly": {"time": [int(h.timestamp()) for h in hours], "temperature_2m": [80.0] * 72,
+                           "relative_humidity_2m": [60.0] * 72, "precipitation": ours,
+                           "precipitation_probability": [90] * 72, "wind_gusts_10m": [15.0] * 72}, "daily": {}}
+    ensemble = {"hourly": {"time": [int(h.timestamp()) for h in hours], "weather_code_member01": [3] * 72}}
+    model = {"2026-10-18": {"probability": 0.2, "score": 8.0, "factors": [
+        {"factor": "rain_in", "hazard": "flood", "label": "8.5 in of rain forecast", "weight": 1.0}]}}
+    snap = SimpleNamespace(inputs={"s": Inputs(site=site, readings={}, now=now, model=model)}, species_counts={"s": {}})
+
+    def nws_series(per_hour_in):
+        return [(h.astimezone(timezone.utc), per_hour_in if h.day == 18 else 0.0) for h in hours]
+
+    low, _ = site_inputs(site, forecast, ensemble, snap, now, nws_series(0.04))       # NWS ~1 in for the day
+    assert (low["rain_total_in"], low["rain_work_hours_in"]) == (8.5, 6.0)
+    assert low["rain_nws"] == {"total_in": 1.0, "work_hours_in": 0.4}
+    assert low["rain_forecasts_disagree"] == "1.0-8.5 in" and low["go_status"] == "caution"
+    assert low["top_factors"][0]["label"] == "1.0-8.5 in of rain forecast (forecasts disagree)"
+    high, _ = site_inputs(site, forecast, ensemble, snap, now, nws_series(0.35))      # NWS agrees: 3.5 in in work hours
+    assert high["rain_forecasts_disagree"] is None and high["go_status"] == "no_go"
+    assert high["hard_stops"][0]["text"] == "Heavy rain: 3.5 in expected 7 AM-5 PM"
+    assert high["top_factors"][0]["label"] == "8.5 in of rain forecast"                # the briefing's own figure
+    for i in (low, high):
+        w = writer.template(i)
+        assert writer.problems(w.text, i) == [] and writer.template_audit(i) == []

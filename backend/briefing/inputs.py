@@ -5,6 +5,9 @@ when the heat index reaches 91°F, when thunderstorms become likely) and the sto
 the writer never has to invent a number. briefing/writer.py checks that it didn't.
 """
 
+import logging
+import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -15,9 +18,11 @@ from hazards import http, snapshot
 from hazards.heat import heat_index_f, osha_risk_band
 from hazards.risk import predict
 from hazards.scoring import SOIL_READING, ago, crew_label, soil_level
-from hazards.sources import open_meteo
+from hazards.sources import nws_qpf, open_meteo
 from hazards.sources.nws import FIRE_LEVELS, FLOOD_LEVELS, HEAT_LEVELS, STORM_LEVELS
 from hazards.store import write_readings
+
+log = logging.getLogger(__name__)
 
 ENSEMBLE_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
 # The periods cover the whole calendar day, so rain_total_in is the same window as the index's
@@ -34,7 +39,9 @@ HARD_STOP_WARNINGS = {"Hurricane Warning", "Tropical Storm Warning", "Tornado Wa
                       "Flash Flood Warning", "Coastal Flood Warning", "Excessive Heat Warning", "Extreme Heat Warning"}
 RED_FLAG_FIRE_MI = 10
 FIRE_STOP_MI = 5
-HEAVY_RAIN_STOP_IN = 3.0   # rain forecast during work hours
+HEAVY_RAIN_STOP_IN = 3.0   # rain forecast during work hours, by BOTH our forecast and NWS (the lower of the two)
+DISAGREE_RATIO, DISAGREE_IN = 2.0, 1.0   # forecasts disagree: more than 2x apart and more than 1 in apart
+_RAIN_LABEL = re.compile(r"\d+(?:\.\d+)? in of rain forecast")
 HARD_STOP_CREW = ("Downed line", "Flooding or washout")
 
 
@@ -60,10 +67,13 @@ def hard_stops(inputs: dict) -> list[dict]:
         if a["event"] in HARD_STOP_WARNINGS or (
                 a["event"] == "Red Flag Warning" and fire_mi is not None and fire_mi <= RED_FLAG_FIRE_MI):
             stops.append({"kind": "nws", "name": a["event"], "when": a["work_hours"], "text": f"{a['event']} {a['work_hours']}"})
-    work_rain = inputs.get("rain_work_hours_in") or 0
-    if work_rain >= HEAVY_RAIN_STOP_IN:
-        stops.append({"kind": "rain", "name": "Heavy rain", "when": inputs.get("work_hours") or "7 AM-5 PM",
-                      "text": f"Heavy rain: {work_rain} in expected {inputs.get('work_hours') or '7 AM-5 PM'}"})
+    # Heavy rain stops work only when our forecast and NWS agree: the lower of the two must reach 3 in.
+    nws = inputs.get("rain_nws")
+    if nws is not None:
+        agreed = min(inputs.get("rain_work_hours_in") or 0, nws["work_hours_in"])
+        if agreed >= HEAVY_RAIN_STOP_IN:
+            stops.append({"kind": "rain", "name": "Heavy rain", "when": inputs.get("work_hours") or "7 AM-5 PM",
+                          "text": f"Heavy rain: {agreed} in expected {inputs.get('work_hours') or '7 AM-5 PM'}"})
     heat = inputs.get("heat") or {}
     if heat.get("work_hours_osha_risk_band") == "very high":
         stops.append({"kind": "heat", "name": "OSHA very high heat", "when": heat["work_hours_peak_time"],
@@ -93,13 +103,23 @@ def go_status(inputs: dict) -> str:
     crew = [r["category"] for r in inputs.get("crew_reports_last_48_h_within_2_mi") or []]
     fire = inputs.get("wildfire") or {}
     unconfirmed_fire = fire.get("nearest_detection_mi") is not None and fire["nearest_detection_mi"] <= FIRE_STOP_MI
+    heavy_rain = (inputs.get("rain_work_hours_in") or 0) >= HEAVY_RAIN_STOP_IN   # without NWS agreement
     if (inputs["hazard_index"] >= 4
             or unconfirmed_fire                       # one satellite pass within 5 mi: verify, don't stop
+            or heavy_rain                             # our forecast alone (NWS lower or unavailable)
             or inputs["thunderstorm_chance_work_hours_pct"] >= THUNDERSTORM_LIKELY_PCT
             or any(("Watch" in a["event"] or "Warning" in a["event"]) for a in inputs["nws_alerts"])
             or any(c.startswith("Heat illness") for c in crew)):
         return "caution"
     return "go"
+
+
+def rain_disagreement(ours: float, nws: float | None) -> str | None:
+    """'0.9-9.6 in' when our forecast and NWS differ by more than 2x and by more than 1 in, else None."""
+    if nws is None:
+        return None
+    lo, hi = sorted((ours, nws))
+    return f"{lo}-{hi} in" if hi > DISAGREE_RATIO * lo and hi - lo > DISAGREE_IN else None
 
 
 def _window(start: datetime, end: datetime, tz: ZoneInfo) -> str:
@@ -127,7 +147,8 @@ def _day_hours(times: list[datetime], tz: ZoneInfo, day: date, start_h: int, end
     return [i for i, t in enumerate(times) if t.astimezone(tz).date() == day and start_h <= t.astimezone(tz).hour < end_h]
 
 
-def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snapshot, now: datetime) -> tuple[dict, list[dict]]:
+def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snapshot, now: datetime,
+                nws_rain: list | None = None) -> tuple[dict, list[dict]]:
     """(inputs JSON, tomorrow's top factors with weights for the API)."""
     tz = ZoneInfo(site["timezone"])
     day = local_tomorrow(site, now)
@@ -230,6 +251,18 @@ def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snaps
     crew = [{"category": crew_label(r), "reported": ago(r["created_at"], now),
              "reported_at": clock_time(r["created_at"], tz), "distance_mi": r["distance_mi"]}
             for r in inp.crew_reports]
+    # The NWS rain forecast for the same day and work hours (None: NWS unavailable).
+    rain_nws = None
+    if nws_rain is not None:
+        day_end = day_start + timedelta(days=1)
+        rain_nws = {"total_in": round(nws_qpf.total(nws_rain, day_start, day_end), 1),
+                    "work_hours_in": round(nws_qpf.total(nws_rain, work_start, work_end), 1)}
+    rain_total = round(day_rain, 1)
+    disagree = rain_disagreement(rain_total, rain_nws["total_in"] if rain_nws else None)
+    # One rain figure everywhere in the briefing: rain amounts in the index's factor labels are replaced by
+    # the briefing's own total (or the range when the forecasts disagree).
+    shown_rain = f"{disagree} of rain forecast (forecasts disagree)" if disagree else f"{rain_total} in of rain forecast"
+    factors = [{"hazard": f["hazard"], "label": _RAIN_LABEL.sub(shown_rain, f["label"])} for f in scored["top_factors_tomorrow"]]
     inputs = {
         "site": {"name": site["name"], "county": site["county"], "timezone": site["timezone"]},
         "for_date": day.isoformat(),
@@ -238,13 +271,15 @@ def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snaps
         "hazard_index": index,
         "hazard_index_scale": "0 to 10; green under 4, amber 4 to under 7, red 7 and up",
         "top_hazard": scored["top_hazard_tomorrow"],
-        "top_factors": [{"hazard": f["hazard"], "label": f["label"]} for f in scored["top_factors_tomorrow"]],
+        "top_factors": factors,
         "daylight": daylight or None,
         "heat": heat,
         "wind": wind,
         "periods": periods,
-        "rain_total_in": round(day_rain, 1),
+        "rain_total_in": rain_total,
         "rain_work_hours_in": round(work_rain, 1),
+        "rain_nws": rain_nws,
+        "rain_forecasts_disagree": disagree,
         "thunderstorms_likely_from": storms_from,
         "thunderstorm_chance_work_hours_pct": work_storm_pct,
         "soil": {"level": level, "moisture_pct": round(vwc[0] * 100), "crew_note": SOIL_READING[level]} if level else None,
@@ -272,6 +307,23 @@ def build_all(pool: ConnectionPool, site_ids: list[str] | None, now: datetime) -
     if not sites:
         return {}
     forecasts, ensemble = fetch_weather(pool, sites, now)
+    nws = fetch_nws_rain(pool, sites, now)
     snap = snapshot.load(pool)  # re-read so tomorrow's index uses the forecast just written
     by_id = {s["id"]: s for s in snap.sites}
-    return {s["id"]: site_inputs(by_id[s["id"]], f, e, snap, now) for s, f, e in zip(sites, forecasts, ensemble)}
+    return {s["id"]: site_inputs(by_id[s["id"]], f, e, snap, now, nws.get(s["id"]))
+            for s, f, e in zip(sites, forecasts, ensemble)}
+
+
+def fetch_nws_rain(pool: ConnectionPool, sites: list[dict], now: datetime) -> dict[str, list | None]:
+    """{site_id: NWS hourly rain forecast or None}: one gridpoint request per site (hazards/sources/nws_qpf),
+    8 at a time. Stores each site's next-24-h NWS total (flood/rain_next_24h_nws_in) for /sites/{id}."""
+    with ThreadPoolExecutor(max_workers=8) as workers:
+        series = dict(zip((s["id"] for s in sites), workers.map(nws_qpf.forecast, sites)))
+    rows = [(sid, now, "flood", "rain_next_24h_nws_in", round(nws_qpf.total(v, now, now + timedelta(hours=24)), 2),
+             nws_qpf.NAME) for sid, v in series.items() if v is not None]
+    if rows:
+        write_readings(pool, rows)
+    failed = sum(v is None for v in series.values())
+    if failed:
+        log.warning("NWS rain forecast unavailable for %d of %d sites (rain alone can't make NO-GO there)", failed, len(sites))
+    return series

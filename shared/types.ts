@@ -119,6 +119,12 @@ export interface FloodConditions extends HazardCard {
   rain_past_24h_in?: number | null;
   rain_past_72h_in?: number | null;
   rain_next_24h_in?: number | null;
+  /**
+   * The NWS gridpoint forecast (api.weather.gov) for the next 24 h, in inches: a cross-check on
+   * rain_next_24h_in (our model). Updated by the 6 PM briefing run; null when NWS wasn't available.
+   * When the two differ by more than 2x and more than 1 in, show both (a range), not the higher alone.
+   */
+  rain_next_24h_nws_in?: number | null;
   /** FEMA NFHL zone, e.g. "AE", "VE", "X"; "unmapped" where FEMA has no map. */
   fema_flood_zone?: string | null;
   /** In FEMA's Special Flood Hazard Area (1%-annual-chance floodplain). */
