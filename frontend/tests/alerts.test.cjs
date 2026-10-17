@@ -37,10 +37,17 @@ const conditions = { status: "warning", source: "NWS Flood Warning", hazard_stat
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 
 test("strike distances floor to one decimal, including the ten-mile boundary", () => {
-  for (const [input, expected] of [[9.996, "9.9 mi"], [9.999999999, "9.9 mi"], [9.9, "9.9 mi"], [2.49, "2.4 mi"], [2, "2.0 mi"], [0.099, "0.0 mi"], [0, "0.0 mi"], [10, "10.0 mi"]]) {
+  for (const [input, expected] of [[9.996, "9.9 mi"], [9.999999999, "9.9 mi"], [9.9, "9.9 mi"], [2.49, "2.4 mi"], [2, "2.0 mi"], [0.099, "0.0 mi"], [0, "0.0 mi"], [10, "10 mi"], [12.9, "12 mi"]]) {
     assert.equal(helpers.formatStrikeDistance(input), expected);
   }
   for (const missing of [null, NaN, Infinity, -1]) assert.equal(helpers.formatStrikeDistance(missing), null);
+});
+
+test("distances: one decimal under 10 mi, whole miles from 10 up", () => {
+  for (const [input, expected] of [[0.04, "0.0 mi"], [9.6, "9.6 mi"], [9.96, "10 mi"], [10.4, "10 mi"], [99.55, "100 mi"]]) {
+    assert.equal(helpers.formatMiles(input), expected);
+  }
+  for (const missing of [null, undefined, NaN, -1]) assert.equal(helpers.formatMiles(missing), null);
 });
 
 test("flood banners are amber with reason and site-local start time, never countdowns", () => {

@@ -45,11 +45,13 @@ type BriefingCardProps = {
   connectionLost?: boolean;
   /** Link the site name to its detail page (on /briefings). */
   linkSite?: boolean;
+  /** List view: verdict, site, headline and index up front; risks, actions and numbers behind "Show details". */
+  collapsible?: boolean;
   /** Regenerate this site's briefing (POST /briefing/send-now). Omit to hide the button (demo mode). */
   onRegenerate?: () => Promise<void>;
 };
 
-export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs, connectionLost = false, linkSite = false, onRegenerate }: BriefingCardProps) {
+export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs, connectionLost = false, linkSite = false, collapsible = false, onRegenerate }: BriefingCardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const demoCode = useDemoCode();
@@ -75,6 +77,59 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
   const go = b?.go_status ?? null;
   const unavailable = new Set(b?.unavailable ?? []);
   const structured = (b?.risks?.length ?? 0) > 0 || (b?.actions?.length ?? 0) > 0;
+  // Risks, actions, key numbers and the full text: always shown on the site page, behind
+  // "Show details" in the briefings list.
+  const details = b && <>
+    {structured ? (
+      <>
+        {b.risks && b.risks.length > 0 && (
+          <section>
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Top risks</h3>
+            <ol className="mbs-1 list-decimal space-y-1 ps-5 text-sm">{b.risks.map((r, i) => <li key={i}>{r}</li>)}</ol>
+          </section>
+        )}
+        {b.actions && b.actions.length > 0 && (
+          <section>
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Actions</h3>
+            <ul className="mbs-1 list-disc space-y-1 ps-5 text-sm">{b.actions.map((a, i) => <li key={i}>{a}</li>)}</ul>
+          </section>
+        )}
+      </>
+    ) : (
+      <p className="whitespace-pre-wrap text-sm">{b.text}</p>
+    )}
+
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+      {(Object.keys(KEY_NUMBER_LABEL) as (keyof BriefingKeyNumbers)[]).map((key) => {
+        const missing = unavailable.has(key) || typeof b.key_numbers?.[key] !== "number";
+        const v = b.key_numbers?.[key];
+        return (
+          <div key={key} className="flex justify-between gap-2">
+            <dt className="text-muted">{KEY_NUMBER_LABEL[key]}</dt>
+            <dd className="font-medium tabular-nums">
+              {missing || v === undefined
+                ? <span className="text-muted" title="No live data behind this number">—<span className="sr-only">no live data</span></span>
+                : key === "hazard_index"
+                  ? <span className={`whitespace-nowrap rounded-chip px-2 ${uncertain ? "" : RISK_BADGE[riskLevel(v)]}`}>{keyValue(key, v)}</span>
+                  : keyValue(key, v)}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+
+    {b.top_factors && b.top_factors.length > 0 && (
+      <p className="text-xs text-muted">
+        Why: {b.top_factors.map((f) => `${factorHazardLabel(f.hazard)} (${Math.round(f.weight * 100)}%)`).join(" · ")}
+      </p>
+    )}
+    {structured && (
+      <details className="text-sm">
+        <summary className="cursor-pointer text-brand">Full briefing text</summary>
+        <p className="mbs-1 whitespace-pre-wrap">{b.text}</p>
+      </details>
+    )}
+  </>;
   const title = linkSite
     ? <Link href={`/sites/${siteId}`} className="text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand">{siteName}</Link>
     : "Tomorrow's briefing";
@@ -111,55 +166,21 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
           {day === "old" && <p role="status" className="text-sm font-semibold">Old briefing: no newer one has been generated.</p>}
           {b.headline && <p className="font-semibold">{b.headline}</p>}
 
-          {structured ? (
-            <>
-              {b.risks && b.risks.length > 0 && (
-                <section>
-                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Top risks</h3>
-                  <ol className="mbs-1 list-decimal space-y-1 ps-5 text-sm">{b.risks.map((r, i) => <li key={i}>{r}</li>)}</ol>
-                </section>
-              )}
-              {b.actions && b.actions.length > 0 && (
-                <section>
-                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Actions</h3>
-                  <ul className="mbs-1 list-disc space-y-1 ps-5 text-sm">{b.actions.map((a, i) => <li key={i}>{a}</li>)}</ul>
-                </section>
-              )}
-            </>
-          ) : (
-            <p className="whitespace-pre-wrap text-sm">{b.text}</p>
-          )}
-
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
-            {(Object.keys(KEY_NUMBER_LABEL) as (keyof BriefingKeyNumbers)[]).map((key) => {
-              const missing = unavailable.has(key) || typeof b.key_numbers?.[key] !== "number";
-              const v = b.key_numbers?.[key];
-              return (
-                <div key={key} className="flex justify-between gap-2">
-                  <dt className="text-muted">{KEY_NUMBER_LABEL[key]}</dt>
-                  <dd className="font-medium tabular-nums">
-                    {missing || v === undefined
-                      ? <span className="text-muted" title="No live data behind this number">—<span className="sr-only">no live data</span></span>
-                      : key === "hazard_index"
-                        ? <span className={`whitespace-nowrap rounded-chip px-2 ${uncertain ? "" : RISK_BADGE[riskLevel(v)]}`}>{keyValue(key, v)}</span>
-                        : keyValue(key, v)}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-
-          {b.top_factors && b.top_factors.length > 0 && (
-            <p className="text-xs text-muted">
-              Why: {b.top_factors.map((f) => `${factorHazardLabel(f.hazard)} (${Math.round(f.weight * 100)}%)`).join(" · ")}
-            </p>
-          )}
-          {structured && (
-            <details className="text-sm">
-              <summary className="cursor-pointer text-brand">Full briefing text</summary>
-              <p className="mbs-1 whitespace-pre-wrap">{b.text}</p>
+          {collapsible ? <>
+            {typeof b.key_numbers?.hazard_index === "number" && !unavailable.has("hazard_index") && (
+              <p className="flex items-baseline gap-2 text-sm">
+                <span className="text-muted">Hazard index</span>
+                <span className={`whitespace-nowrap rounded-chip px-2 font-semibold ${uncertain ? "" : RISK_BADGE[riskLevel(b.key_numbers.hazard_index)]}`}>{keyValue("hazard_index", b.key_numbers.hazard_index)}</span>
+              </p>
+            )}
+            <details className="group text-sm">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 font-semibold">
+                <span aria-hidden="true" className="text-xs text-muted motion-safe:transition-[rotate] group-open:rotate-90">▸</span>
+                <span className="group-open:hidden">Show details</span><span className="hidden group-open:inline">Hide details</span>
+              </summary>
+              <div className="flex flex-col gap-3 pbs-2">{details}</div>
             </details>
-          )}
+          </> : details}
         </div>
       )}
 

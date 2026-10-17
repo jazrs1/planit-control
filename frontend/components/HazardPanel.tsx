@@ -65,11 +65,11 @@ export default function HazardPanel({ title, card, rows, freshness, timeZone, no
       </p>
 
       {live && rows.length > 0 && (
-        <dl className={`grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm ${uncertain ? "text-muted" : ""}`}>
+        <dl className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-sm ${uncertain ? "text-muted" : ""}`}>
           {rows.map((row) => (
             <div key={row.label} className="contents">
               <dt className="text-muted">{row.label}</dt>
-              <dd className="text-end font-semibold tabular-nums">
+              <dd className="whitespace-nowrap text-end font-semibold tabular-nums">
                 {row.value ?? <span className="text-muted" title="Not available">—<span className="sr-only">not available</span></span>}
               </dd>
             </div>

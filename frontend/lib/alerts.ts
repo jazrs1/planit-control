@@ -1,9 +1,16 @@
 import type { Alert, FloodConditions, Site } from "@shared/types";
 
-/** Always round down: an in-range strike must never appear to be 10 miles away. */
+/** Always round down: an in-range strike must never appear to be 10 miles away. Whole miles from 10 up. */
 export function formatStrikeDistance(distance: Alert["last_strike_distance_mi"]): string | null {
   if (distance === null || !Number.isFinite(distance) || distance < 0) return null;
-  return `${(Math.floor(distance * 10) / 10).toFixed(1)} mi`;
+  return distance >= 10 ? `${Math.floor(distance)} mi` : `${(Math.floor(distance * 10) / 10).toFixed(1)} mi`;
+}
+
+/** One decimal under 10 mi, whole miles from 10 up: "9.6 mi", "100 mi". null when there's no distance. */
+export function formatMiles(distance: number | null | undefined): string | null {
+  if (distance === null || distance === undefined || !Number.isFinite(distance) || distance < 0) return null;
+  const tenths = Math.round(distance * 10) / 10;
+  return tenths < 10 ? `${tenths.toFixed(1)} mi` : `${Math.round(distance)} mi`;
 }
 
 /** Real alerts only. Counts never mix real and replay: replay counts belong on the replay timeline. */

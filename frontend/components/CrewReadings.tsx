@@ -1,7 +1,7 @@
 import type { HazardCard, OshaHeatRisk, SiteDetail } from "@shared/types";
 import type { ReactNode } from "react";
 import { hasReading } from "@/lib/crew";
-import { formatAlertTime } from "@/lib/alerts";
+import { formatAlertTime, formatMiles } from "@/lib/alerts";
 
 // A sign band across the top of each reading: one line, the same height on every card.
 const BANDS = {
@@ -51,7 +51,7 @@ export default function CrewReadings({ detail, stale }: { detail: SiteDetail | n
       </Reading>
       <Reading title="Wildlife" card={wildlife} stale={stale} timezone={timezone} value={wildlife ? <>{wildlife.observations_30d}<span className="ms-1 font-sans text-base font-extrabold">sightings</span></> : "No data"}>
         <p>Past 30 days · {wildlife?.crew_reports_2mi ?? "—"} crew reports within 2 mi</p>
-        {[...(conditions?.wildlife ?? [])].sort((a, b) => a.distance_mi - b.distance_mi).slice(0, 2).map((sighting, index) => <p key={`${sighting.species}-${index}`}>{sighting.species} · {sighting.distance_mi.toFixed(1)} mi</p>)}
+        {[...(conditions?.wildlife ?? [])].sort((a, b) => a.distance_mi - b.distance_mi).slice(0, 2).map((sighting, index) => <p key={`${sighting.species}-${index}`}>{sighting.species} · {formatMiles(sighting.distance_mi) ?? "distance unknown"}</p>)}
       </Reading>
     </div>
   </section>;

@@ -13,6 +13,7 @@ import { DEMO_DATA, getSites } from "@/lib/api";
 import { chooseCrewSite, hasReading, rememberedSite, rememberSite } from "@/lib/crew";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 import { formatAlertTime } from "@/lib/alerts";
+import { timeZoneName } from "@/lib/time";
 import { useCrewSiteData } from "@/lib/useCrewSiteData";
 import { usePolling } from "@/lib/usePolling";
 
@@ -90,7 +91,7 @@ function CrewModeView({ initialSites, demo }: { initialSites: Site[] | null; dem
         {!selected && <option value="">{sites === null ? "Sites unavailable" : "Choose a site"}</option>}
         {[...(sites ?? [])].sort((a, b) => a.name.localeCompare(b.name)).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
       </select>
-      {selected && <p className="mbs-2 text-sm text-muted">{selected.county} County · {selected.timezone}</p>}
+      {selected && <p className="mbs-2 text-sm text-muted">{selected.county} County · {timeZoneName(selected.timezone)}</p>}
       {sitesFailed && sites !== null && <p role="status" className="mbs-2 font-medium text-muted">Site list not confirmed · showing the last loaded sites.</p>}
     </div>
     {selected ? <CrewSite key={selected.id} site={selected} /> : <section role="status" className="space-y-3 rounded-card border-2 border-rule bg-surface p-5 text-muted">

@@ -70,7 +70,8 @@ test("stale and unknown advisories stay visible, grey with ? and Not confirmed; 
   ]) {
     const html = render(Chip, props);
     advisory(html);
-    assert.match(html, /WITHIN THE HOUR \?/);
+    assert.match(html, /Unconfirmed/);
+    assert.doesNotMatch(html, /WITHIN THE HOUR \?/);
     assert.match(html, /Last known/);
     assert.match(html, /Not confirmed/);
     assert.doesNotMatch(html, /text-risk-amber|bg-risk-amber-bg/);

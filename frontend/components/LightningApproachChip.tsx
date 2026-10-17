@@ -19,7 +19,8 @@ export default function LightningApproachChip({ approach, stopWork, unconfirmed,
 
   return <div role="status" className={`space-y-1.5 border-2 border-dashed p-3 ${uncertain ? "border-muted bg-bg text-muted" : "border-risk-amber-solid bg-risk-amber-bg text-text"}`}>
     <p>
-      <span className={`pc-chip ${uncertain ? "pc-chip--unknown" : "pc-chip--approach"}`}>LIGHTNING POSSIBLE WITHIN THE HOUR{uncertain && " ?"}</span>
+      <span className={`pc-chip ${uncertain ? "pc-chip--unknown" : "pc-chip--approach"}`}>LIGHTNING POSSIBLE WITHIN THE HOUR</span>
+      {uncertain && <span className="pc-label ms-2 align-middle">Unconfirmed</span>}
     </p>
     <p className="text-sm font-semibold">{uncertain && "Last known: "}{motion}</p>
     <p className="text-xs">{demo ? "Demo data · " : ""}{uncertain ? "Not confirmed · " : ""}Lightning can arrive sooner. Stay alert for stop-work orders.</p>

@@ -4,7 +4,6 @@ import type { Alert, FloodConditions, Site } from "@shared/types";
 import AlertBanner, { ReplayTag } from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { approachUnconfirmed as approachIsOld } from "@/lib/lightning";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 import { timeZoneAbbr } from "@/lib/time";
 
@@ -48,9 +47,9 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
   const replayStop = !!lightning?.replay;
   const edge = realStop ? "border-s-risk-red-solid bg-risk-red-bg" : replayStop ? "border-s-notice [border-inline-start-style:dashed] bg-surface" : "border-s-transparent bg-surface";
   const approach = !lightning && site.lightning_approach ? site.lightning_approach : null;
-  const approachUnsure = !!approach && (approachUnconfirmed || (!demo && approachIsOld(approach, nowMs)));
 
-  // Right side of the row: the most important state, or the risk band when there's none.
+  // Right side of the row: the most important state, or the risk band when there's none. Whether an
+  // advisory is confirmed is shown in the expanded row, not here.
   const status = lightning
     ? <span className="flex items-center gap-1">
       {lightning.replay && <ReplayTag />}
@@ -58,7 +57,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
       {!selected && <StopWorkCountdown all_clear_at={lightning.all_clear_at} replay={lightning.replay} inline />}
     </span>
     : floodAlert ? <span className="flex items-center gap-1">{floodAlert.replay && <ReplayTag />}<span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : "pc-chip--flood"}`}>Flood risk{alertsUnconfirmed && " ?"}</span></span>
-    : approach ? <span className={`pc-chip ${approachUnsure ? "pc-chip--unknown" : "pc-chip--approach"}`}>Lightning possible{approachUnsure && " ?"}</span>
+    : approach ? <span className="pc-chip pc-chip--approach">Lightning possible</span>
     : <span className={`text-xs font-semibold ${risk.text}`}>{risk.label}</span>;
 
   const row = <>

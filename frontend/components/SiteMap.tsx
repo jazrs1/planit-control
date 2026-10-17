@@ -5,6 +5,7 @@ import type { Alert, HazardReport, LightningCell, LightningFlash, Site } from "@
 import type { GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { riskLevel } from "@/lib/risk";
 import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
+import { formatStrikeDistance } from "@/lib/alerts";
 import { paintBasemap } from "@/lib/mapStyle";
 import { resolveColor } from "@/lib/themeColor";
 
@@ -269,7 +270,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         const distance = alert.last_strike_distance_mi;
         rows.set(site.id, alert.type === "flood" ? { site, text: "Flood risk", tone: "flood" }
           : alert.replay ? { site, text: "Stop work", tone: "replay" }
-          : { site, text: distance !== null && Number.isFinite(distance) ? `Stop work · ${(Math.floor(distance * 10) / 10).toFixed(1)} mi` : "Stop work", tone: "stop" });
+          : { site, text: formatStrikeDistance(distance) ? `Stop work · ${formatStrikeDistance(distance)}` : "Stop work", tone: "stop" });
       }
       // Cluster in screen space so nearby sites share one label.
       const groups: { x: number; y: number; items: typeof rows extends Map<string, infer V> ? V[] : never }[] = [];

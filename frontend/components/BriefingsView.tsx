@@ -235,6 +235,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
           {shown.map(({ site, entry }) => (
             <li key={site.id}>
               <BriefingCard
+                collapsible
                 siteId={site.id}
                 siteName={site.name}
                 timeZone={site.timezone}

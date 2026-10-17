@@ -10,7 +10,7 @@ import HazardPanel from "@/components/HazardPanel";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import SiteScoreHistory from "@/components/SiteScoreHistory";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { formatStrikeDistance } from "@/lib/alerts";
+import { formatMiles, formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
@@ -260,7 +260,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
             <IndexBadge label="Today" value={detail.hazard_index_today} uncertain={connectionLost} unknown={noLiveData} />
             <IndexBadge label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} unknown={noLiveData} />
           </div>
-          <p className="text-xs text-muted">Hazard index 0–10 · interim rule-based score</p>
+          <p className="text-xs text-muted">Hazard index 0–10 · weather model + safety rules</p>
         </div>
       </header>
 
@@ -294,7 +294,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         <HazardPanel
           title="Lightning" card={c.lightning} freshness={{ kind: "live" }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           rows={[
-            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : `${c.lightning.nearest_strike_mi} mi` },
+            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : formatMiles(c.lightning.nearest_strike_mi) },
             { label: "Strike time", value: c.lightning.nearest_strike_at && formatSiteTime(c.lightning.nearest_strike_at, tz) },
             { label: "Strikes, last 30 min", value: String(c.lightning.strikes_last_30_min) },
           ]}
@@ -333,7 +333,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         <HazardPanel
           title="Wildfire" card={c.wildfire} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.wildfire }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           rows={[
-            { label: "Nearest fire", value: c.wildfire.nearest_detection_mi === null ? "None detected" : `${c.wildfire.nearest_detection_mi} mi` },
+            { label: "Nearest fire", value: c.wildfire.nearest_detection_mi === null ? "None detected" : formatMiles(c.wildfire.nearest_detection_mi) },
             { label: "Detected", value: c.wildfire.detected_at && formatSiteDateTime(c.wildfire.detected_at, tz) },
             { label: "Confidence", value: c.wildfire.confidence },
             { label: "Fires within 25 mi (24 h)", value: c.wildfire.detections_25mi == null ? null : String(c.wildfire.detections_25mi) },
@@ -353,7 +353,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
               {c.wildlife.slice(0, 8).map((s, i) => (
                 <li key={`${s.species}-${s.seen_at}-${i}`} className="flex flex-wrap justify-between gap-x-2 py-1">
                   <span className="min-w-0 font-medium">{s.species}</span>
-                  <span className="shrink-0 text-muted tabular-nums">{s.distance_mi} mi · {formatSiteDateTime(s.seen_at, tz)}</span>
+                  <span className="shrink-0 text-muted tabular-nums">{formatMiles(s.distance_mi) ?? "Distance unknown"} · {formatSiteDateTime(s.seen_at, tz)}</span>
                 </li>
               ))}
             </ul>
