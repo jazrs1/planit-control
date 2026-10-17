@@ -55,7 +55,7 @@ function device(options = {}) {
   const api = {
     ApiRequestError,
     getPushPublicKey: async () => { calls.push("public key"); return { public_key: "AQID-_8" }; },
-    subscribePush: async (body) => { calls.push("server subscribe"); posts.push(body); if (options.serverFails) throw Error("offline"); return { id: "sub-1", site_ids: body.site_ids, role: body.role, created_at: "2026-10-17T18:00:00Z", updated_at: "2026-10-17T18:00:00Z" }; },
+    subscribePush: async (body) => { calls.push("server subscribe"); posts.push(body); if (options.serverFails) throw Error("offline"); const refused = options.subscribeErrors?.shift(); if (refused) throw new ApiRequestError("refused", refused); return { id: "sub-1", site_ids: body.site_ids, role: body.role, created_at: "2026-10-17T18:00:00Z", updated_at: "2026-10-17T18:00:00Z" }; },
     testPush: async (body) => { calls.push({ test: body }); if (options.testError) throw new ApiRequestError("test failed", options.testError); return options.testResult ?? { sent: true, removed: false }; },
     unsubscribePush: async (body) => { calls.push({ unsubscribe: body }); if (options.removeFails) throw Error("offline"); return { removed: true }; },
   };
@@ -127,6 +127,41 @@ test("a server failure never pretends registration succeeded; retry preserves br
   await quiet.client.initialize();
   assert.equal(quiet.client.state.phase, "unconfirmed");
   assert.equal(quiet.client.state.canUnsubscribe, true);
+});
+
+test("subscription limits show plain messages and keep the device unconfirmed", async () => {
+  for (const [status, message] of [[429, /Too many devices on this network.*Try again later/], [503, /aren't available on the server right now/]]) {
+    const d = device({ subscribeErrors: [status] });
+    await d.client.initialize(); await d.client.enable(preferences);
+    assert.equal(d.client.state.phase, "unconfirmed");
+    assert.match(d.client.state.message, message);
+    assert.equal(d.calls.filter(value => value === "browser unsubscribe").length, 0, `${status} keeps the browser subscription for a retry`);
+    const quiet = device({ existing: true, preferences, subscribeErrors: [status] });
+    await quiet.client.initialize();
+    assert.equal(quiet.client.state.phase, "unconfirmed");
+    assert.match(quiet.client.state.message, message);
+  }
+});
+
+test("a 409 (keys already used) renews the browser subscription once and registers it, on enable and on load", async () => {
+  const d = device({ subscribeErrors: [409] });
+  await d.client.initialize(); await d.client.enable(preferences);
+  assert.equal(d.client.state.phase, "registered");
+  assert.equal(d.posts.length, 2);
+  assert.notEqual(d.posts[0].subscription.endpoint, d.posts[1].subscription.endpoint);
+  assert.equal(d.posts[1].subscription.endpoint, d.subscription.endpoint);
+  assert.equal(d.calls.filter(value => value === "browser unsubscribe").length, 1);
+  assert.equal(d.calls.filter(value => value === "permission").length, 1);
+  const quiet = device({ existing: true, preferences, subscribeErrors: [409] });
+  await quiet.client.initialize();
+  assert.equal(quiet.client.state.phase, "registered");
+  assert.match(quiet.client.state.message, /renewed/);
+  assert.equal(quiet.posts.length, 2);
+  assert.equal(quiet.calls.includes("permission"), false);
+  const stuck = device({ subscribeErrors: [409, 409] });          // never loops
+  await stuck.client.initialize(); await stuck.client.enable(preferences);
+  assert.equal(stuck.client.state.phase, "unconfirmed");
+  assert.equal(stuck.posts.length, 2);
 });
 
 test("a removed test subscription is renewed and posted again without another permission prompt", async () => {
