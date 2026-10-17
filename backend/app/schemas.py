@@ -154,6 +154,7 @@ class Alert(BaseModel):
     started_at: datetime
     all_clear_at: datetime | None
     last_strike_distance_mi: float | None
+    replay: bool = False   # from a lightning replay (simulated time), not a real alert
 
 
 

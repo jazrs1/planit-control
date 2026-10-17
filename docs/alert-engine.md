@@ -161,7 +161,12 @@ There are three reasons the engine uses only the `now` it's handed:
 
 ### Live and replay never mix
 
-Replay alerts are stored with `replay = true`. The "one active alert per site" rule is per mode, the engine only touches alerts of its own mode, and the API only shows the mode matching the current clock. A replayed August storm can't extend or clear a real alert at the same site, and tonight's real alerts don't show up during a demo replay. Each new replay starts by deleting old replay alerts.
+Replay alerts are stored with `replay = true`. The "one active alert per site" rule is per mode, and the engine only touches alerts of its own mode, so a replayed August storm can't extend or clear a real alert at the same site. Each new replay starts by deleting old replay alerts.
+
+Real alerts never disappear during a replay:
+- **Live ingestion keeps running.** The live loop polls GOES-19 on real time while the replay plays, and each cycle tells the hook which mode it is (`ingest_cycle(..., replay=...)`), so the two never share a clock.
+- **`GET /alerts` shows both.** Live alerts are checked against real time, replay alerts against the simulated time, and each carries `replay: true/false`. The frontend tags replay alerts **REPLAY** and counts real ones down on real time.
+- **The beacon** (`GET /sites/{id}/beacon`) reports a real stop-work, on real time, even during a replay.
 
 ## What the rest of the app shows
 

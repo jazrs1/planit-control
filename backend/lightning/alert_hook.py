@@ -8,8 +8,9 @@ It also runs when a cycle found no new flashes, so the engine can clear alerts w
 30-minute countdown has run out.
 
 Rules for the engine:
-  - Use `now` for every time comparison, never datetime.now(). During replay `now` is the
-    simulated clock (also available as app.clock.now()).
+  - Use `now` for every time comparison, never datetime.now() or app.clock.now(). Live and replay
+    cycles can run at the same time: a live cycle gets real time and replay=False, a replay cycle
+    the simulated time and replay=True.
   - `flashes` covers Florida plus ~30 mi. Apply the stop-work radius yourself, e.g. with
     lightning.geo.nearest_site_miles(), miles_between() in SQL, or the 5-minute rollup.
   - Exceptions are logged and swallowed by the caller, so a bug here can't stop ingestion.
@@ -31,12 +32,10 @@ if TYPE_CHECKING:  # glm.py imports this module, so avoid a runtime import cycle
 log = logging.getLogger(__name__)
 
 
-def on_new_flashes(flashes: list[Flash], now: datetime) -> None:
+def on_new_flashes(flashes: list[Flash], now: datetime, *, replay: bool = False) -> None:
     from alerts import approach, engine
-    from app import clock
 
     # Replay writes its own alerts (alerts.replay = true) so it never touches live ones.
-    replay = clock.is_simulated()
     engine.run(flashes, now, replay=replay)
     try:
         approach.run(now, replay=replay)

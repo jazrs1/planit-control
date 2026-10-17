@@ -4,7 +4,8 @@ One file:  download -> parse with xarray -> absolute UTC flash times -> keep Flo
            -> insert (once per file, race-safe) -> refresh the 5-minute per-site rollup.
 One cycle: ingest_cycle() runs that for a batch of files, then passes the new flashes to
            lightning.alert_hook.on_new_flashes(). Live polling (live.py) and replay (replay.py)
-           both call ingest_cycle(); only where the bytes come from and the clock differ.
+           both call ingest_cycle(); only where the bytes come from, the clock and the
+           `replay` flag differ. Both can run at the same time.
 
 Data: s3://noaa-goes19/GLM-L2-LCFA/YYYY/DDD/HH/, public, read anonymously over HTTPS.
 """
@@ -234,8 +235,10 @@ def ingest_file(pool: ConnectionPool, source_file: str, data: bytes) -> tuple[in
 Loader = Callable[[], bytes]
 
 
-def ingest_cycle(pool: ConnectionPool, files: Iterable[tuple[str, Loader]], now: datetime) -> CycleResult:
-    """Ingest a batch of files in order, then hand the new flashes to the alert hook.
+def ingest_cycle(pool: ConnectionPool, files: Iterable[tuple[str, Loader]], now: datetime,
+                 replay: bool = False) -> CycleResult:
+    """Ingest a batch of files in order, then hand the new flashes to the alert hook (as replay
+    alerts when `replay`, else live ones).
 
     `files` is (source_file name, function returning the file's bytes). A file that fails to
     load or parse is logged and skipped; it is not marked processed, so the next cycle retries it.
@@ -258,7 +261,7 @@ def ingest_cycle(pool: ConnectionPool, files: Iterable[tuple[str, Loader]], now:
             result.new_flashes += flashes
 
     try:
-        alert_hook.on_new_flashes(result.new_flashes, now)
+        alert_hook.on_new_flashes(result.new_flashes, now, replay=replay)
     except Exception:  # noqa: BLE001 - the alert engine must not break ingestion
         log.exception("Alert hook failed")
     return result
@@ -269,4 +272,4 @@ def poll_latest(pool: ConnectionPool, now: datetime, lookback: timedelta = timed
     keys = newest_keys(now, lookback)
     done = processed_files(pool, [k.rsplit("/", 1)[1] for k in keys])
     todo = [(k.rsplit("/", 1)[1], lambda k=k: download(k)) for k in keys if k.rsplit("/", 1)[1] not in done]
-    return ingest_cycle(pool, todo, now)
+    return ingest_cycle(pool, todo, now, replay=False)
