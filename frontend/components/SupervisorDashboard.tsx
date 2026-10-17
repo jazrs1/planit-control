@@ -53,7 +53,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const nowMs = lightningStale && lastOnlineNow.current !== null ? lastOnlineNow.current : serverNow();
   useEffect(() => { if (!lightningStale) lastOnlineNow.current = nowMs; });
   const cellsUnconfirmed = !demo && (offline || cellsFailed);
-  const oldCells = !demo && cells?.some((cell) => cellUnconfirmed(cell, serverNow()));
+  // Each quiet cell is already drawn as unconfirmed; the legend only says so when every cell is.
+  const oldCells = !demo && !!cells?.length && cells.every((cell) => cellUnconfirmed(cell, serverNow()));
   const alertsKnown = knownAlerts !== null;
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
