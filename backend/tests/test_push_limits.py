@@ -212,3 +212,16 @@ def test_a_test_push_counts_as_seen(clients, conn):  # noqa: F811
     age = conn.execute("SELECT %s - last_seen_at AS age FROM push_subscriptions WHERE id = %s",
                        (clock.real_now(), sub_id)).fetchone()["age"]
     assert age < timedelta(minutes=1)
+
+
+def test_before_migration_010_sends_warn_once(monkeypatch, push_on, caplog):  # noqa: F811
+    import psycopg
+    monkeypatch.setattr(notify, "_warned_missing", False)
+    monkeypatch.setattr("app.db.get_pool", lambda: object())
+
+    def old_schema(pool):
+        raise psycopg.errors.UndefinedColumn("column last_seen_at does not exist")
+    for _ in range(3):
+        notify._guard(old_schema)
+    assert caplog.text.count("run `python -m scripts.migrate` (009-010)") == 1
+    assert "Push notifications failed" not in caplog.text

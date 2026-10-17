@@ -348,9 +348,9 @@ def _guard(fn, *args) -> None:
 
     try:
         fn(get_pool(), *args)
-    except psycopg.errors.UndefinedTable:
+    except (psycopg.errors.UndefinedTable, psycopg.errors.UndefinedColumn):
         if not _warned_missing:
-            log.warning("push_subscriptions doesn't exist: run `python -m scripts.migrate` (009)")
+            log.warning("Push tables are missing or out of date: run `python -m scripts.migrate` (009-010)")
             _warned_missing = True
     except Exception:  # noqa: BLE001 - a push failure must never surface anywhere else
         log.exception("Push notifications failed (alerts are unaffected)")
