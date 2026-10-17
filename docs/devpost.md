@@ -47,7 +47,7 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
   - Arrival estimates ran late in 7 of 8, so the app never shows an arrival countdown.
   - 11 of 19 advisories weren't followed by a stop-work.
 - **Every alert change is logged** with strike time and processing time, for audits.
-- 265 backend tests and 58 frontend tests.
+- 265 backend tests and 73 frontend tests.
 
 ## What we learned
 
