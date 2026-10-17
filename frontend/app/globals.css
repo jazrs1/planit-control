@@ -40,6 +40,8 @@
   --color-on-risk-red: var(--pc-on-risk-red);
   --color-lightning: var(--pc-lightning);
   --color-lightning-ring: var(--pc-lightning-ring);
+  --color-lightning-replay: var(--pc-lightning-replay);
+  --color-fire: var(--pc-fire);
 
   --radius-card: var(--pc-radius-card);
   --radius-chip: var(--pc-radius-chip);
@@ -334,6 +336,20 @@
 .report-marker[aria-pressed="true"], .report-marker:focus-visible {
   outline: 3px solid var(--pc-notice);
   outline-offset: 3px;
+}
+
+/* Info popovers (InfoButton): open next to their button where anchoring is supported, centered
+   otherwise; they fade in. */
+.pc-popover { opacity: 0; transition: opacity 160ms var(--pc-ease-out), display 160ms allow-discrete, overlay 160ms allow-discrete; }
+.pc-popover:popover-open { opacity: 1; }
+@starting-style { .pc-popover:popover-open { opacity: 0; } }
+@supports (position-area: block-end) {
+  .pc-popover {
+    margin: 0;
+    margin-block-start: 0.5rem;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  }
 }
 
 /* Map callouts for stop-work and flood sites (SiteMap). A rule toward the site on the near side. */

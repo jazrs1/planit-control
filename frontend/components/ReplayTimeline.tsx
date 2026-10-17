@@ -119,7 +119,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
     return (
       <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 bg-instrument px-4 py-2.5 text-text shadow-float">
         <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
-        <p className="min-w-0 flex-1 basis-56 font-mono text-xs text-muted sm:truncate">{replayWindowLabel(replay)} · plays a recorded storm through the live pipeline</p>
+        <p className="min-w-0 flex-1 basis-56 text-xs text-muted sm:truncate">{replayWindowLabel(replay)} · plays a recorded storm through the live pipeline</p>
         <ReplayControl />
       </section>
     );
@@ -144,9 +144,9 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
         <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
           <span className="pc-chip pc-chip--replay">REPLAY</span>
-          <span className="font-mono text-xs text-muted">{replayWindowLabel(replay)}</span>
-          <span className="ms-auto font-mono text-xs">
-            <span className="text-muted">Replay </span>{replayStops} stop work{replayFlood ? ` · ${replayFlood} flood risk` : ""}{stale ? " · last known" : ""}
+          <span className="text-xs text-muted">{replayWindowLabel(replay)}</span>
+          <span className="ms-auto text-xs">
+            <span className="text-muted">Replay </span><span className="font-mono font-semibold">{replayStops}</span> stop work{replayFlood ? <> · <span className="font-mono font-semibold">{replayFlood}</span> flood risk</> : ""}{stale ? " · last known" : ""}
           </span>
         </header>
 
@@ -165,14 +165,17 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
             </div>
             {timed
               ? <div className="relative h-4 font-mono text-[0.6875rem] text-muted" aria-hidden="true">
-                {ticks.map((tick, i) => <span key={tick} className={`absolute whitespace-nowrap ${i === 0 ? "" : i === ticks.length - 1 && at(span, tick) > 92 ? "-translate-x-full" : "-translate-x-1/2"}`} style={{ insetInlineStart: `${at(span, tick)}%` }}>{i === 0 ? clock(tick, true) : clock(tick).replace(/\s?[AP]M$/, "")}</span>)}
+                {ticks.map((tick, i) => <span key={tick} className={`absolute whitespace-nowrap ${i === 0 ? "" : i === ticks.length - 1 && at(span, tick) > 92 ? "-translate-x-full" : "-translate-x-1/2"}`} style={{ insetInlineStart: `${at(span, tick)}%` }}>{i === 0 ? clock(tick) : clock(tick).replace(/\s?[AP]M$/, "")}</span>)}
               </div>
-              : <div className="flex justify-between font-mono text-[0.6875rem] text-muted"><span>Storm start</span><span>Storm end</span></div>}
-            <p className="font-mono text-xs">{quiet ? "Storm data done · quiet period, countdowns clearing" : timed ? `Storm data until ${clock(tEnd)} · then 31 quiet minutes` : `${Math.round(progress * 100)}% of storm data`}</p>
+              : <div className="flex justify-between text-[0.6875rem] text-muted"><span>Storm start</span><span>Storm end</span></div>}
+            <p className="text-xs text-muted">
+              {quiet ? "Quiet period: countdowns clearing" : timed ? `Storm data until ${clock(tEnd)}, then 31 quiet minutes` : `${Math.round(progress * 100)}% of storm data`}
+              {replay && Number.isFinite(replay.files_total) && ` · ${replay.files_done}/${replay.files_total} files · ${(replay.flashes_ingested ?? 0).toLocaleString()} flashes`}
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 border-bs border-instrument-line pbs-3">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 pbs-1">
           <figure className="grid gap-1.5">
             <figcaption className="flex justify-between gap-2 text-xs text-muted"><span>Flashes per 5 min</span>{bins.length > 0 && <span className="font-mono">peak {Math.max(...bins.map((bin) => bin.flashes)).toLocaleString()}</span>}</figcaption>
             {timed && <FlashBars bins={bins} span={span} />}
@@ -191,7 +194,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
         </summary>
         {events.length === 0
           ? <p className="mbs-2 text-xs text-muted">{timeline.preparing ? "Preparing replay timeline…" : timeline.events === null ? "Loading the storm’s events…" : "No stop-work, advisory or all-clear yet."}</p>
-          : <ol className="mbs-1 max-h-44 divide-y divide-instrument-line overflow-y-auto overscroll-contain">{[...events].reverse().map(eventRow)}</ol>}
+          : <ol className="mbs-1 max-h-44 overflow-y-auto overscroll-contain">{[...events].reverse().map(eventRow)}</ol>}
       </details>
     </section>
   );
