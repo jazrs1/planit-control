@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AlertsProvider } from "@/components/AlertsProvider";
 import TopNavigation from "@/components/TopNavigation";
-import { getAlerts } from "@/lib/api";
+import { getAlerts, orNull } from "@/lib/api";
 import "./globals.css";
 
 // The navigation count is live safety data on every route.
@@ -13,7 +13,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const alerts = await getAlerts();
+  // null if the backend is unreachable: the badge shows "—" until real alerts load.
+  const alerts = await orNull(getAlerts());
 
   return (
     <html lang="en">

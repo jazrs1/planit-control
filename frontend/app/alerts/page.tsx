@@ -1,10 +1,11 @@
 import AlertsList from "@/components/AlertsList";
-import { getSites } from "@/lib/api";
+import { getSites, orNull } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
-  const sites = await getSites();
+  // Only used for site names; alerts fall back to their site id if this fails.
+  const sites = (await orNull(getSites())) ?? [];
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">

@@ -1,4 +1,5 @@
 import type { Alert, Site } from "@shared/types";
+import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 
 // Reference component: copy this structure for new cards.
@@ -64,12 +65,18 @@ export default function SiteCard({ site, lightningAlert, selected, onSelect }: S
       {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className="rounded-card border border-border px-3 py-2 text-left text-sm text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">{selected ? "Selected on map" : "Show on map"}</button>}
 
       {lightningAlert && (
-        <div className="rounded-card bg-risk-red px-3 py-2 text-sm font-semibold text-surface">
-          ⚡ STOP WORK: lightning {lightningAlert.last_strike_distance_mi} mi away
+        <div className="flex flex-col gap-2 rounded-card bg-risk-red p-3 text-sm font-semibold text-surface">
+          <p>
+            ⚡ STOP WORK: {lightningAlert.last_strike_distance_mi === null
+              ? "lightning nearby"
+              : `lightning ${lightningAlert.last_strike_distance_mi} mi away`}
+          </p>
+          {/* Same live countdown as /alerts; it resets when a new strike moves all_clear_at. */}
+          <StopWorkCountdown all_clear_at={lightningAlert.all_clear_at} />
           {lightningAlert.all_clear_at && (
-            <span className="block font-normal">
+            <p className="font-normal">
               All clear at {formatLocalTime(lightningAlert.all_clear_at, site.timezone)} if no new strikes
-            </span>
+            </p>
           )}
         </div>
       )}
