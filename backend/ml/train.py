@@ -28,7 +28,7 @@ from ml.features import FEATURES, SITE_FEATURES
 from ml.labels import HAZARD_GROUPS, LABELS_PATH, RADIUS_MI
 from ml.metrics import (apply_platt, average_precision, block_bootstrap, brier, fit_isotonic, fit_platt,
                         log_loss, reliability, roc_auc)
-from ml.model import BOOSTER_PATH, FACTOR_GROUPS, INDEX_PERCENTILES, INDEX_VALUES, META_PATH, HazardModel
+from ml.model import BOOSTER_PATH, FACTOR_GROUPS, META_PATH, HazardModel, factor_minimums, index_anchors
 from ml.paths import DOCS_DIR, MODELS_DIR
 
 TRAIN_YEARS = [2022, 2023]
@@ -277,8 +277,7 @@ def main() -> None:
     a, b = fit_platt(raw_val, val.hazard.to_numpy())
     isotonic = fit_isotonic(raw_val, val.hazard.to_numpy())
     p_val = apply_platt(raw_val, a, b)
-    prob_anchors = [0.0] + [float(np.quantile(p_val, q)) for q in INDEX_PERCENTILES[1:]]
-    prob_anchors = list(np.maximum.accumulate(np.asarray(prob_anchors) + np.arange(len(prob_anchors)) * 1e-9))
+    index = index_anchors(p_val, val.hazard.to_numpy(), VAL_YEAR)
 
     clim = train.groupby(train.date.str[5:7].astype(int)).hazard.mean()
     fires = rule_fires(train)
@@ -294,8 +293,8 @@ def main() -> None:
         "weather_source": "Open-Meteo gfs_seamless (HRRR over Florida); training on the Historical Forecast API",
         "split": {"train": TRAIN_YEARS, "validation": VAL_YEAR, "test": TEST_YEAR},
         "calibration": {"method": "platt", "fit_on": VAL_YEAR, "a": a, "b": b},
-        "index": {"reference_year": VAL_YEAR, "percentiles": INDEX_PERCENTILES, "probability_anchors": prob_anchors,
-                  "index_values": INDEX_VALUES},
+        "index": index,
+        "factor_min": factor_minimums(val),
         "baselines": {"climatology_by_month": {int(k): float(v) for k, v in clim.items()},
                       "rule": {"rain_in_at_least": RULE_RAIN_IN, "heat_index_f_at_least": RULE_HEAT_INDEX_F, **rule_prob}},
     }

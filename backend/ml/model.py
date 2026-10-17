@@ -20,10 +20,36 @@ from ml.paths import MODELS_DIR
 BOOSTER_PATH = MODELS_DIR / "hazard_lgbm.txt"
 META_PATH = MODELS_DIR / "hazard_model.json"
 
-# Index anchors: the calmest 65% of reference days score < 4 (green), the next 25% score
-# 4 to < 7 (amber), and the riskiest 10% score >= 7 (red). 9 = top 1%, 10 = top 0.1%.
-INDEX_PERCENTILES = [0.0, 0.65, 0.90, 0.99, 0.999]
+# Index anchors by lift over the reference year's base rate (the share of 2024 site-days with a logged
+# event): 4 (amber starts) = 2x that rate, 7 (red starts) = 5x. 9 and 10 stay at the reference year's
+# 99th and 99.9th percentiles. Piecewise-linear between anchors (hazard_index below).
 INDEX_VALUES = [0.0, 4.0, 7.0, 9.0, 10.0]
+INDEX_LIFTS = {4.0: 2.0, 7.0: 5.0}
+TOP_PERCENTILES = {9.0: 0.99, 10.0: 0.999}
+
+
+# The smallest reading a factor label can show as non-zero (labels round rain to 0.1 in).
+LABEL_MIN = {"rain_in": 0.05, "rain_rate_max_in": 0.05, "rain_prior3_in": 0.05, "rain_prior7_in": 0.05,
+             "thunder_hours": 0.5}
+
+
+def factor_minimums(X_ref: pd.DataFrame) -> dict[str, float]:
+    """meta["factor_min"]: per weather feature, the reference year's median or the smallest reading its
+    label can show, whichever is higher. Factors at or below it aren't shown as raising the risk."""
+    return {f: max(float(X_ref[f].median()), LABEL_MIN.get(f, 0.0)) for f in FACTOR_HAZARD if f in X_ref.columns}
+
+
+def index_anchors(p_ref, y_ref, reference_year: int) -> dict:
+    """The meta["index"] block: probability anchors for INDEX_VALUES from the reference year's
+    calibrated probabilities `p_ref` and outcomes `y_ref`, plus each anchor's percentile in that year."""
+    p_ref, base = np.asarray(p_ref, dtype=float), float(np.mean(y_ref))
+    probs = [0.0, INDEX_LIFTS[4.0] * base, INDEX_LIFTS[7.0] * base,
+             float(np.quantile(p_ref, TOP_PERCENTILES[9.0])), float(np.quantile(p_ref, TOP_PERCENTILES[10.0]))]
+    probs = list(np.maximum.accumulate(np.asarray(probs) + np.arange(len(probs)) * 1e-9))  # strictly increasing
+    return {"reference_year": reference_year, "method": "lift", "base_rate": base,
+            "lifts": {str(k): v for k, v in INDEX_LIFTS.items()},
+            "percentiles": [float(np.mean(p_ref < x)) for x in probs],   # where each anchor falls that year
+            "probability_anchors": [float(x) for x in probs], "index_values": INDEX_VALUES}
 
 # Features that explain together (two coordinates of one idea).
 FACTOR_GROUPS = {"doy_sin": "season", "doy_cos": "season", "lat": "location", "lon": "location"}
@@ -120,7 +146,8 @@ class HazardModel:
         idx = self.index(p)
         contrib = self.contributions(X)
         return [
-            Prediction(float(p[i]), float(idx[i]), top_factors(contrib.iloc[i], X.iloc[i], dates[i], top))
+            Prediction(float(p[i]), float(idx[i]),
+                       top_factors(contrib.iloc[i], X.iloc[i], dates[i], top, self.meta.get("factor_min") or {}))
             for i in range(len(X))
         ]
 
@@ -131,12 +158,21 @@ def hazard_index(p, prob_anchors, index_values=INDEX_VALUES) -> np.ndarray:
     return np.round(out, 1)
 
 
-def top_factors(contrib: pd.Series, row: pd.Series, day: date, top: int = 3) -> list[dict]:
+def top_factors(contrib: pd.Series, row: pd.Series, day: date, top: int = 3,
+                factor_min: dict[str, float] | None = None) -> list[dict]:
     """Largest positive contributors, grouped, in plain language. weight = share of the positive push.
+
+    Only factors that raise the risk: a positive contribution AND, for weather features, a reading above
+    `factor_min` (the reference year's median, meta["factor_min"]). Every weather feature is "more is
+    riskier", so a reading at or below an ordinary day's (e.g. "0.0 in of rain forecast") isn't shown even
+    when the model's interactions give it a small positive contribution.
 
     Every factor gets a HazardType (the API requires one): season and location borrow the hazard of
     the weather factor that pushed risk up the most."""
     grouped = contrib.groupby(lambda f: FACTOR_GROUPS.get(f, f)).sum()
+    floors = factor_min or {}
+    raises = [f for f in grouped.index if f not in floors or float(row[f]) >= floors[f]]
+    grouped = grouped[raises]
     positive = grouped[grouped > 0].sort_values(ascending=False)
     total = positive.sum()
     weather = [f for f in positive.index if FACTOR_HAZARD[f]]
