@@ -1,0 +1,25 @@
+{
+  "bin_minutes": 5,
+  "bins": [
+    {
+      "start": "2025-08-04T22:00:00+00:00",
+      "flashes": 1495,
+      "sites_in_stop_work": 7
+    },
+    {
+      "start": "2025-08-04T22:05:00+00:00",
+      "flashes": 1670,
+      "sites_in_stop_work": 9
+    },
+    {
+      "start": "2025-08-04T22:10:00+00:00",
+      "flashes": 1609,
+      "sites_in_stop_work": 9
+    },
+    {
+      "start": "2025-08-04T22:15:00+00:00",
+      "flashes": 633,
+      "sites_in_stop_work": 9
+    }
+  ]
+}

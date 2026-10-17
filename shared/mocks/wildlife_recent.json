@@ -1,0 +1,23 @@
+[
+  {
+    "lat": 27.611,
+    "lon": -80.405,
+    "species": null,
+    "seen_at": "2026-10-17T13:20:00-04:00",
+    "source": "crew"
+  },
+  {
+    "lat": 27.583,
+    "lon": -80.398,
+    "species": "American Alligator",
+    "seen_at": "2026-10-15T09:02:00-04:00",
+    "source": "inaturalist"
+  },
+  {
+    "lat": 28.905,
+    "lon": -82.64,
+    "species": "Florida Cottonmouth",
+    "seen_at": "2026-10-02T17:45:00-04:00",
+    "source": "inaturalist"
+  }
+]
