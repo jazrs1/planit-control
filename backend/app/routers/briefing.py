@@ -1,12 +1,13 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from psycopg_pool import ConnectionPool
 from pydantic import TypeAdapter
 
 from app import mocks, site_data
+from app.admin import ADMIN_HEADER, check_admin_token, send_all_limit, send_site_limit
 from app.cache import api_cache
 from app.db import get_pool, get_pool_optional
 from app.schemas import Briefing, SendBriefingRequest, SendBriefingResponse
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/briefing", tags=["briefing"])
 list_router = APIRouter(tags=["briefing"])
 log = logging.getLogger(__name__)
 _briefings = TypeAdapter(list[Briefing])
+_all_running = False   # a send-now for all sites is writing briefings in the background
 
 
 @list_router.get("/briefings", response_model=list[Briefing])
@@ -47,26 +49,38 @@ def get_briefing(site_id: str, pool: ConnectionPool | None = Depends(get_pool_op
 
 
 @router.post("/send-now", response_model=SendBriefingResponse)
-async def send_now(body: SendBriefingRequest | None = None, pool: ConnectionPool = Depends(get_pool)):
-    """Generate tomorrow's briefing now: one site (returned right away) or all sites (in the
-    background; 202). Replaces any briefing already stored for that day."""
+async def send_now(body: SendBriefingRequest | None = None, pool: ConnectionPool = Depends(get_pool),
+                   x_admin_token: str | None = Header(None, alias=ADMIN_HEADER)):
+    """Generate tomorrow's briefing now: one site (returned right away; at most once a minute per
+    site) or all sites (in the background, 202; needs the X-Admin-Token demo code, at most once per
+    15 minutes and not while a run is in progress). Replaces any briefing already stored for that day."""
+    global _all_running
     body = body or SendBriefingRequest()
     if body.site_id and body.site_id not in site_data._real_sites():
         raise HTTPException(404, f"Site '{body.site_id}' not found")
     if body.site_id:
+        send_site_limit.hit(body.site_id)
         done = await asyncio.to_thread(service.generate, pool, [body.site_id])
         if not done:
             raise HTTPException(404, f"Site '{body.site_id}' not found")
         return {"generated": [service.to_response(service.latest(pool, body.site_id))], "queued": 0}
 
+    check_admin_token(x_admin_token)   # before the limit, so a bad request can't use up the window
+    if _all_running:
+        raise HTTPException(409, "Briefings for all sites are already being written.")
+    send_all_limit.hit("all")
     with pool.connection() as conn:
         count = conn.execute("SELECT count(*) AS n FROM sites").fetchone()["n"]
 
     async def run_all():
+        global _all_running
         try:
             await asyncio.to_thread(service.generate, pool, None)
         except Exception:  # noqa: BLE001 - background; logged
             log.exception("send-now for all sites failed")
+        finally:
+            _all_running = False
 
+    _all_running = True
     asyncio.get_running_loop().create_task(run_all())
     return JSONResponse({"generated": [], "queued": count}, status_code=status.HTTP_202_ACCEPTED)

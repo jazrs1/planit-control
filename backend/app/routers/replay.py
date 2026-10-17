@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg_pool import ConnectionPool
 
+from app.admin import require_admin
 from app.db import get_pool
 from app.schemas import ReplayStatus, StartReplayRequest
 from lightning import replay
@@ -8,7 +9,8 @@ from lightning import replay
 router = APIRouter(prefix="/replay", tags=["replay"])
 
 
-@router.post("/start", response_model=ReplayStatus, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/start", response_model=ReplayStatus, status_code=status.HTTP_202_ACCEPTED,
+             dependencies=[Depends(require_admin)])
 async def start_replay(body: StartReplayRequest | None = None, pool: ConnectionPool = Depends(get_pool)):
     body = body or StartReplayRequest()
     windows = replay.available_windows()
@@ -24,7 +26,7 @@ async def start_replay(body: StartReplayRequest | None = None, pool: ConnectionP
     return replay.runner.status()
 
 
-@router.post("/stop", response_model=ReplayStatus)
+@router.post("/stop", response_model=ReplayStatus, dependencies=[Depends(require_admin)])
 async def stop_replay():
     await replay.runner.stop()
     return replay.runner.status()

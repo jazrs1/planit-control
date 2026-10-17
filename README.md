@@ -57,10 +57,12 @@ With `DATABASE_URL` set, the API polls NOAA's public GOES-19 bucket every 20 s a
 
 ```bash
 python -m scripts.find_replay_window      # samples Aug 2025 afternoons, downloads the stormiest hour to data/replay/ (~150 MB, gitignored)
-curl -X POST localhost:8000/replay/start -H "content-type: application/json" -d '{"speed": 30}'
+curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "content-type: application/json" -d '{"speed": 30}'
 curl localhost:8000/replay/status
-curl -X POST localhost:8000/replay/stop
+curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"
 ```
+
+Starting or stopping a replay needs the **demo code**: `ADMIN_TOKEN` from `backend/.env`, sent as the `X-Admin-Token` header (the frontend asks for it once and remembers it on that device). Without `ADMIN_TOKEN` set, those actions are off.
 
 At 30x, one hour of lightning plays in 2 minutes, followed by 31 quiet simulated minutes so stop-work countdowns can clear. While it runs, every time-based route (sites, recent flashes) uses the simulated clock. Live lightning polling keeps running on real time, and `GET /alerts` returns real alerts alongside the replay's, each with `replay: true/false`, so a real stop-work never disappears during a demo. If ingestion can't keep up with the requested speed, the clock waits for it rather than running ahead.
 
@@ -111,7 +113,7 @@ Other commands: `npm run typecheck`, `npm run build`.
 | POST | `/uploads` | Upload a report photo (raw image body); returns `photo_url` |
 | GET | `/briefing/{site_id}` | Latest next-day briefing (generated 6 PM site time) and key numbers |
 | GET | `/briefings` | Latest briefing for every site in one response |
-| POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`) or all |
+| POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`, at most once a minute per site) or all (needs `X-Admin-Token`, at most once per 15 min) |
 | GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
 | GET | `/sites/{id}/beacon` | Tiny alarm state: stop / approaching / flood / clear, with countdowns |
 
