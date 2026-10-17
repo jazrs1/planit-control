@@ -24,7 +24,7 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
 
 - **Lightning:** GOES-19 satellite files every 20 seconds. The stop-work engine runs on *strike time*, so a late file can never shorten a countdown. It uses the time it's given, which makes replay possible.
 - **Data:** Open-Meteo, NWS alerts, FEMA flood zones, USGS rivers, NASA FIRMS fires and iNaturalist, stored in **Tiger Data** (TimescaleDB), with hypertables for flashes and readings.
-- **The hazard model:** LightGBM trained on archived HRRR forecasts against NOAA Storm Events: did a crew-relevant hazardous event happen within 15 miles, or in the site's NWS zone, that day? Trained on 2022–2023, calibrated on 2024, tested on 2025. The index is the highest of the model, the OSHA heat band, and the wildfire, wildlife and crew-report rules. NWS warnings set floors, and a stop-work holds today at 9 or more.
+- **The hazard model:** LightGBM trained on archived HRRR forecasts against NOAA Storm Events: did a crew-relevant hazardous event happen within 15 miles, or in the site's NWS zone, that day? Trained on 2022–2023, calibrated on 2024, tested on 2025. The index is the highest of the model, the OSHA heat band, and the wildfire, wildlife and crew-report rules. Wildlife sightings and distant fires can't color a site on their own. NWS warnings set floors, and a stop-work holds today at 9 or more.
 - **Arrival forecast:** we cluster the last 20 minutes of flashes into storm cells, fit each cell's motion, and project its leading edge toward each site. Advisories live in their own table, so they can't touch a stop-work.
 - **Grounded briefings:** Claude writes each briefing from a JSON file of facts. Code checks that every number appears in it, that hazard words match the data, and that the text is under 150 words. Then Claude Haiku rereads it for wrong statements. A rejected draft gets one retry, then Gemini, then a template. The go / no-go call is made in code, never by a model.
 - **Push and beacon:** each push is queued after an alert commits, so a failed push can't affect an alert, and each event is sent once. The beacon only shows green when the server says clear.
@@ -42,7 +42,8 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
 - Replaying the **August 4, 2025** storm (16,533 flashes in one hour) alerted **21 of 55 sites**. Okeechobee Clean Energy Center **reset 177 times** and cleared exactly 30 minutes after its final strike.
 - **The model beats both baselines on 2025**, a year it never saw.
   - PR-AUC is 0.128, against 0.032 for monthly climatology and 0.040 for a rain/heat rule.
-  - Red days were 8% of site-days and held 44% of logged hazardous events.
+  - Amber starts at twice an average day's risk and red at five times. Red days (about 2% of site-days) had a logged event about 1 in 5 times.
+  - Because many Florida storms form with little warning, more than half of logged events (58%) still fell on green days. Amber and red days held 42% (83% with our first, looser anchors, which colored most sites on an ordinary day). So the index plans the day, and the live lightning engine and NWS warnings protect the crew.
 - **On that storm, the forecast warned 8 of 13 stop-works** a median of 10.8 minutes ahead, counting those after a 15-minute warm-up. It's one storm, and we tuned on it.
   - Arrival estimates ran late in 7 of 8, so the app never shows an arrival countdown.
   - 11 of 19 advisories weren't followed by a stop-work.
