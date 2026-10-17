@@ -39,9 +39,11 @@ FACTOR_HAZARD = {
     "gust_max_mph": "lightning",
     "cape_max": "lightning",
     "thunder_hours": "lightning",
+    # No hazard of their own: they take the hazard of the strongest weather factor (see top_factors).
     "season": None,
     "location": None,
 }
+DEFAULT_HAZARD = "lightning"  # storms are most of the labels
 STORM_MONTHS = {5, 6, 7, 8, 9}
 
 
@@ -73,7 +75,8 @@ def factor_label(factor: str, row: pd.Series, day: date) -> str:
             month = day.strftime("%B")
             return f"Peak storm season ({month})" if day.month in STORM_MONTHS else f"Time of year ({month})"
         case "location":
-            return "Site has a history of severe-weather reports"
+            # Partly real climate, partly where NOAA receives reports (see docs/ml-model.md, limitations).
+            return "Area with frequent past severe-weather reports"
     raise ValueError(factor)
 
 
@@ -129,11 +132,17 @@ def hazard_index(p, prob_anchors, index_values=INDEX_VALUES) -> np.ndarray:
 
 
 def top_factors(contrib: pd.Series, row: pd.Series, day: date, top: int = 3) -> list[dict]:
-    """Largest positive contributors, grouped, in plain language. weight = share of the positive push."""
+    """Largest positive contributors, grouped, in plain language. weight = share of the positive push.
+
+    Every factor gets a HazardType (the API requires one): season and location borrow the hazard of
+    the weather factor that pushed risk up the most."""
     grouped = contrib.groupby(lambda f: FACTOR_GROUPS.get(f, f)).sum()
     positive = grouped[grouped > 0].sort_values(ascending=False)
     total = positive.sum()
+    weather = [f for f in positive.index if FACTOR_HAZARD[f]]
+    fallback = FACTOR_HAZARD[weather[0]] if weather else DEFAULT_HAZARD
     return [
-        {"factor": f, "label": factor_label(f, row, day), "hazard": FACTOR_HAZARD[f], "weight": round(float(v / total), 2)}
+        {"factor": f, "label": factor_label(f, row, day), "hazard": FACTOR_HAZARD[f] or fallback,
+         "weight": round(float(v / total), 2)}
         for f, v in positive.head(top).items()
     ]

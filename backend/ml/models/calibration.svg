@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 460" width="680" height="460" role="img" aria-labelledby="t d">
+<title id="t">Calibration on the 2025 test year</title>
+<desc id="d">Observed share of hazardous site-days versus predicted probability, per bin. Points on the dashed diagonal mean the predicted chance matched what happened.</desc>
+<style>
+  .surface { fill: #fcfcfb; } .ink { fill: #0b0b0b; } .ink2 { fill: #52514e; }
+  .grid { stroke: #e4e3df; } .axis { stroke: #8a8984; } .diag { stroke: #8a8984; }
+  .s1 { stroke: #2a78d6; fill: #2a78d6; } .s2 { stroke: #eb6834; fill: #eb6834; } .s3 { stroke: #1baf7a; fill: #1baf7a; }
+  .ring { stroke: #fcfcfb; }
+  path.line, line.line { fill: none; }
+  @media (prefers-color-scheme: dark) {
+    .surface { fill: #1a1a19; } .ink { fill: #f0efec; } .ink2 { fill: #c3c2b7; }
+    .grid { stroke: #34332f; } .axis { stroke: #8a8984; } .diag { stroke: #77766f; }
+    .s1 { stroke: #3987e5; fill: #3987e5; } .s2 { stroke: #d95926; fill: #d95926; } .s3 { stroke: #199e70; fill: #199e70; }
+    .ring { stroke: #1a1a19; }
+  }
+  text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+</style>
+<rect class="surface" width="680" height="460"/>
+<text class="ink" x="64" y="26" font-size="16" font-weight="600">Calibration on the 2025 test year</text>
+<text class="ink2" x="64" y="46" font-size="12">Each point is a bin of site-days (n ≥ 50). On the diagonal = predicted chance matches what happened.</text>
+<line class="grid" x1="64" x2="530" y1="404.0" y2="404.0" stroke-width="1"/>
+<text class="ink2" x="56" y="408.0" font-size="11" text-anchor="end">0%</text>
+<text class="ink2" x="64.0" y="422" font-size="11" text-anchor="middle">0%</text>
+<line class="grid" x1="64" x2="530" y1="319.0" y2="319.0" stroke-width="1"/>
+<text class="ink2" x="56" y="323.0" font-size="11" text-anchor="end">10%</text>
+<text class="ink2" x="180.5" y="422" font-size="11" text-anchor="middle">10%</text>
+<line class="grid" x1="64" x2="530" y1="234.0" y2="234.0" stroke-width="1"/>
+<text class="ink2" x="56" y="238.0" font-size="11" text-anchor="end">20%</text>
+<text class="ink2" x="297.0" y="422" font-size="11" text-anchor="middle">20%</text>
+<line class="grid" x1="64" x2="530" y1="149.0" y2="149.0" stroke-width="1"/>
+<text class="ink2" x="56" y="153.0" font-size="11" text-anchor="end">30%</text>
+<text class="ink2" x="413.5" y="422" font-size="11" text-anchor="middle">30%</text>
+<line class="grid" x1="64" x2="530" y1="64.0" y2="64.0" stroke-width="1"/>
+<text class="ink2" x="56" y="68.0" font-size="11" text-anchor="end">40%</text>
+<text class="ink2" x="530.0" y="422" font-size="11" text-anchor="middle">40%</text>
+<line class="axis" x1="64" x2="530" y1="404" y2="404" stroke-width="1"/>
+<line class="diag" x1="64.0" y1="404.0" x2="530.0" y2="64.0" stroke-width="1" stroke-dasharray="2 4"/>
+<text class="ink2" x="297.0" y="446" font-size="12" text-anchor="middle">Predicted probability of a hazardous day</text>
+<text class="ink2" x="16" y="234.0" font-size="12" text-anchor="middle" transform="rotate(-90 16 234.0)">Observed share hazardous</text>
+<path class="s1 line" d="M65.6,400.7 L72.4,392.2 L80.6,384.3 L92.6,368.4 L109.0,353.7 L135.1,335.8 L165.6,313.6 L206.0,250.5 L264.8,216.9 L341.8,218.1 L510.9,206.9" stroke-width="2" stroke-linejoin="round"/>
+<circle class="s1 ring" cx="65.6" cy="400.7" r="4.5" stroke-width="2"><title>Model, same-day: predicted 0.1%, observed 0.4% (10,727 site-days)</title></circle>
+<circle class="s1 ring" cx="72.4" cy="392.2" r="4.5" stroke-width="2"><title>Model, same-day: predicted 0.7%, observed 1.4% (2,665 site-days)</title></circle>
+<circle class="s1 ring" cx="80.6" cy="384.3" r="4.5" stroke-width="2"><title>Model, same-day: predicted 1.4%, observed 2.3% (2,675 site-days)</title></circle>
+<circle class="s1 ring" cx="92.6" cy="368.4" r="4.5" stroke-width="2"><title>Model, same-day: predicted 2.5%, observed 4.2% (1,264 site-days)</title></circle>
+<circle class="s1 ring" cx="109.0" cy="353.7" r="4.5" stroke-width="2"><title>Model, same-day: predicted 3.9%, observed 5.9% (1,149 site-days)</title></circle>
+<circle class="s1 ring" cx="135.1" cy="335.8" r="4.5" stroke-width="2"><title>Model, same-day: predicted 6.1%, observed 8.0% (636 site-days)</title></circle>
+<circle class="s1 ring" cx="165.6" cy="313.6" r="4.5" stroke-width="2"><title>Model, same-day: predicted 8.7%, observed 10.6% (282 site-days)</title></circle>
+<circle class="s1 ring" cx="206.0" cy="250.5" r="4.5" stroke-width="2"><title>Model, same-day: predicted 12.2%, observed 18.1% (299 site-days)</title></circle>
+<circle class="s1 ring" cx="264.8" cy="216.9" r="4.5" stroke-width="2"><title>Model, same-day: predicted 17.2%, observed 22.0% (159 site-days)</title></circle>
+<circle class="s1 ring" cx="341.8" cy="218.1" r="4.5" stroke-width="2"><title>Model, same-day: predicted 23.8%, observed 21.9% (128 site-days)</title></circle>
+<circle class="s1 ring" cx="510.9" cy="206.9" r="4.5" stroke-width="2"><title>Model, same-day: predicted 38.4%, observed 23.2% (69 site-days)</title></circle>
+<text class="ink" x="520.9" y="210.9" font-size="12">Model, same-day</text>
+<path class="s2 line" d="M65.6,400.2 L72.4,385.2 L80.5,383.8 L92.6,365.7 L108.5,345.7 L135.1,318.1 L165.1,296.0 L205.9,286.5 L267.4,306.7 L345.7,235.3 L491.3,306.9" stroke-width="2" stroke-linejoin="round"/>
+<circle class="s2 ring" cx="65.6" cy="400.2" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 0.1%, observed 0.4% (11,404 site-days)</title></circle>
+<circle class="s2 ring" cx="72.4" cy="385.2" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 0.7%, observed 2.2% (2,488 site-days)</title></circle>
+<circle class="s2 ring" cx="80.5" cy="383.8" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 1.4%, observed 2.4% (2,478 site-days)</title></circle>
+<circle class="s2 ring" cx="92.6" cy="365.7" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 2.5%, observed 4.5% (1,131 site-days)</title></circle>
+<circle class="s2 ring" cx="108.5" cy="345.7" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 3.8%, observed 6.9% (1,065 site-days)</title></circle>
+<circle class="s2 ring" cx="135.1" cy="318.1" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 6.1%, observed 10.1% (554 site-days)</title></circle>
+<circle class="s2 ring" cx="165.1" cy="296.0" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 8.7%, observed 12.7% (299 site-days)</title></circle>
+<circle class="s2 ring" cx="205.9" cy="286.5" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 12.2%, observed 13.8% (311 site-days)</title></circle>
+<circle class="s2 ring" cx="267.4" cy="306.7" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 17.5%, observed 11.5% (131 site-days)</title></circle>
+<circle class="s2 ring" cx="345.7" cy="235.3" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 24.2%, observed 19.8% (126 site-days)</title></circle>
+<circle class="s2 ring" cx="491.3" cy="306.9" r="4.5" stroke-width="2"><title>Model, day-ahead: predicted 36.7%, observed 11.4% (70 site-days)</title></circle>
+<text class="ink" x="501.3" y="310.9" font-size="12">Model, day-ahead</text>
+<path class="s3 line" d="M64.8,398.5 L73.9,401.0 L80.2,382.6 L98.2,403.5 L109.3,376.0 L126.5,376.4" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/>
+<circle class="s3 ring" cx="64.8" cy="398.5" r="4.5" stroke-width="2"><title>Climatology (by month): predicted 0.1%, observed 0.6% (1,540 site-days)</title></circle>
+<circle class="s3 ring" cx="73.9" cy="401.0" r="4.5" stroke-width="2"><title>Climatology (by month): predicted 0.9%, observed 0.4% (1,705 site-days)</title></circle>
+<circle class="s3 ring" cx="80.2" cy="382.6" r="4.5" stroke-width="2"><title>Climatology (by month): predicted 1.4%, observed 2.5% (5,115 site-days)</title></circle>
+<circle class="s3 ring" cx="98.2" cy="403.5" r="4.5" stroke-width="2"><title>Climatology (by month): predicted 2.9%, observed 0.1% (1,650 site-days)</title></circle>
+<circle class="s3 ring" cx="109.3" cy="376.0" r="4.5" stroke-width="2"><title>Climatology (by month): predicted 3.9%, observed 3.3% (6,710 site-days)</title></circle>
+<circle class="s3 ring" cx="126.5" cy="376.4" r="4.5" stroke-width="2"><title>Climatology (by month): predicted 5.4%, observed 3.2% (3,355 site-days)</title></circle>
+<text class="ink" x="136.5" y="380.4" font-size="12">Climatology (by month)</text>
+<line class="s1 line" x1="80" x2="102" y1="78" y2="78" stroke-width="2"/>
+<text class="ink2" x="108" y="82" font-size="11">Model, same-day</text>
+<line class="s2 line" x1="80" x2="102" y1="98" y2="98" stroke-width="2"/>
+<text class="ink2" x="108" y="102" font-size="11">Model, day-ahead</text>
+<line class="s3 line" x1="80" x2="102" y1="118" y2="118" stroke-width="2" stroke-dasharray="6 4"/>
+<text class="ink2" x="108" y="122" font-size="11">Climatology (by month)</text>
+</svg>

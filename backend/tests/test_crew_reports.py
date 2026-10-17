@@ -14,7 +14,8 @@ from app.config import get_settings
 from app.schemas import CreateReportRequest
 from briefing import writer
 from briefing.inputs import go_status
-from hazards.scoring import Inputs, score_site
+from hazards.risk import predict
+from hazards.scoring import Inputs
 
 NOW = datetime(2026, 7, 15, 18, 0, tzinfo=timezone.utc)
 SITE = {"id": "s", "name": "Test", "lat": 28.0, "lon": -82.0, "timezone": "America/New_York",
@@ -29,7 +30,7 @@ def report(category, hours_ago, species=None, distance=0.5):
 def cards_for(*reports, readings=None):
     inp = Inputs(site=SITE, readings={k: (v, NOW) for k, v in (readings or {}).items()},
                  crew_reports=sorted(reports, key=lambda r: r["created_at"], reverse=True), now=NOW)
-    return score_site(inp, {})
+    return predict(inp, {})
 
 
 # ---------- cards ----------

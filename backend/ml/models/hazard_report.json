@@ -1,7 +1,7 @@
 {
  "meta": {
   "version": 1,
-  "trained_at": "2026-10-17T04:14:44+00:00",
+  "trained_at": "2026-10-17T04:37:49+00:00",
   "features": [
    "tmax_f",
    "heat_index_max_f",
@@ -1131,7 +1131,7 @@
     "probability": 0.3317,
     "hazard_index": 8.2,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,960 J/kg)",
      "0.4 in of rain forecast"
     ]
@@ -1144,7 +1144,7 @@
     "hazard_index": 7.9,
     "factors": [
      "2.0 in of rain forecast",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Wet ground (21% soil moisture)"
     ]
    },
@@ -1155,7 +1155,7 @@
     "probability": 0.2067,
     "hazard_index": 7.7,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 5,140 J/kg)",
      "Wet ground (22% soil moisture)"
     ]
@@ -1179,7 +1179,7 @@
     "probability": 0.171,
     "hazard_index": 7.5,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,400 J/kg)",
      "0.1 in of rain forecast"
     ]
@@ -1191,7 +1191,7 @@
     "probability": 0.1605,
     "hazard_index": 7.5,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "0.8 in of rain forecast",
      "Unstable air for storms (CAPE 3,170 J/kg)"
     ]
@@ -1204,7 +1204,7 @@
     "hazard_index": 7.4,
     "factors": [
      "0.8 in of rain forecast",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Wet ground (22% soil moisture)"
     ]
    },
@@ -1215,7 +1215,7 @@
     "probability": 0.1529,
     "hazard_index": 7.4,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "0.5 in of rain forecast",
      "Wet ground (22% soil moisture)"
     ]
@@ -1252,7 +1252,7 @@
     "hazard_index": 7.1,
     "factors": [
      "Unstable air for storms (CAPE 4,200 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "0.1 in of rain forecast"
     ]
    },
@@ -1359,7 +1359,7 @@
     "probability": 0.0389,
     "hazard_index": 6.1,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,520 J/kg)",
      "Wet ground (19% soil moisture)"
     ]
@@ -1372,7 +1372,7 @@
     "hazard_index": 6.0,
     "factors": [
      "Unstable air for storms (CAPE 3,180 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "0.2 in of rain forecast"
     ]
    },
@@ -1431,7 +1431,7 @@
     "probability": 0.0302,
     "hazard_index": 5.4,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,120 J/kg)",
      "High of 91\u00b0F"
     ]
@@ -1445,7 +1445,7 @@
     "factors": [
      "0.3 in of rain forecast",
      "Wet ground (18% soil moisture)",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -1505,7 +1505,7 @@
     "factors": [
      "Unstable air for storms (CAPE 4,560 J/kg)",
      "High of 93\u00b0F",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -1528,7 +1528,7 @@
     "hazard_index": 4.6,
     "factors": [
      "Unstable air for storms (CAPE 3,490 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "High of 89\u00b0F"
     ]
    },
@@ -1564,7 +1564,7 @@
     "hazard_index": 4.4,
     "factors": [
      "Unstable air for storms (CAPE 4,290 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "High of 90\u00b0F"
     ]
    },
@@ -1708,7 +1708,7 @@
     "hazard_index": 2.7,
     "factors": [
      "Unstable air for storms (CAPE 4,520 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Heat index 105\u00b0F"
     ]
    },
@@ -2184,7 +2184,7 @@
     "probability": 0.3089,
     "hazard_index": 8.1,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,600 J/kg)",
      "0.9 in of rain forecast"
     ]
@@ -2196,7 +2196,7 @@
     "probability": 0.2138,
     "hazard_index": 7.7,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "3.1 in of rain forecast",
      "Unstable air for storms (CAPE 3,510 J/kg)"
     ]
@@ -2208,7 +2208,7 @@
     "probability": 0.139,
     "hazard_index": 7.4,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,180 J/kg)",
      "Wet ground (20% soil moisture)"
     ]
@@ -2221,7 +2221,7 @@
     "hazard_index": 7.4,
     "factors": [
      "2.5 in of rain forecast",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,490 J/kg)"
     ]
    },
@@ -2232,7 +2232,7 @@
     "probability": 0.1437,
     "hazard_index": 7.4,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "0.7 in of rain forecast",
      "Unstable air for storms (CAPE 3,030 J/kg)"
     ]
@@ -2256,7 +2256,7 @@
     "probability": 0.1084,
     "hazard_index": 7.2,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,210 J/kg)",
      "0.2 in of rain forecast"
     ]
@@ -2292,7 +2292,7 @@
     "probability": 0.0732,
     "hazard_index": 7.1,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,030 J/kg)",
      "Wet ground (19% soil moisture)"
     ]
@@ -2340,7 +2340,7 @@
     "probability": 0.0498,
     "hazard_index": 6.9,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,940 J/kg)",
      "Wet ground (20% soil moisture)"
     ]
@@ -2366,7 +2366,7 @@
     "factors": [
      "Unstable air for storms (CAPE 3,590 J/kg)",
      "1.1 in of rain forecast",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -2378,7 +2378,7 @@
     "factors": [
      "0.4 in of rain forecast",
      "Unstable air for storms (CAPE 2,920 J/kg)",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -2425,7 +2425,7 @@
     "hazard_index": 5.4,
     "factors": [
      "Unstable air for storms (CAPE 2,930 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Wet ground (18% soil moisture)"
     ]
    },
@@ -2436,7 +2436,7 @@
     "probability": 0.0286,
     "hazard_index": 5.3,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,380 J/kg)",
      "High of 96\u00b0F"
     ]
@@ -2462,7 +2462,7 @@
     "factors": [
      "Unstable air for storms (CAPE 2,570 J/kg)",
      "Wind gusts to 30 mph",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -2498,7 +2498,7 @@
     "factors": [
      "Unstable air for storms (CAPE 2,950 J/kg)",
      "High of 92\u00b0F",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -2522,7 +2522,7 @@
     "factors": [
      "Unstable air for storms (CAPE 3,120 J/kg)",
      "Wet ground (20% soil moisture)",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -2532,7 +2532,7 @@
     "probability": 0.0175,
     "hazard_index": 4.5,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,090 J/kg)",
      "High of 93\u00b0F"
     ]
@@ -2544,7 +2544,7 @@
     "probability": 0.0158,
     "hazard_index": 4.4,
     "factors": [
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,890 J/kg)",
      "High of 96\u00b0F"
     ]
@@ -2557,7 +2557,7 @@
     "hazard_index": 4.4,
     "factors": [
      "Unstable air for storms (CAPE 3,090 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "High of 91\u00b0F"
     ]
    },
@@ -2606,7 +2606,7 @@
     "factors": [
      "Unstable air for storms (CAPE 3,340 J/kg)",
      "Peak storm season (August)",
-     "Site has a history of severe-weather reports"
+     "Area with frequent past severe-weather reports"
     ]
    },
    {
@@ -2665,7 +2665,7 @@
     "hazard_index": 3.8,
     "factors": [
      "Unstable air for storms (CAPE 2,400 J/kg)",
-     "Site has a history of severe-weather reports",
+     "Area with frequent past severe-weather reports",
      "High of 93\u00b0F"
     ]
    },

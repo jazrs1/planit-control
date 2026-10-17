@@ -57,6 +57,15 @@ def hourly_frame(payload: dict, suffix: str = "") -> pd.DataFrame:
     return frame.reindex(columns=HOURLY_VARS)
 
 
+def hourly_frame_unix(payload: dict, tz: str) -> pd.DataFrame:
+    """Same as hourly_frame for a payload requested with timezone=GMT and timeformat=unixtime (the
+    live poller's format): times are converted to the site's local wall clock."""
+    hourly = payload["hourly"]
+    frame = pd.DataFrame({v: pd.to_numeric(pd.Series(hourly.get(v)), errors="coerce") for v in HOURLY_VARS if v in hourly})
+    frame.index = pd.to_datetime(hourly["time"], unit="s", utc=True).tz_convert(tz).tz_localize(None)
+    return frame.reindex(columns=HOURLY_VARS)
+
+
 def daily_weather(hourly: pd.DataFrame) -> pd.DataFrame:
     """Per local date: same-day weather features (no history yet)."""
     h = hourly.copy()

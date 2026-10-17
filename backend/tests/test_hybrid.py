@@ -1,0 +1,193 @@
+"""The hybrid hazard index (hazards/risk.py), the weather poll's request, scoring from the poll's
+forecasts, and stored scoring runs (hazards/model_scores.py)."""
+
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from hazards import model_scores
+from hazards.risk import combine, predict
+from hazards.scoring import STOP_WORK_FACTOR, Inputs
+from hazards.sources import open_meteo
+
+pytest.importorskip("lightgbm")
+
+NOW = datetime(2026, 7, 15, 18, 0, tzinfo=timezone.utc)   # 2 PM in New York, 1 PM in Chicago
+SITE = {"id": "s", "name": "Test", "lat": 28.0, "lon": -82.0, "timezone": "America/New_York",
+        "fema_flood_zone": "X", "fema_sfha": False, "near_river": False, "river_name": None}
+MODEL_FACTORS = [{"factor": "cape_max", "hazard": "lightning", "label": "Unstable air for storms (CAPE 4,600 J/kg)", "weight": 0.5},
+                 {"factor": "rain_in", "hazard": "flood", "label": "2.2 in of rain forecast", "weight": 0.3}]
+
+
+def inputs(readings=None, model=None, **kwargs) -> Inputs:
+    return Inputs(site=SITE, readings={k: (v, NOW) for k, v in (readings or {}).items()}, now=NOW,
+                  model=model or {}, **kwargs)
+
+
+def ml(score, factors=MODEL_FACTORS):
+    return {"probability": 0.1, "score": score, "factors": factors}
+
+
+# ---------- the hybrid ----------
+
+def test_model_wins_on_a_stormy_day():
+    scored = predict(inputs({("heat", "heat_index_f"): 95.0}, model={"2026-07-15": ml(7.2), "2026-07-16": ml(3.0)}), {})
+    assert scored["hazard_index_today"] == 7.2
+    assert scored["top_hazard"] == "lightning"
+    assert [f["source"] for f in scored["top_factors"]] == ["model", "model", "rule"]
+    assert scored["top_factors"][0]["label"].startswith("Unstable air")
+    assert scored["top_factors"][2]["label"] == "Heat index up to 95°F (OSHA moderate)"  # 5.0: at watch, so listed
+    assert scored["hazard_index_tomorrow"] == 3.0
+
+
+def test_rule_wins_when_heat_is_worse_than_the_weather_score():
+    scored = predict(inputs({("heat", "heat_index_f"): 110.0}, model={"2026-07-15": ml(2.0)}), {})
+    assert scored["hazard_index_today"] == 7.5             # OSHA high beats the model's 2.0
+    assert scored["top_hazard"] == "heat"
+    assert scored["top_factors"] == [{"hazard": "heat", "label": "Heat index up to 110°F (OSHA high)",
+                                      "weight": 1.0, "source": "rule"}]          # the model's 2.0 isn't elevated
+
+
+def test_without_a_model_score_the_rules_still_work():
+    scored = predict(inputs({("heat", "heat_index_f"): 98.0, ("heat", "tomorrow_peak_heat_index_f"): 104.0}), {})
+    assert (scored["hazard_index_today"], scored["hazard_index_tomorrow"]) == (5.0, 7.5)
+    assert scored["model_today"] is None and all(f["source"] == "rule" for f in scored["top_factors"])
+
+
+def test_lightning_override_is_today_only_and_listed_first():
+    alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW, "all_clear_at": NOW + timedelta(minutes=30)}
+    scored = predict(inputs(model={"2026-07-15": ml(6.0), "2026-07-16": ml(6.5)}, lightning_alert=alert), {})
+    assert scored["hazard_index_today"] == 9.0
+    assert scored["top_factors"][0] == {"hazard": "lightning", "label": STOP_WORK_FACTOR, "weight": 0.6, "source": "rule"}
+    assert scored["hazard_index_tomorrow"] == 6.5 and scored["top_factors_tomorrow"][0]["source"] == "model"
+
+
+def test_crew_reports_count_today_and_downed_lines_stay_on_their_card():
+    flood = {"id": "r1", "category": "flooding", "species": None, "created_at": NOW - timedelta(hours=1), "distance_mi": 0.4}
+    downed = {"id": "r2", "category": "downed_line", "species": None, "created_at": NOW, "distance_mi": 0.2}
+    scored = predict(inputs(crew_reports=[downed, flood]), {})
+    assert scored["hazard_index_today"] == 4.0
+    assert scored["top_factors"] == [{"hazard": "flood", "label": "Crew report: Flooding or washout", "weight": 1.0,
+                                      "source": "rule"}]
+    assert scored["cards"]["crew_hazards"]["hazard_status"] == "danger"
+    assert scored["hazard_index_tomorrow"] == 0.0
+
+
+def test_today_and_tomorrow_follow_the_site_timezone():
+    # 04:30 UTC Jul 16 is 12:30 AM Jul 16 in New York but still 11:30 PM Jul 15 in Chicago.
+    model = {"2026-07-15": ml(2.0), "2026-07-16": ml(6.0), "2026-07-17": ml(8.0)}
+    chicago = {**SITE, "timezone": "America/Chicago"}
+    late = datetime(2026, 7, 16, 4, 30, tzinfo=timezone.utc)
+    ny = predict(Inputs(site=SITE, readings={}, now=late, model=model), {})
+    ct = predict(Inputs(site=chicago, readings={}, now=late, model=model), {})
+    assert (ny["hazard_index_today"], ny["hazard_index_tomorrow"]) == (6.0, 8.0)
+    assert (ct["hazard_index_today"], ct["hazard_index_tomorrow"]) == (2.0, 6.0)
+
+
+def test_weights_never_sum_past_one_and_at_most_four_factors():
+    from hazards.risk import Component
+    comps = [Component("model", "lightning", 7.7, [("lightning", "a", 0.34), ("flood", "b", 0.33), ("flood", "c", 0.33)]),
+             Component("rule", "heat", 7.5, [("heat", "d", 1.0)]), Component("rule", "wildfire", 6.0, [("wildfire", "e", 1.0)])]
+    index, top, factors = combine(comps, stop_work=True)
+    assert index == 9.0 and top == "lightning" and len(factors) == 4
+    assert sum(f["weight"] for f in factors) <= 1.0
+
+
+# ---------- the weather poll ----------
+
+def test_poll_requests_exactly_what_the_model_was_trained_on_at_one_call_per_site(monkeypatch):
+    from ml import openmeteo as trained
+    seen = {}
+
+    def fake_get_json(url, params, retries=0):
+        seen.update(params)
+        return [{"hourly": {}}] * len(params["latitude"].split(","))
+
+    monkeypatch.setattr(open_meteo.http, "get_json", fake_get_json)
+    open_meteo.fetch([SITE, SITE])
+    assert seen["models"] == trained.MODEL
+    assert seen["hourly"].split(",") == trained.HOURLY_VARS
+    assert {k: seen[k] for k in trained.UNITS} == trained.UNITS
+    assert seen["past_days"] >= 8   # prior-7-day rain for today
+    # Open-Meteo bills one call per location for <= 10 variables and <= 14 days.
+    assert len(seen["hourly"].split(",")) <= 10 and seen["past_days"] + seen["forecast_days"] <= 14
+
+    open_meteo.fetch([SITE], extra_hourly=("precipitation_probability",), daily=("sunrise", "sunset"))  # the briefing
+    assert len(seen["hourly"].split(",")) + len(seen["daily"].split(",")) <= 10
+
+
+def hourly_payload(start_utc: datetime, days: int, tz: str | None = None, seed: int = 0) -> dict:
+    """A plausible summer hourly series. tz=None: the poller's format (GMT unixtime); otherwise
+    the training download's format (local time strings)."""
+    rng = np.random.default_rng(seed)
+    times = pd.date_range(start_utc, periods=24 * days, freq="h", tz="UTC")
+    hour = times.hour.to_numpy()
+    temp = 82 + 8 * np.sin((hour - 13) / 24 * 2 * np.pi) + rng.normal(0, 1, len(times))
+    rain = np.where(rng.random(len(times)) < 0.05, rng.exponential(0.3, len(times)), 0.0)
+    hourly = {
+        "temperature_2m": temp.round(1).tolist(), "relative_humidity_2m": (75 - (temp - 82) * 2).round().tolist(),
+        "precipitation": rain.round(2).tolist(), "wind_gusts_10m": (15 + 10 * rng.random(len(times))).round(1).tolist(),
+        "cape": (1500 + 1500 * rng.random(len(times))).round().tolist(), "weather_code": [3] * len(times),
+        "soil_moisture_0_to_10cm": [0.2] * len(times),
+    }
+    if tz is None:
+        hourly["time"] = [int(t.timestamp()) for t in times]
+    else:
+        hourly["time"] = [t.tz_convert(tz).strftime("%Y-%m-%dT%H:%M") for t in times]
+    return {"hourly": hourly}
+
+
+def test_poller_payload_gives_the_same_features_as_training_data():
+    from ml.features import hourly_frame, hourly_frame_unix, site_features
+    start = datetime(2026, 7, 6, 4, 0, tzinfo=timezone.utc)   # local midnight in New York
+    live = site_features(SITE, hourly_frame_unix(hourly_payload(start, 12), SITE["timezone"]))
+    train = site_features(SITE, hourly_frame(hourly_payload(start, 12, tz=SITE["timezone"])))
+    pd.testing.assert_frame_equal(live, train)
+
+
+def test_components_score_today_and_tomorrow_from_the_poll():
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    payload = hourly_payload(datetime(2026, 7, 7, tzinfo=timezone.utc), 12)
+    comps = model_scores.components([SITE], [payload], now)["s"]
+    assert set(comps) == {"2026-07-15", "2026-07-16"}
+    for c in comps.values():
+        assert 0 <= c["probability"] <= 1 and 0 <= c["score"] <= 10
+        assert c["factors"] and all(f["hazard"] for f in c["factors"])
+
+
+# ---------- stored scoring runs (database) ----------
+
+def test_scoring_run_is_stored_and_read_back(conn):  # noqa: F811
+    from app import site_data
+    from tests.test_crew_reports import FakePool
+    migration = Path(__file__).resolve().parents[1] / "db" / "migrations" / "007_hazard_scores_model.sql"
+    if conn.execute("SELECT 1 FROM information_schema.columns WHERE table_name = 'hazard_scores' "
+                    "AND column_name = 'model_score'").fetchone() is None:
+        conn.execute(migration.read_text())   # rolled back with the test
+    pool = FakePool(conn)
+    site = conn.execute("SELECT id, lat, lon, timezone FROM sites WHERE id = 'sanford'").fetchone()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    payload = hourly_payload((now - timedelta(days=8)).replace(hour=0, minute=0, second=0), 12)
+
+    detail = model_scores.run(pool, [site], [payload], now)
+    assert "failed" not in detail, detail
+
+    points = model_scores.history(conn, site, now + timedelta(seconds=1))
+    mine = [p for p in points if p["scored_at"] == now]
+    assert {p["horizon"] for p in mine} == {"today", "tomorrow"}
+    assert all(p["model_score"] is not None for p in mine)
+
+    stored = model_scores.latest(conn, now)["sanford"]
+    assert len(stored) >= 2
+    other = model_scores.latest(conn, now).get("big-bend", {})
+    assert all(v["score"] is not None for v in other.values())   # only sites with a fresh model score
+
+    detail = site_data.get_site_detail(pool, "sanford")
+    today = [p for p in mine if p["horizon"] == "today"][0]
+    assert detail["hazard_index_today"] >= today["model_score"]   # the API recombines the stored model part
+
+
+from tests.test_crew_reports import conn  # noqa: E402,F401 - the rolled-back DB fixture

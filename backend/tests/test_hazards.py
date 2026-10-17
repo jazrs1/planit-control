@@ -1,5 +1,5 @@
-"""Hazard rules: heat index, OSHA bands, flood-risk rule, soil wording, and the TEMPORARY index
-with its lightning override. Pure functions, no database."""
+"""Hazard rules: heat index, OSHA bands, flood-risk rule, soil wording, and the hybrid index's
+lightning override. Pure functions, no database. More hybrid-index tests: tests/test_hybrid.py."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -7,6 +7,7 @@ import pytest
 
 from alerts.flood import flood_risk
 from hazards.heat import heat_index_f, osha_risk_band
+from hazards.risk import predict
 from hazards.scoring import STOP_WORK_FACTOR, Inputs, score_site, soil_level, status_for
 
 NOW = datetime(2026, 7, 15, 18, 0, tzinfo=timezone.utc)
@@ -50,8 +51,8 @@ def test_soil_levels_and_crew_wording():
 
 def test_lightning_stop_work_overrides_today_only():
     alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW, "all_clear_at": NOW + timedelta(minutes=30)}
-    scored = score_site(inputs({("heat", "heat_index_f"): 85.0, ("heat", "tomorrow_peak_heat_index_f"): 95.0},
-                               lightning_alert=alert), {})
+    scored = predict(inputs({("heat", "heat_index_f"): 85.0, ("heat", "tomorrow_peak_heat_index_f"): 95.0},
+                            lightning_alert=alert, now=NOW), {})
     assert scored["hazard_index_today"] >= 9.0
     assert scored["top_hazard"] == "lightning"
     assert scored["top_factors"][0]["label"] == STOP_WORK_FACTOR
@@ -61,16 +62,17 @@ def test_lightning_stop_work_overrides_today_only():
 
 def test_override_never_lowers_a_higher_index():
     alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW, "all_clear_at": NOW + timedelta(minutes=30)}
-    scored = score_site(inputs({("heat", "heat_index_f"): 118.0}, lightning_alert=alert), {})
-    assert scored["hazard_index_today"] == 10.0          # 9.5 very-high heat + 0.5 for lightning
+    scored = predict(inputs({("heat", "heat_index_f"): 118.0}, lightning_alert=alert, now=NOW), {})
+    assert scored["hazard_index_today"] == 9.5           # very-high heat beats the 9.0 floor
     assert scored["top_factors"][0]["label"] == STOP_WORK_FACTOR
 
 
-def test_index_adds_half_point_per_other_elevated_hazard():
-    scored = score_site(inputs({("heat", "heat_index_f"): 105.0, ("flood", "rain_past_24h_in"): 2.5,
-                                ("flood", "rain_past_12h_in"): 2.5, ("flood", "rain_next_24h_in"): 0.0}), {})
-    assert scored["hazard_index_today"] == 8.0           # heat high 7.5 + 0.5 (flood 6 is elevated)
+def test_index_is_the_highest_part_and_flood_rules_feed_cards_not_the_index():
+    scored = predict(inputs({("heat", "heat_index_f"): 105.0, ("flood", "rain_past_24h_in"): 2.5,
+                             ("flood", "rain_past_12h_in"): 2.5, ("flood", "rain_next_24h_in"): 0.0}, now=NOW), {})
+    assert scored["hazard_index_today"] == 7.5           # OSHA high heat; rain is the ML model's job
     assert scored["top_hazard"] == "heat"
+    assert scored["cards"]["flood"]["hazard_status"] == "watch"   # the flood card still reacts to the rain
 
 
 def test_missing_sources_say_so_instead_of_guessing():

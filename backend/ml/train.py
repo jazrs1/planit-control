@@ -9,7 +9,8 @@ because that's where the archived GFS soil moisture starts, and because of the O
 budget (see ml/openmeteo.py); labels exist back to 2018 if more years are downloaded later.
 
 Writes models/hazard_lgbm.txt, models/hazard_model.json (runtime metadata), models/hazard_report.json
-(every number in docs/ml-model.md), and docs/img/ml-calibration.svg.
+(every number in docs/ml-model.md), and the calibration plot (docs/img/ml-calibration.svg and
+models/calibration.svg, which the API serves).
 """
 
 import argparse
@@ -326,6 +327,7 @@ def main() -> None:
     REPORT_PATH.write_text(json.dumps(report, indent=1, default=_json_default) + "\n")
     CALIBRATION_SVG.parent.mkdir(parents=True, exist_ok=True)
     CALIBRATION_SVG.write_text(plots.calibration_svg(report))
+    (MODELS_DIR / "calibration.svg").write_text(plots.calibration_svg(report))  # served by GET /model/calibration.svg
     print(f"\nwrote {BOOSTER_PATH} ({BOOSTER_PATH.stat().st_size / 1e6:.2f} MB), {META_PATH}, {REPORT_PATH}, {CALIBRATION_SVG}")
     rd = report["replay_day_today"]
     print(f"{REPLAY_DAY}: {rd['hazardous_sites']}/{rd['sites']} sites hazardous, {rd['red_sites']} red, "

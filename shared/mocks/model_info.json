@@ -1,0 +1,229 @@
+{
+  "version": "2026-10-17T04:37:49+00:00",
+  "trained_at": "2026-10-17T04:37:49+00:00",
+  "label": "NOAA Storm Events crew-relevant event within 15 mi or in the site's NWS zone/county, by site-local date",
+  "weather_source": "Open-Meteo gfs_seamless (HRRR over Florida); training on the Historical Forecast API",
+  "hybrid": "The hazard index is the highest of: the ML weather score (the model's calibrated probability mapped to 0-10), the OSHA heat-index band, and the wildfire, wildlife and crew-report rules. While a site has an active lightning stop-work, today's index is at least 9. Every factor says whether it came from the model or a rule.",
+  "training": {
+    "train_years": [
+      2022,
+      2023
+    ],
+    "validation_year": 2024,
+    "test_year": 2025,
+    "sites": 55,
+    "train_site_days": 40150,
+    "train_events": 1152
+  },
+  "test": {
+    "site_days": 20075,
+    "events": 476,
+    "base_rate": 0.0237
+  },
+  "results": [
+    {
+      "name": "Hazard model (LightGBM)",
+      "description": "Calibrated probability from the weather forecast, season and site.",
+      "same_day": {
+        "pr_auc": 0.1285,
+        "roc_auc": 0.8419,
+        "brier": 0.02219
+      },
+      "day_ahead": {
+        "pr_auc": 0.1021,
+        "roc_auc": 0.8253,
+        "brier": 0.02271
+      }
+    },
+    {
+      "name": "Climatology",
+      "description": "The training years' hazardous-day rate for that calendar month.",
+      "same_day": {
+        "pr_auc": 0.0318,
+        "roc_auc": 0.6154,
+        "brier": 0.02319
+      },
+      "day_ahead": {
+        "pr_auc": 0.0318,
+        "roc_auc": 0.6154,
+        "brier": 0.02319
+      }
+    },
+    {
+      "name": "Simple rule",
+      "description": "Flag the day if forecast rain is at least 1 in or the heat index reaches 108°F.",
+      "same_day": {
+        "pr_auc": 0.0396,
+        "roc_auc": 0.5994,
+        "brier": 0.02308
+      },
+      "day_ahead": {
+        "pr_auc": 0.0338,
+        "roc_auc": 0.5644,
+        "brier": 0.02313
+      }
+    }
+  ],
+  "bands": [
+    {
+      "band": "green",
+      "share_of_days": 0.6671,
+      "event_rate": 0.0059,
+      "share_of_events": 0.166
+    },
+    {
+      "band": "amber",
+      "share_of_days": 0.2559,
+      "event_rate": 0.0364,
+      "share_of_events": 0.3929
+    },
+    {
+      "band": "red",
+      "share_of_days": 0.077,
+      "event_rate": 0.1358,
+      "share_of_events": 0.4412
+    }
+  ],
+  "index_anchors": [
+    {
+      "index": 0.0,
+      "percentile": 0.0,
+      "probability": 0.0
+    },
+    {
+      "index": 4.0,
+      "percentile": 0.65,
+      "probability": 0.0101
+    },
+    {
+      "index": 7.0,
+      "percentile": 0.9,
+      "probability": 0.0518
+    },
+    {
+      "index": 9.0,
+      "percentile": 0.99,
+      "probability": 0.5151
+    },
+    {
+      "index": 10.0,
+      "percentile": 0.999,
+      "probability": 0.9042
+    }
+  ],
+  "calibration": {
+    "plot_url": "/model/calibration.svg",
+    "bins": [
+      {
+        "mean_predicted": 0.0014,
+        "observed": 0.0039,
+        "site_days": 10727
+      },
+      {
+        "mean_predicted": 0.0072,
+        "observed": 0.0139,
+        "site_days": 2665
+      },
+      {
+        "mean_predicted": 0.0143,
+        "observed": 0.0232,
+        "site_days": 2675
+      },
+      {
+        "mean_predicted": 0.0245,
+        "observed": 0.0419,
+        "site_days": 1264
+      },
+      {
+        "mean_predicted": 0.0387,
+        "observed": 0.0592,
+        "site_days": 1149
+      },
+      {
+        "mean_predicted": 0.061,
+        "observed": 0.0802,
+        "site_days": 636
+      },
+      {
+        "mean_predicted": 0.0872,
+        "observed": 0.1064,
+        "site_days": 282
+      },
+      {
+        "mean_predicted": 0.1219,
+        "observed": 0.1806,
+        "site_days": 299
+      },
+      {
+        "mean_predicted": 0.1723,
+        "observed": 0.2201,
+        "site_days": 159
+      },
+      {
+        "mean_predicted": 0.2385,
+        "observed": 0.2188,
+        "site_days": 128
+      },
+      {
+        "mean_predicted": 0.3836,
+        "observed": 0.2319,
+        "site_days": 69
+      }
+    ]
+  },
+  "top_features": [
+    {
+      "label": "Storm energy (CAPE)",
+      "importance": 0.9788
+    },
+    {
+      "label": "Site location (past report frequency)",
+      "importance": 0.772
+    },
+    {
+      "label": "Time of year",
+      "importance": 0.5728
+    },
+    {
+      "label": "Soil moisture",
+      "importance": 0.4773
+    },
+    {
+      "label": "Rain that day",
+      "importance": 0.4058
+    },
+    {
+      "label": "Wind gusts",
+      "importance": 0.2665
+    },
+    {
+      "label": "High temperature",
+      "importance": 0.1831
+    },
+    {
+      "label": "Heat index",
+      "importance": 0.1565
+    },
+    {
+      "label": "Heaviest hour of rain",
+      "importance": 0.1243
+    },
+    {
+      "label": "Rain over the past 3 days",
+      "importance": 0.0922
+    },
+    {
+      "label": "Rain over the past 7 days",
+      "importance": 0.0391
+    }
+  ],
+  "limitations": [
+    "The label is \"NOAA logged a hazardous-weather event\", not \"it happened\": rural sites and nights are under-reported, and lightning is logged only when it causes damage or injury.",
+    "Location is partly reporting bias: areas near people get more reports, so the model rates them riskier. That's why \"Area with frequent past severe-weather reports\" can be a top factor.",
+    "Heat isn't learned (NOAA logged Florida heat only in 2022-2023), so heat comes from the OSHA rule.",
+    "Wildfire is barely predicted by weather alone, so fires come from the satellite-detection rule.",
+    "Two training years, one calibration year (2024, with three hurricanes) and one test year: very high probabilities (above ~20%) run over-confident in ordinary years.",
+    "Much better at ranking days than at exact probabilities: 4% Brier skill over monthly averages today, not significant a day ahead."
+  ],
+  "last_scored_at": "2026-10-17T09:00:12+00:00"
+}

@@ -99,7 +99,7 @@ def test_top_factors_groups_season_and_ranks_positive_pushes():
     row = pd.Series({"heat_index_max_f": 108.4, "rain_in": 3.14, "cape_max": 100.0})
     factors = top_factors(contrib, row, date(2025, 8, 4))
     assert [f["label"] for f in factors] == ["3.1 in of rain forecast", "Peak storm season (August)", "Heat index 108°F"]
-    assert [f["hazard"] for f in factors] == ["flood", None, "heat"]
+    assert [f["hazard"] for f in factors] == ["flood", "flood", "heat"]  # season borrows the top weather hazard
     assert sum(f["weight"] for f in factors) <= 1.0001
 
 
@@ -129,3 +129,10 @@ def test_budget_ledger_waits_before_exceeding_rolling_24h(tmp_path, monkeypatch)
     with pytest.raises(Waited):
         openmeteo._spend(1, "over budget")
     assert openmeteo.spent_last_24h() == 100  # nothing recorded for the blocked request
+
+
+def test_location_factor_wording_and_fallback_hazard():
+    contrib = pd.Series({"lat": 0.5, "lon": 0.2, "cape_max": -0.1, "doy_sin": 0.0, "doy_cos": 0.0})
+    factors = top_factors(contrib, pd.Series({"cape_max": 100.0}), date(2025, 1, 4))
+    assert factors == [{"factor": "location", "label": "Area with frequent past severe-weather reports",
+                        "hazard": "lightning", "weight": 1.0}]

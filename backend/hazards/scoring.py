@@ -1,15 +1,12 @@
-"""Hazard cards and a TEMPORARY rule-based hazard index. Pure functions, no database.
-
-TEMPORARY: replace hazard_index / top_factors with the ML model when it exists. Until then the
-score is deliberately simple and explainable:
+"""Hazard cards and the rule sub-scores the hybrid hazard index uses. Pure functions, no database.
 
   1. Each hazard gets a 0-10 sub-score from fixed rules below.
      Card hazard_status follows the risk bands: < 4 ok, 4 to < 7 watch, >= 7 danger.
-  2. hazard_index = highest sub-score + 0.5 for each OTHER hazard at watch or danger, capped at 10.
-  3. Override (today only): while the site has an active lightning stop-work alert, the index is
-     at least 9.0 and the top factor is "Active stop-work: lightning within 10 mi".
-  4. Tomorrow uses the same rules on tomorrow's forecast (heat peak, rain), carries over soil,
-     wildfire and wildlife, and never applies the lightning override (lightning isn't forecast).
+  2. Tomorrow uses the same rules on tomorrow's forecast (heat peak, rain), carries over soil,
+     wildfire and wildlife.
+  3. The hazard index itself is built in hazards/risk.py: the ML weather score or the safety rules
+     returned here (OSHA heat band, wildfire, wildlife, crew reports), whichever is highest, plus
+     the lightning stop-work override (today only).
 """
 
 import math
@@ -37,6 +34,7 @@ class Inputs:
     firms_detail: str | None = None                          # e.g. "skipped: FIRMS_MAP_KEY not set"
     crew_reports: list[dict] = field(default_factory=list)   # last 48 h within 2 mi, newest first
     now: datetime | None = None                              # for "2 h ago"
+    model: dict[str, dict] = field(default_factory=dict)     # site-local date (ISO) -> latest hazard-model score
 
 
 @dataclass
@@ -79,6 +77,25 @@ def _until(alert: dict, site: dict) -> str:
 
 # ---------- per hazard ----------
 
+def osha_score(hi: float) -> float:
+    """Heat sub-score from the OSHA band of a heat index (whole degrees, as reported)."""
+    return {"lower": 0 if round(hi) < 80 else 2, "moderate": 5, "high": 7.5, "very_high": 9.5}[osha_risk_band(round(hi))]
+
+
+def heat_rule(inp: Inputs) -> dict:
+    """The hybrid index's heat rule: OSHA band of today's remaining peak and tomorrow's peak."""
+    hi_now = _value(inp, "heat", "heat_index_f")
+    rest = max(hi_now, _value(inp, "heat", "rest_of_day_peak_heat_index_f") or hi_now) if hi_now is not None else None
+    tomorrow_peak = _value(inp, "heat", "tomorrow_peak_heat_index_f")
+    return {
+        "today": osha_score(rest) if rest is not None else 0,
+        "tomorrow": osha_score(tomorrow_peak) if tomorrow_peak is not None else 0,
+        "label_today": f"Heat index up to {rest:.0f}°F (OSHA {OSHA_LABEL[osha_risk_band(round(rest))]})" if rest is not None else "",
+        "label_tomorrow": (f"Heat index peak {tomorrow_peak:.0f}°F tomorrow (OSHA {OSHA_LABEL[osha_risk_band(round(tomorrow_peak))]})"
+                           if tomorrow_peak is not None else ""),
+    }
+
+
 def heat(inp: Inputs) -> Hazard:
     hi_now = _value(inp, "heat", "heat_index_f")
     if hi_now is None:
@@ -90,12 +107,9 @@ def heat(inp: Inputs) -> Hazard:
     # Heat index is reported in whole degrees, so classify the rounded value (90.7 -> 91 -> moderate).
     band = osha_risk_band(round(peak))
 
-    def sub(hi: float) -> float:
-        return {"lower": 0 if round(hi) < 80 else 2, "moderate": 5, "high": 7.5, "very_high": 9.5}[osha_risk_band(round(hi))]
-
     level, nws_alert = _nws(inp, HEAT_LEVELS)
-    today = max(sub(rest), {0: 0, 1: 6, 2: 8}[level])
-    tomorrow = sub(tomorrow_peak) if tomorrow_peak is not None else 0
+    today = max(osha_score(rest), {0: 0, 1: 6, 2: 8}[level])
+    tomorrow = osha_score(tomorrow_peak) if tomorrow_peak is not None else 0
     peak_time = datetime.fromtimestamp(peak_at, timezone.utc) if peak_at else None
     as_of = _as_of(inp, "heat", "heat_index_f")
     peak_past = peak_time is not None and as_of is not None and peak_time < as_of
@@ -329,38 +343,29 @@ def crew_hazards(inp: Inputs) -> dict:
     }
 
 
-# ---------- index ----------
+# ---------- rule components for the hybrid index (hazards/risk.py) ----------
 
-def combine(scores: dict[str, tuple[float, str]], stop_work: bool) -> tuple[float, str, list[dict]]:
-    """(hazard_index, top_hazard, top_factors) from {hazard: (sub_score, label)}. TEMPORARY rule."""
-    ranked = sorted(((h, s, label) for h, (s, label) in scores.items()), key=lambda x: -x[1])
-    top_h, top_s, _ = ranked[0]
-    index = min(10.0, top_s + 0.5 * sum(1 for h, s, _ in ranked[1:] if s >= 4))
-    if stop_work:
-        index = max(index, 9.0)
-        top_h = "lightning"
-    positive = [(h, s, label) for h, s, label in ranked if s > 0 and label]
-    total = sum(s for _, s, _ in positive) or 1
-    factors = [{"hazard": h, "label": label, "weight": round(s / total, 2)} for h, s, label in positive[:4]]
-    if stop_work:
-        factors = [f for f in factors if f["hazard"] != "lightning"]
-        factors.insert(0, {"hazard": "lightning", "label": STOP_WORK_FACTOR,
-                           "weight": round(9.0 / max(total, 9.0), 2)})
-        factors = factors[:4]
-    return round(index, 1), top_h, factors
+def crew_rule(inp: Inputs) -> list[dict]:
+    """Crew reports that raise a hazard card to watch also count toward today's index (score 4.0,
+    one per hazard, newest report). Downed lines and "other" stay on the crew-hazards card."""
+    out: dict[str, dict] = {}
+    for r in inp.crew_reports:  # newest first
+        hazard = CREW_CARD.get(r["category"])
+        if hazard and hazard not in out:
+            out[hazard] = {"hazard": hazard, "score": CREW_WATCH, "label": f"Crew report: {crew_label(r)}"}
+    return list(out.values())
 
 
 def score_site(inp: Inputs, species_counts: dict[str, int]) -> dict:
-    """All card extras plus today's and tomorrow's index for one site."""
+    """All card extras, plus the rule sub-scores the hybrid index combines with the ML score."""
     parts = {"heat": heat(inp), "lightning": lightning(inp), "flood": flood(inp),
              "soil_saturation": soil(inp), "wildfire": wildfire(inp), "wildlife": wildlife(inp, species_counts)}
+    # Wildfire and wildlife rules before crew reports raise their cards (crew reports count separately).
+    rules = {h: {"today": parts[h].today, "tomorrow": parts[h].tomorrow,
+                 "label_today": parts[h].label_today, "label_tomorrow": parts[h].label_tomorrow}
+             for h in ("wildfire", "wildlife")}
+    rules["heat"] = heat_rule(inp)
     apply_crew_reports(parts, inp)
-    today, top, factors = combine({h: (p.today, p.label_today) for h, p in parts.items()},
-                                  stop_work=inp.lightning_alert is not None)
-    tomorrow, top_tomorrow, factors_tomorrow = combine(
-        {h: (p.tomorrow, p.label_tomorrow) for h, p in parts.items()}, stop_work=False)
     cards = {h: p.card for h, p in parts.items()}
     cards["crew_hazards"] = crew_hazards(inp)
-    return {"cards": cards, "hazard_index_today": today,
-            "hazard_index_tomorrow": tomorrow, "top_hazard": top, "top_factors": factors,
-            "top_hazard_tomorrow": top_tomorrow, "top_factors_tomorrow": factors_tomorrow}
+    return {"cards": cards, "rules": rules, "crew": crew_rule(inp)}

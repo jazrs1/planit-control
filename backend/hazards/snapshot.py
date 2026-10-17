@@ -12,6 +12,7 @@ from psycopg_pool import ConnectionPool
 
 from alerts import engine
 from app import clock
+from hazards import model_scores
 from hazards.scoring import Inputs
 
 WILDLIFE_RADIUS_MI = 5 / 1.609344   # iNaturalist query radius: 5 km
@@ -34,9 +35,11 @@ class Snapshot:
     sightings: dict[str, list[dict]] = field(default_factory=dict)  # site -> WildlifeSighting dicts
 
 
-def load(pool: ConnectionPool) -> Snapshot:
+def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
+    """`replay`: which lightning alerts to use (default: replay alerts while a replay runs)."""
     real_now = datetime.now(timezone.utc)   # live sources
-    clock_now = clock.now()                 # lightning (simulated during replay)
+    replay = clock.is_simulated() if replay is None else replay
+    clock_now = clock.now() if replay else real_now   # lightning (simulated during replay)
     since = real_now - timedelta(days=WILDLIFE_DAYS)
     with pool.connection() as conn:
         sites = conn.execute(
@@ -50,7 +53,7 @@ def load(pool: ConnectionPool) -> Snapshot:
             """SELECT sa.site_id, a.event, a.headline, a.severity, a.ends_at
                FROM site_nws_alerts sa JOIN nws_alerts a ON a.id = sa.alert_id
                WHERE a.ends_at IS NULL OR a.ends_at > %s""", (real_now,)).fetchall()
-        lightning = {a["site_id"]: a for a in engine.active_alerts(conn, clock_now, replay=clock.is_simulated())
+        lightning = {a["site_id"]: a for a in engine.active_alerts(conn, clock_now, replay=replay)
                      if a["type"] == engine.ALERT_TYPE}
         flood_alerts = {a["site_id"]: a for a in engine.active_alerts(conn, real_now, replay=False)
                         if a["type"] == "flood"}
@@ -61,6 +64,7 @@ def load(pool: ConnectionPool) -> Snapshot:
         observations = conn.execute(
             """SELECT species, venomous, observed_at, lat, lon, quality_grade FROM wildlife_observations
                WHERE observed_at > %s ORDER BY observed_at DESC""", (since,)).fetchall()
+        model = model_scores.latest(conn, real_now)
 
     by_site: dict[str, dict] = {s["id"]: {} for s in sites}
     for r in readings:
@@ -94,6 +98,6 @@ def load(pool: ConnectionPool) -> Snapshot:
             nws=[a for a in nws if a["site_id"] == s["id"]],
             lightning_alert=lightning.get(s["id"]), flood_alert=flood_alerts.get(s["id"]),
             crew_wildlife_reports=len(near_reports), firms_detail=firms["detail"] if firms else None,
-            crew_reports=crew_recent, now=real_now,
+            crew_reports=crew_recent, now=real_now, model=model.get(s["id"], {}),
         )
     return snap

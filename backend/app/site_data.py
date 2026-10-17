@@ -5,7 +5,7 @@ With a database, every hazard is real:
   - lightning: GOES-19 flashes and stop-work alerts (alerts/engine.py)
   - heat, rain, soil: Open-Meteo; NWS alerts; FEMA flood zones; USGS rivers; NASA FIRMS fires;
     iNaturalist wildlife (hazards/sources/, polled by hazards/scheduler.py into `conditions`)
-  - hazard_index / top_factors: TEMPORARY rule-based score (hazards/scoring.py) until the ML model.
+  - hazard_index / top_factors: hybrid of the ML weather model and safety rules (hazards/risk.py)
 A card whose source has no reading yet keeps the shape's required numbers from the placeholder
 mock and says "No live ... data yet" with as_of = null.
 
@@ -103,7 +103,7 @@ def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -
             "wildlife_summary": cards["wildlife"],
             "crew_hazards": cards["crew_hazards"],
         },
-        # TEMPORARY rule-based score (hazards/scoring.py) until the ML model exists.
+        # Hybrid: ML weather score or safety rules, whichever is higher (hazards/risk.py).
         "hazard_index": scored["hazard_index_today"],
         "hazard_index_today": scored["hazard_index_today"],
         "hazard_index_tomorrow": scored["hazard_index_tomorrow"],
@@ -154,6 +154,11 @@ def list_sites(pool: ConnectionPool | None) -> list[dict]:
         return [_placeholder_detail(s) for s in _real_sites().values()]
     snap = snapshot.load(pool)
     return [_build(s, snap, NO_LIGHTNING, detail=False) for s in snap.sites]
+
+
+def known_site(site_id: str) -> dict | None:
+    """The site from sites.json (id, name, lat, lon, timezone, ...), or None."""
+    return _real_sites().get(site_id)
 
 
 def get_site_detail(pool: ConnectionPool | None, site_id: str) -> dict | None:

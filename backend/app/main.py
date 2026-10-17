@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.config import get_settings
-from app.routers import alerts, briefing, lightning, replay, reports, sites, uploads
+from app.routers import alerts, briefing, lightning, model, replay, reports, sites, uploads
 from briefing import service as briefing_service
 from hazards import scheduler as hazard_scheduler
 from lightning import live
@@ -53,6 +53,7 @@ app.include_router(briefing.list_router)
 app.include_router(uploads.router)
 app.include_router(lightning.router)
 app.include_router(replay.router)
+app.include_router(model.router)
 
 uploads.UPLOADS_DIR.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads.UPLOADS_DIR), name="uploads")

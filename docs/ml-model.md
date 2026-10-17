@@ -1,6 +1,6 @@
 # The ML hazard index
 
-Code: `backend/ml/` · Tests: `backend/tests/test_ml.py` · Model: `backend/ml/models/` · Not wired into the API yet.
+Code: `backend/ml/` (model), `backend/hazards/risk.py` + `backend/hazards/model_scores.py` (live) · Tests: `backend/tests/test_ml.py`, `backend/tests/test_hybrid.py` · Model: `backend/ml/models/`
 
 ## In one paragraph
 
@@ -10,7 +10,7 @@ For each site and day, a LightGBM model estimates **the chance that NOAA logs a 
 - **Red days (index ≥ 7)** were 8% of site-days, and **1 in 7 of them** had a logged hazardous event, against **1 in 170 green days**. Red days held 44% of all events.
 - It works a day ahead too, with somewhat less skill (PR-AUC 0.102 tomorrow vs 0.128 today).
 
-It's a decent first model, not a finished one: it can't learn heat or wildfire well from these labels, and it leans partly on *where* NOAA tends to receive reports. Details are in [Limitations](#honest-limitations).
+It's a decent first model, not a finished one: it can't learn heat or wildfire well from these labels, and it leans partly on *where* NOAA tends to receive reports. Details are in [Limitations](#honest-limitations). That's why the index in the app is a **hybrid**: the model's weather score or a safety rule (OSHA heat band, wildfire, wildlife, crew reports), whichever is higher, plus the lightning stop-work override. See [section 8](#8-live-the-hybrid-hazard-index).
 
 ## 1. Labels: what counts as a hazardous day
 
@@ -219,10 +219,10 @@ LightGBM computes exact **SHAP values** for tree models (`pred_contrib=True`). F
 | prior rain | "3.1 in of rain in the past 3 days" | flood |
 | soil | "Wet ground (22% soil moisture)" | soil_saturation |
 | gusts / CAPE / thunder code | "Wind gusts to 35 mph" / "Unstable air for storms (CAPE 4,640 J/kg)" | lightning |
-| season | "Peak storm season (August)" | — |
-| location | "Site has a history of severe-weather reports" | — |
+| season | "Peak storm season (August)" | the top weather factor's hazard |
+| location | "Area with frequent past severe-weather reports" | the top weather factor's hazard |
 
-Each factor also gets a `weight`: its share of the upward push, so the weights sum to ≤ 1. The output is shaped to drop into the API's `ContributingFactor`, but two integration decisions remain. The contract has no `storm` hazard, so storm factors map to `lightning`. And *season* and *location* have no hazard type.
+Each factor also gets a `weight`: its share of the upward push, so the weights sum to ≤ 1. The API's `ContributingFactor` needs a `HazardType`, and it has no `storm` type, so storm factors (CAPE, gusts, thunder) use `lightning`. *Season* and *location* aren't hazards: they borrow the hazard of the strongest weather factor in the same prediction (or `lightning` if there is none), since they mostly reflect storm and flood reports.
 
 **What drives the model overall** (mean |SHAP| on 2025, log-odds): CAPE 0.98 · location 0.77 · season 0.57 · soil moisture 0.48 · rain 0.41 · gusts 0.27 · high temp 0.18 · heat index 0.16 · wettest hour 0.12 · prior 3-day rain 0.09 · prior 7-day rain 0.04 · thunder hours 0.00.
 
@@ -236,10 +236,40 @@ Each factor also gets a `weight`: its share of the upward push, so the weights s
 
 Soil moisture adds little. Location adds a lot, which is the subject of the second limitation below.
 
+## 8. Live: the hybrid hazard index
+
+The app never shows the raw model alone. `hazards/risk.predict()` is the one function behind `/sites`, `/sites/{id}`, the stored score history, and the evening briefing's input. For each site's local today and tomorrow, it takes **the highest of**:
+
+| Part | Source | Today | Tomorrow |
+|---|---|---|---|
+| ML weather score | model | ✔ | ✔ |
+| OSHA heat-index band (lower 0–2, moderate 5, high 7.5, very high 9.5) | rule | ✔ (rest of today's peak) | ✔ (tomorrow's peak) |
+| Wildfire (FIRMS distance, red flag warning) | rule | ✔ | ✔ |
+| Wildlife (sightings, crew wildlife reports) | rule | ✔ | ✔ |
+| Crew report that raises a card to watch | rule (4.0) | ✔ | — |
+| **Lightning stop-work** (index at least 9.0) | rule | ✔ | — |
+
+**Why a maximum and not a blend:** each part answers a different question, and a crew needs to know about the worst one. The rules cover exactly what the model can't learn from its labels: heat, fire, wildlife, and what crews see on the ground.
+
+Every factor carries `source: "model" | "rule"`. Factors list the stop-work first, then the winning part's reasons, then any other part at watch or above.
+
+**What no longer feeds the index directly:** the rule scores for rain, flood zones, soil, NWS flood and thunderstorm watches/warnings, and the heavy-rain flood alert. They all still drive their cards, alerts, and the briefing's go/caution logic. In the index, rain, storms and soil are the model's job.
+
+**How it runs.** The hourly weather poll (`hazards/sources/open_meteo.py`) now requests exactly what the model was trained on: `gfs_seamless`, the same 7 variables and units, 8 past days + 4 forecast days. That's still one Open-Meteo call per site (≤ 10 variables, ≤ 14 days), so 1,320 calls/day, the same as before. The model is scored from that same response with no extra calls (`hazards/model_scores.py`). Every run stores one `hazard_scores` row per site for today and tomorrow: the hybrid `score` and `factors`, plus the model's own part (`model_probability`, `model_score`, `model_factors`, `model_version`; migration `007`). Between runs, `/sites` reads the latest model part back and recombines it with the live rules, so a new stop-work or crew report shows up immediately.
+
+- If the model can't load or score, the weather readings are still saved, the failure is recorded in `data_sources` as `hazard-model`, and the index falls back to the rules.
+- **Soil card source changed.** The poller used to get soil moisture from Open-Meteo's default blend (0–9 cm layers). It now gets it from GFS 0–10 cm, the layer the model was trained on. The card's dry/moist/saturated cutoffs (0.15 / 0.30 m³/m³) are unchanged. On GFS data, 48% of 2022–2025 site-days fall under 0.15 and 1.4% at or above 0.30, so "saturated" is now rare.
+
+**Endpoints:** `GET /sites/{id}/score-history` (the last 7 days of hourly runs, for a sparkline), `GET /model/info` (test metrics, baselines, training years, index anchors, calibration bins, limitations), and `GET /model/calibration.svg` (the plot above).
+
 ## Honest limitations
 
 1. **The label is "NOAA logged it", not "it happened".** Storm Events relies on spotter and public reports, so rural sites and nights are under-reported, and lightning appears only when it causes damage. A 15-mile radius and county-level zone matching are judgment calls.
-2. **Location partly means "where reports come from".** Removing lat/lon drops 2025 PR-AUC from 0.128 to 0.088. Some of that is real climatology (the panhandle and Jacksonville get more severe storms), and some is reporting density. That's why "Site has a history of severe-weather reports" can be a top factor. It's an honest description of what the model uses, but it isn't weather.
+2. **Reporting bias: location partly means "where reports come from".** Storm Events entries come from storm spotters, emergency managers, the media and the public, so they cluster where people live and drive. A storm over a rural plant or a wetland is less likely to be logged than the same storm over a city. The model learns this along with the weather: removing lat/lon drops 2025 PR-AUC from 0.128 to 0.088. Some of that is real climatology (the panhandle and Jacksonville do get more severe storms), and some is reporting density, and the two can't be fully separated with these labels. Two consequences:
+   - **Sites near cities and highways score somewhat higher, and remote sites somewhat lower, than the weather alone would justify.** A low index at a remote site is weaker evidence of a quiet day.
+   - **"Area with frequent past severe-weather reports" can be a top factor.** That wording is deliberate: it describes what the model uses (past report frequency) without claiming the site is inherently more dangerous.
+
+   Fixing this would take labels that don't depend on people, for example radar-estimated hail and wind swaths or GOES lightning density, which we already ingest for stop-work alerts.
 3. **Heat is effectively not learned.** Heat labels exist only in 2022–2023 (and in only one of our two training years in any number), and there are none in validation or test. The heat-index features have low importance. Until better heat labels exist (for example, archived NWS Heat Advisories from the Iowa Environmental Mesonet), the live heat card's direct heat-index thresholds are more trustworthy for heat than this index.
 4. **Wildfire is barely predicted** (ROC-AUC 0.67). There's no drought or fuel signal. Long-dry-spell or NASA FIRMS features would be the fix.
 5. **Only two training years, one calibration year, one test year.** 1,152 training events is small. Calibration came from a hurricane year, so the top end (> 20%) is over-confident in ordinary years.
@@ -258,7 +288,8 @@ python -m ml.dataset                     # join -> data/ml/dataset.csv.gz, datas
 python -m ml.train                       # tune, train, calibrate, evaluate, write models/ and the plot
 python -m ml.predict --site big-bend     # score today/tomorrow from the live forecast
 python -m ml.predict --date 2025-08-04   # score a past day from archived forecasts
-python -m pytest tests/test_ml.py
+python -m pytest tests/test_ml.py tests/test_hybrid.py
+python -m scripts.migrate                # once, for migration 007 (hazard_scores model columns)
 ```
 
 Everything downloaded is cached under `backend/data/ml/` (gitignored). Training is deterministic: rerunning `ml.train` on the same data gives the same model and metrics (only the `trained_at` timestamp changes). `hazard_report.json` holds every number on this page.
@@ -275,8 +306,13 @@ Everything downloaded is cached under `backend/data/ml/` (gitignored). Training 
 | `ml/dataset.py` | Joins features and labels |
 | `ml/train.py` | Tuning, training, calibration, baselines, evaluation, report |
 | `ml/model.py` | Runtime: calibrated probability, 0–10 index, top factors |
-| `ml/predict.py` | Score sites for today/tomorrow (not wired into the API) |
+| `ml/predict.py` | Offline CLI: score sites for today/tomorrow with its own Open-Meteo request |
+| `hazards/risk.py` | The hybrid index: model score vs safety rules, lightning override, labeled factors |
+| `hazards/model_scores.py` | Score every site from the hourly weather poll, store runs, read them back |
+| `app/routers/model.py` | `GET /model/info`, `GET /model/calibration.svg` |
+| `db/migrations/007_hazard_scores_model.sql` | Model columns on `hazard_scores` |
 | `ml/metrics.py`, `ml/plots.py` | PR-AUC, ROC-AUC, Brier, calibration, bootstrap in numpy; the SVG plot |
 | `ml/models/hazard_lgbm.txt` | The trained booster (0.8 MB) |
 | `ml/models/hazard_model.json` | Features, calibration, index anchors, baselines |
 | `ml/models/hazard_report.json` | Every metric above, plus Aug 4 per site |
+| `ml/models/calibration.svg` | The calibration plot the API serves (same as `docs/img/ml-calibration.svg`) |
