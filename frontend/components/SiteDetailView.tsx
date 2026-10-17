@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Alert, FloodStatus, OshaHeatRisk, SiteDetail, SoilLevel } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
+import BriefingCard from "@/components/BriefingCard";
 import HazardPanel from "@/components/HazardPanel";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { ApiRequestError, DEMO_DATA, getSiteDetail } from "@/lib/api";
+import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
+import { loadBriefing } from "@/lib/loadBriefings";
+import type { BriefingResult } from "@/lib/loadBriefings";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 import { formatAgo, formatSiteDateTime, formatSiteTime, timeZoneAbbr } from "@/lib/time";
 import { usePolling } from "@/lib/usePolling";
@@ -15,6 +18,8 @@ import { usePolling } from "@/lib/usePolling";
 const REPLAY_MS = 3_000;
 const LIVE_MS = 30_000;
 const RETRY_MS = 5_000;
+/** Briefings change once a day (6 PM site time) or when regenerated. */
+const BRIEFING_MS = 5 * 60_000;
 
 /** A polled reading older than this is flagged as old: about 3 missed polls of its source
  *  (weather 15 min, FIRMS 30 min, iNaturalist 6 h; see backend/hazards/scheduler.py). */
@@ -125,6 +130,28 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
     }
   }, [siteId]);
   usePolling(poll, demo || missing ? null : replay?.running ? REPLAY_MS : liveDetail === null ? RETRY_MS : LIVE_MS);
+
+  // Tomorrow's briefing: undefined until the first try; a failed refresh keeps the last one, marked stale.
+  const [liveBriefing, setLiveBriefing] = useState<BriefingResult | undefined>(undefined);
+  const [briefingStale, setBriefingStale] = useState(false);
+  const pollBriefing = useCallback(async () => {
+    const result = await loadBriefing(siteId);
+    if (result === "error") {
+      setBriefingStale(true);
+      setLiveBriefing((prev) => (prev === undefined ? "error" : prev));
+    } else {
+      setLiveBriefing(result);
+      setBriefingStale(false);
+    }
+  }, [siteId]);
+  usePolling(pollBriefing, demo || missing ? null : liveBriefing === undefined || liveBriefing === "error" ? RETRY_MS : BRIEFING_MS);
+  const regenerateBriefing = useCallback(async () => {
+    const fresh = (await sendBriefingNow({ site_id: siteId })).generated[0];
+    if (!fresh) throw new Error("The server didn't return a briefing.");
+    setLiveBriefing(fresh);
+    setBriefingStale(false);
+  }, [siteId]);
+  const briefing = demo ? DEMO_DATA.briefings[siteId] ?? null : liveBriefing;
 
   // Reading ages. Hazard pollers run on real time even during replay, so use the real clock;
   // demo data is a fixed sample, so use the demo clock there.
@@ -312,6 +339,16 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           )}
         </HazardPanel>
       </section>
+
+      <BriefingCard
+        siteId={detail.id}
+        siteName={detail.name}
+        timeZone={tz}
+        entry={briefing === undefined ? { kind: "loading" } : briefing === "error" ? { kind: "unknown" } : briefing === null ? { kind: "none" } : { kind: "briefing", briefing }}
+        nowMs={nowMs}
+        connectionLost={!demo && (briefingStale || connectionLost) && briefing !== "error"}
+        onRegenerate={demo ? undefined : regenerateBriefing}
+      />
 
       <section aria-labelledby="factors-heading" className="rounded-card border border-border bg-surface p-4 shadow-card">
         <h2 id="factors-heading" className="text-base font-semibold">What drives today&apos;s index</h2>
