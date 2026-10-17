@@ -1,4 +1,4 @@
-import type { Alert, ApiError, Briefing, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, SendBriefingRequest, SendBriefingResponse, SiteDetail, StartReplayRequest } from "@shared/types";
+import type { Alert, ApiError, Briefing, CreateReportRequest, HazardReport, LightningFlash, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";

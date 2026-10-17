@@ -22,8 +22,8 @@ const RETRY_MS = 5_000;
 const BRIEFING_MS = 5 * 60_000;
 
 /** A polled reading older than this is flagged as old: about 3 missed polls of its source
- *  (weather 15 min, FIRMS 30 min, iNaturalist 6 h; see backend/hazards/scheduler.py). */
-const STALE_AFTER_MIN = { weather: 45, wildfire: 90, wildlife: 18 * 60 } as const;
+ *  (weather 60 min, FIRMS 30 min, iNaturalist 6 h; see backend/hazards/scheduler.py). */
+const STALE_AFTER_MIN = { weather: 180, wildfire: 90, wildlife: 18 * 60 } as const;
 
 const RISK_STYLES = {
   green: { badge: "bg-risk-green-bg text-risk-green", label: "Low" },
@@ -42,8 +42,18 @@ function timeOfDay(date: Date) {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-function IndexBadge({ label, value, uncertain }: { label: string; value: number; uncertain: boolean }) {
+function IndexBadge({ label, value, uncertain, unknown }: { label: string; value: number; uncertain: boolean; unknown: boolean }) {
   const risk = RISK_STYLES[riskLevel(value)];
+  if (unknown) {
+    // No card has live data (e.g. the backend has no database): the index is a placeholder.
+    return (
+      <div className="flex min-w-24 flex-col items-center rounded-card bg-bg px-3 py-1 text-muted" aria-label={`${label}: hazard index unknown, no live data`}>
+        <span className="text-xs font-medium">{label}</span>
+        <span className="font-mono text-2xl font-bold leading-tight">—</span>
+        <span className="text-xs font-medium uppercase tracking-wide">No data</span>
+      </div>
+    );
+  }
   return (
     <div
       className={`flex min-w-24 flex-col items-center rounded-card px-3 py-1 ${uncertain ? "bg-bg text-muted" : risk.badge}`}
@@ -204,6 +214,8 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   const tz = detail.timezone;
   const c = detail.conditions;
   const siteAlerts = (alerts ?? []).filter((a) => a.site_id === detail.id);
+  // No card has a status: everything is placeholder, so the index is too.
+  const noLiveData = [c.lightning, c.heat, c.flood, c.soil, c.wildfire, c.wildlife_summary].every((card) => !card?.hazard_status);
   const nws = detail.nws_alerts;
 
   return (
@@ -238,8 +250,8 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex gap-2">
-            <IndexBadge label="Today" value={detail.hazard_index_today} uncertain={connectionLost} />
-            <IndexBadge label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} />
+            <IndexBadge label="Today" value={detail.hazard_index_today} uncertain={connectionLost} unknown={noLiveData} />
+            <IndexBadge label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} unknown={noLiveData} />
           </div>
           <p className="text-xs text-muted">Hazard index 0–10 · interim rule-based score</p>
         </div>

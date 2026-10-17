@@ -150,3 +150,35 @@ def test_not_due_twice_but_earlier_send_now_is_replaced():
     now = utc(2026, 10, 16, 22, 30)
     assert is_due(now, ET, 18, made_at=utc(2026, 10, 16, 22, 0)) is False      # made at 6:00 PM
     assert is_due(now, ET, 18, made_at=utc(2026, 10, 16, 19, 0)) is True       # send-now at 3 PM
+
+
+def test_unsupported_hazard_words_are_rejected():
+    calm = {**CALM, "soil": {"level": "moist", "moisture_pct": 20, "crew_note": "Moist ground"}}
+    assert writer.unsupported_claims("Saturated soil and soft spots", calm)
+    assert writer.unsupported_claims("A Flood Warning is in effect", calm)
+    assert writer.unsupported_claims("Thunderstorms are possible", calm)
+    assert writer.unsupported_claims("Extreme heat today", calm)
+    assert writer.unsupported_claims("Moist ground, soft spots off pavement", calm) == []
+    busy_ok = "Saturated ground; Heat Advisory in effect; thunderstorms likely from 2 PM"
+    assert writer.unsupported_claims(busy_ok, BUSY) == []
+
+
+@pytest.mark.parametrize("inputs", [BUSY, CALM])
+def test_template_has_no_unsupported_claims(inputs):
+    assert writer.unsupported_claims(writer.template(inputs).text, inputs) == []
+
+
+def test_gemini_wrong_hazard_word_gets_retry(monkeypatch, gemini_on):
+    calm = {**CALM, "soil": {"level": "moist", "moisture_pct": 12, "crew_note": "Moist ground"}}
+    wrong = {"headline": "Quiet day.", "risks": ["Saturated soil off pavement"], "actions": ["Normal operations"]}
+    right = {"headline": "Quiet day.", "risks": ["Moist ground off pavement"], "actions": ["Normal operations"]}
+    calls = fake(monkeypatch, wrong, right)
+    w = writer.write(calm)
+    assert w.generator == "gemini" and "saturated" in calls[1]
+
+
+def test_gemini_timeout_retries_once_then_template(monkeypatch, gemini_on):
+    calls = fake(monkeypatch, TimeoutError(), GOOD)
+    assert writer.write(BUSY).generator == "gemini" and len(calls) == 2
+    fake(monkeypatch, TimeoutError(), TimeoutError())
+    assert writer.write(BUSY).generator == "template"
