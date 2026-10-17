@@ -86,3 +86,14 @@ def test_firms_ignores_plant_hot_spots():
     grass_fire = {"lat": 30.05, "lon": -85.0}             # ~3.5 mi away
     kept, ignored = plant_hot_spots([at_stack, grass_fire], [plant])
     assert kept == [grass_fire] and ignored == 1
+
+
+def test_firms_ignores_hot_spots_at_other_florida_thermal_plants():
+    from hazards.sources.firms import plant_hot_spots, thermal_plants
+    plants = {p["name"]: p for p in thermal_plants()}
+    hardee = plants["Hardee Power Station"]                   # gas plant next to Midulla, not one of our sites
+    assert "Solar Photovoltaic" not in {p["technology"] for p in plants.values()}
+    at_hardee = {"lat": hardee["lat"] + 0.003, "lon": hardee["lon"]}     # ~0.2 mi
+    two_km_away = {"lat": hardee["lat"] + 0.018, "lon": hardee["lon"]}   # ~1.2 mi
+    kept, ignored = plant_hot_spots([at_hardee, two_km_away], list(plants.values()))
+    assert kept == [two_km_away] and ignored == 1

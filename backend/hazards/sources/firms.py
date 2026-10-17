@@ -7,19 +7,23 @@ Writes per site (wildfire): nearest_detection_mi, nearest_detection_epoch, neare
 (0 low, 1 nominal, 2 high), detections_25mi, plant_hot_spots_ignored. NaN means no detection.
 
 Power plants are hot: VIIRS flags their stacks and flares as "fires", and the near-real-time feed
-has no industrial flag. Detections within PLANT_HOT_SPOT_KM of any of our sites are therefore
-treated as plant heat and not counted as wildfire (they stay in fire_detections). Trade-off: a
-real fire inside that ring would be missed.
+has no industrial flag. Detections within PLANT_HOT_SPOT_KM of any of our sites, or of any other
+Florida plant that burns fuel or makes steam (data/fl_thermal_plants.json, from EIA-860M), are
+therefore treated as plant heat and not counted as wildfire (they stay in fire_detections).
+Solar and battery sites aren't excluded: they give off no heat, so a hot spot there may be real.
+Trade-off: a real fire inside that ring would be missed.
 """
 
 import csv
 import io
+import json
 import math
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 
 from psycopg_pool import ConnectionPool
 
-from app.config import get_settings
+from app.config import BACKEND_DIR, get_settings
 from hazards import http
 from hazards.store import write_readings
 from lightning.glm import FL_BBOX
@@ -32,6 +36,13 @@ CONFIDENCE_CODE = {"low": 0, "nominal": 1, "high": 2}
 NEARBY_MI = 25
 PLANT_HOT_SPOT_KM = 1.0
 PLANT_HOT_SPOT_MI = PLANT_HOT_SPOT_KM / 1.609344
+THERMAL_PLANTS_FILE = BACKEND_DIR / "data" / "fl_thermal_plants.json"
+
+
+@lru_cache
+def thermal_plants() -> tuple[dict, ...]:
+    """Every Florida plant that burns fuel or makes steam (rebuilt by scripts/load_sites.py)."""
+    return tuple(json.loads(THERMAL_PLANTS_FILE.read_text())["plants"])
 
 
 class SkipSource(Exception):
@@ -105,7 +116,7 @@ def poll(pool: ConnectionPool, sites: list[dict], now: datetime) -> str:
                VALUES (%(ts)s, %(lat)s, %(lon)s, %(satellite)s, %(confidence)s, %(frp_mw)s)
                ON CONFLICT DO NOTHING""", detections)
     recent = [d for d in detections if d["ts"] >= now - timedelta(hours=24)]
-    fires, ignored = plant_hot_spots(recent, sites)
+    fires, ignored = plant_hot_spots(recent, [*sites, *thermal_plants()])
     rows = [(s["id"], now, hz, m, v, NAME) for s in sites for hz, m, v in site_readings(
         s, fires, sum(1 for d in recent if _miles(s["lat"], s["lon"], d["lat"], d["lon"]) <= PLANT_HOT_SPOT_MI))]
     write_readings(pool, rows)
