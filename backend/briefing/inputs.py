@@ -34,6 +34,7 @@ HARD_STOP_WARNINGS = {"Hurricane Warning", "Tropical Storm Warning", "Tornado Wa
                       "Flash Flood Warning", "Coastal Flood Warning", "Excessive Heat Warning", "Extreme Heat Warning"}
 RED_FLAG_FIRE_MI = 10
 FIRE_STOP_MI = 5
+HEAVY_RAIN_STOP_IN = 3.0   # rain forecast during work hours
 HARD_STOP_CREW = ("Downed line", "Flooding or washout")
 
 
@@ -59,6 +60,10 @@ def hard_stops(inputs: dict) -> list[dict]:
         if a["event"] in HARD_STOP_WARNINGS or (
                 a["event"] == "Red Flag Warning" and fire_mi is not None and fire_mi <= RED_FLAG_FIRE_MI):
             stops.append({"kind": "nws", "name": a["event"], "when": a["work_hours"], "text": f"{a['event']} {a['work_hours']}"})
+    work_rain = inputs.get("rain_work_hours_in") or 0
+    if work_rain >= HEAVY_RAIN_STOP_IN:
+        stops.append({"kind": "rain", "name": "Heavy rain", "when": inputs.get("work_hours") or "7 AM-5 PM",
+                      "text": f"Heavy rain: {work_rain} in expected {inputs.get('work_hours') or '7 AM-5 PM'}"})
     heat = inputs.get("heat") or {}
     if heat.get("work_hours_osha_risk_band") == "very high":
         stops.append({"kind": "heat", "name": "OSHA very high heat", "when": heat["work_hours_peak_time"],
@@ -81,12 +86,15 @@ def hard_stops(inputs: dict) -> list[dict]:
 def go_status(inputs: dict) -> str:
     """The verdict, made in code (never by the writer). NO-GO only for a named hard stop during work
     hours (hard_stops). A high hazard index alone, hazards outside work hours, thunderstorms likely
-    during work hours, any NWS watch or warning tomorrow, or a crew report of heat illness give at
-    most CAUTION; otherwise GO."""
+    during work hours, any NWS watch or warning tomorrow, a fire within 5 mi seen on one satellite pass,
+    or a crew report of heat illness give at most CAUTION; otherwise GO."""
     if inputs.get("hard_stops"):
         return "no_go"
     crew = [r["category"] for r in inputs.get("crew_reports_last_48_h_within_2_mi") or []]
+    fire = inputs.get("wildfire") or {}
+    unconfirmed_fire = fire.get("nearest_detection_mi") is not None and fire["nearest_detection_mi"] <= FIRE_STOP_MI
     if (inputs["hazard_index"] >= 4
+            or unconfirmed_fire                       # one satellite pass within 5 mi: verify, don't stop
             or inputs["thunderstorm_chance_work_hours_pct"] >= THUNDERSTORM_LIKELY_PCT
             or any(("Watch" in a["event"] or "Warning" in a["event"]) for a in inputs["nws_alerts"])
             or any(c.startswith("Heat illness") for c in crew)):

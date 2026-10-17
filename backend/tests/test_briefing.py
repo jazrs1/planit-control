@@ -543,9 +543,31 @@ def test_fire_within_5_mi_is_a_no_go_named_in_the_headline():
     six = final({**FIRE_NO_GO, "wildfire": {"detections_within_25_mi": 10, "nearest_detection_mi": 6.0,
                                              "confirmed_within_5_mi": False}})
     assert six["go_status"] == "caution"                           # the index (8.0) gives at most CAUTION
-    one_pass = final({**FIRE_NO_GO, "wildfire": {"detections_within_25_mi": 5, "nearest_detection_mi": 0.9,
-                                                 "confirmed_within_5_mi": False}})
-    assert one_pass["go_status"] == "caution"                      # one satellite pass: watch, not a hard stop
+
+
+
+def test_a_single_pass_fire_within_5_mi_is_caution_with_a_verify_action():
+    one_pass = final({**copy.deepcopy(CALM), "hazard_index": 2.0,
+                      "wildfire": {"detections_within_25_mi": 5, "nearest_detection_mi": 0.9, "confirmed_within_5_mi": False}})
+    w = _check(one_pass)
+    assert one_pass["go_status"] == "caution" and one_pass["hard_stops"] == []     # even with a low index
+    assert w.headline.startswith("Fire detected 0.9 mi away")
+    assert w.actions[0] == "Verify the fire report before staging; keep an exit route clear."
+
+
+@pytest.mark.parametrize("work_rain, verdict_", [(3.0, "no_go"), (9.6, "no_go"), (2.9, "caution")])
+def test_three_inches_of_rain_during_work_hours_is_a_named_no_go(work_rain, verdict_):
+    wet = {**copy.deepcopy(CALM), "hazard_index": 5.0, "rain_total_in": 9.6, "rain_work_hours_in": work_rain,
+           "work_hours": "7 AM-5 PM", "top_factors": [{"hazard": "flood", "label": "9.6 in of rain forecast"}],
+           "periods": [{**p, "rain_in": 6.0 if p["period"] == "morning" else 1.8, "rain_chance_pct": 90}
+                       for p in CALM["periods"]]}
+    i = final(wet)
+    w = _check(i)
+    assert i["go_status"] == verdict_
+    if verdict_ == "no_go":
+        assert w.headline.startswith(f"Heavy rain: {work_rain} in expected 7 AM-5 PM")
+        assert w.text.startswith(f"NO-GO for Thursday, Jul 16: Heavy rain: {work_rain} in expected 7 AM-5 PM")
+        assert "flooded roads" in w.actions[0]
 
 
 @pytest.mark.parametrize("category, what", [("Downed line", "a downed line"), ("Flooding or washout", "site flooding")])

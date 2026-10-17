@@ -182,6 +182,7 @@ SEVERE_WEATHER_ACTION = "Check radar before starting and be ready to stop work."
 THUNDERSTORM_ACTION = ("Thunderstorms are likely during work hours. Plan shelter in a vehicle or building and "
                        "schedule exposed work early.")
 LOCATION_LABEL = "Area with frequent past severe-weather reports"
+UNCONFIRMED_FIRE_ACTION = "Verify the fire report before staging; keep an exit route clear."
 RAIN_PLAN_AHEAD = ("Most of the rain falls outside work hours: secure tools and materials before you leave, "
                    "and expect soft ground and standing water the next morning.")
 NO_RISKS = {True: "No significant weather or site hazards in the forecast.",    # GO
@@ -279,7 +280,10 @@ def threshold_risks(inputs: dict) -> list[Risk]:
             next((f["label"] for f in inputs["top_factors"] if f["label"].startswith("Fire detected")), None)
         text = f"{near}; {fires} fire detection(s) within 25 mi in the last day." if near else \
             f"{fires} fire detection(s) within 25 mi in the last day."
+        wildfire = inputs.get("wildfire") or {}
+        unconfirmed = near_mi is not None and near_mi <= 5 and wildfire.get("confirmed_within_5_mi") is False
         hazards.append(Risk("fire", "wildfire", text, near[0].lower() + near[1:] if near else f"{fires} fire detection(s) within 25 mi",
+                            UNCONFIRMED_FIRE_ACTION if unconfirmed else
                             "Check where the fire is and which way the smoke is moving before staging; keep an escape route "
                             "clear and stop work if smoke or flames reach the site."))
     if wild["sightings_last_30_days"] or wild["crew_reports_within_2_mi_last_30_days"]:
@@ -307,6 +311,8 @@ def _hard_stop_risk(stop: dict, risks: list[Risk]) -> Risk:
     kind, name = stop["kind"], stop["name"]
     if kind == "heat":
         match = next((r for r in risks if r.check.startswith("heat")), None)
+    elif kind == "rain":
+        match = next((r for r in risks if r.check.startswith("rain")), None)
     elif kind == "fire":
         match = next((r for r in risks if r.check == "fire"), None)
     elif kind == "crew":
@@ -336,6 +342,9 @@ def verdict_lead(inputs: dict, risks: list[Risk]) -> Risk | None:
                 return next(r for r in risks if r.hazard == nws_hazard(alert["event"]) and "nws" in r.check)
         if inputs.get("thunderstorms_likely_from"):
             return next(r for r in risks if r.check == "thunderstorms")
+        fire = next((r for r in risks if r.check == "fire" and r.action == UNCONFIRMED_FIRE_ACTION), None)
+        if fire:                                               # a fire within 5 mi seen on one pass
+            return fire
     matches = []
     for f in inputs["top_factors"]:                            # the index's own drivers, in order
         label = f["label"]
