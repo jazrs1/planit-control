@@ -4,7 +4,9 @@ Files from backend/data/replay/<window>/ (made by scripts/find_replay_window.py)
 glm.ingest_cycle(), the same function the live loop uses, one file per cycle, in time order.
 The app clock (app/clock.py) is switched to a simulated clock that starts at the window's
 first file and runs `speed` times faster, and each file is ingested when the simulated clock
-reaches the moment it would have appeared live (its start + 20 s). The live loop pauses
+reaches the moment it would have appeared live (its start + 20 s). After the last file it keeps
+cycling with no new flashes for 31 simulated minutes so alert countdowns can finish (status shows
+files_done == files_total while still running). The live loop pauses
 meanwhile (ingest_lock), so /lightning/recent, the alert hook and anything else using clock.now() see the
 replayed storm as live.
 """
@@ -23,6 +25,11 @@ from lightning import glm
 log = logging.getLogger(__name__)
 
 REPLAY_DIR = BACKEND_DIR / "data" / "replay"
+
+# After the last file, keep cycling with no new flashes (like live does on a quiet night) long
+# enough for every 30-minute all-clear countdown to finish.
+QUIET_TAIL = timedelta(minutes=31)
+FILE_PERIOD = timedelta(seconds=glm.FILE_SECONDS)
 
 # Held by the live loop for each cycle and by a replay for its whole run, so the two never
 # interleave (and the alert hook never sees real and simulated `now` mixed together).
@@ -92,12 +99,23 @@ class ReplayRunner:
         try:
             for path in files:
                 # A file appears live once its 20 s scan ends; wait for that moment on the simulated clock.
-                await clock.sleep_until(glm.file_start(path.name) + timedelta(seconds=glm.FILE_SECONDS))
+                due = glm.file_start(path.name) + FILE_PERIOD
+                await clock.sleep_until(due)
+                if clock.now() > due + FILE_PERIOD:
+                    # Ingestion fell behind the requested speed. Hold the clock back to this file's
+                    # moment instead of letting simulated time race ahead of the data.
+                    clock.start_simulation(due, self.speed)
                 result = await asyncio.to_thread(
                     glm.ingest_cycle, pool, [(path.name, path.read_bytes)], clock.now())
                 self.files_done += 1
                 self.flashes_ingested += len(result.new_flashes)
-            log.info("Replay %s finished: %d Florida flashes", self.window, self.flashes_ingested)
+            log.info("Replay %s: all files in (%d Florida flashes); quiet tail for countdowns",
+                     self.window, self.flashes_ingested)
+            tail_end = end + QUIET_TAIL
+            while clock.now() < tail_end:
+                await clock.sleep_until(min(clock.now() + FILE_PERIOD, tail_end))
+                await asyncio.to_thread(glm.ingest_cycle, pool, [], clock.now())
+            log.info("Replay %s finished", self.window)
         except asyncio.CancelledError:
             log.info("Replay %s stopped after %d/%d files", self.window, self.files_done, self.files_total)
             raise
@@ -108,8 +126,10 @@ class ReplayRunner:
 
 
 def _reset_window(pool: ConnectionPool, names: list[str], start, end) -> None:
-    """Remove this window's flashes from earlier runs so every replay re-ingests them as new."""
+    """Remove earlier replay runs (this window's flashes and all replay alerts) so every replay
+    starts clean and re-ingests the storm as new."""
     with pool.connection() as conn:
+        conn.execute("DELETE FROM alerts WHERE replay")  # alert_events cascade
         conn.execute(
             "DELETE FROM lightning_flashes WHERE ts BETWEEN %s AND %s AND source_file = ANY(%s)",
             (start - timedelta(minutes=1), end + timedelta(minutes=1), names),

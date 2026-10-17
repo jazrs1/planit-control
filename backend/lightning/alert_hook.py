@@ -25,5 +25,8 @@ if TYPE_CHECKING:  # glm.py imports this module, so avoid a runtime import cycle
 
 
 def on_new_flashes(flashes: list[Flash], now: datetime) -> None:
-    # TODO(alerts): call the alert engine here, e.g. alert_engine.process(flashes, now).
-    return None
+    from alerts import engine
+    from app import clock
+
+    # Replay writes its own alerts (alerts.replay = true) so it never touches live ones.
+    engine.run(flashes, now, replay=clock.is_simulated())

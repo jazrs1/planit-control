@@ -47,7 +47,17 @@ curl localhost:8000/replay/status
 curl -X POST localhost:8000/replay/stop
 ```
 
-At 30x, one hour of lightning plays in 2 minutes. While it runs, live polling pauses and every time-based route uses the simulated clock.
+At 30x, one hour of lightning plays in 2 minutes, followed by 31 quiet simulated minutes so stop-work countdowns can clear. While it runs, live polling pauses and every time-based route (alerts, sites, recent flashes) uses the simulated clock. If ingestion can't keep up with the requested speed, the clock waits for it rather than running ahead.
+
+**Stop-work alerts:** any flash within 10 miles of a site opens an alert that clears 30 minutes after the last strike. How it works: [`docs/alert-engine.md`](docs/alert-engine.md).
+
+### Tests
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest -v      # needs DATABASE_URL; each test is rolled back
+```
 
 ### Rebuilding the site list
 

@@ -31,7 +31,7 @@ Only change files in folders you own. If you need something in another folder (a
 |---|---|---|---|
 | GET | `/sites` | `Site[]` | `sites.json` |
 | GET | `/sites/{id}` | `SiteDetail` | `site_details.json` (keyed by id) |
-| GET | `/alerts` | `Alert[]` (active only) | `alerts.json` |
+| GET | `/alerts` | `Alert[]` (active only, from the alert engine) | `alerts.json` |
 | GET | `/reports` | `HazardReport[]` (newest first) | `reports.json` |
 | POST | `/reports` | body `CreateReportRequest`, returns `HazardReport` (201) | `create_report_request.json` |
 | POST | `/uploads` | raw image body (`Content-Type: image/*`), returns `UploadResponse` (201) | — |
@@ -62,10 +62,11 @@ Changing the contract: update `shared/types.ts`, `backend/app/schemas.py`, and t
 - **Frontend data:** fetch through `frontend/lib/api.ts`. If the backend can't be reached, it falls back to `shared/mocks`, so UI work never waits on the API.
 - **Next.js 16:** APIs have changed from older versions. Check `frontend/node_modules/next/dist/docs/` before using a Next API you're unsure of.
 - **Backend:** one router per resource in `backend/app/routers/`. Read config only through `get_settings()` in `backend/app/config.py`. Keep each route's response model the same when you swap in real data.
-- **Real vs placeholder data:** site locations are real (`backend/data/sites.json`). Hazard values are still placeholders borrowed from `shared/mocks`; each one is marked `TODO(<hazard>)` in `backend/app/site_data.py`. Reports are stored in the database; their photos are saved to `backend/uploads/` (gitignored) and served at `/uploads/<file>`. Alerts and briefings are still mocked and only cover the 6 mock sites.
+- **Real vs placeholder data:** site locations, lightning (flashes, the lightning card, stop-work alerts, lightning as top hazard), and reports are real. Other hazard values and the hazard index are still placeholders borrowed from `shared/mocks`; each is marked `TODO(<hazard>)` in `backend/app/site_data.py`. Report photos are saved to `backend/uploads/` (gitignored) and served at `/uploads/<file>`. Briefings are still mocked and only cover the 6 mock sites.
 - **Database (Tiger Data / TimescaleDB):** schema changes are numbered SQL files in `backend/db/migrations/`, applied with `python -m scripts.migrate`. Never edit an applied migration; add the next number. Routes get connections from the pool with `Depends(get_pool)` (`backend/app/db.py`) and write SQL with `%s` / `%(name)s` parameters, never string formatting of values. Other tables reference sites by the API slug `sites.id`, not `plant_id`.
 - **Time:** in the backend, get the current time from `app.clock.now()`, never `datetime.now()`. During lightning replay it returns the simulated time, which is what makes replay behave like live.
-- **Lightning:** `backend/lightning/glm.py` ingests GOES-19 GLM files into `lightning_flashes` (Florida + 30 mi). Live polling (`live.py`, every 20 s, `LIGHTNING_INGEST_ENABLED`) and replay (`replay.py`) both go through `glm.ingest_cycle()`. Alert logic plugs in at `lightning/alert_hook.py`.
+- **Lightning:** `backend/lightning/glm.py` ingests GOES-19 GLM files into `lightning_flashes` (Florida + 30 mi). Live polling (`live.py`, every 20 s, `LIGHTNING_INGEST_ENABLED`) and replay (`replay.py`) both go through `glm.ingest_cycle()`. The hook `lightning/alert_hook.py` runs the stop-work alert engine (`backend/alerts/engine.py`, explained in `docs/alert-engine.md`) every cycle. Alert changes are logged in `alert_events`; replay alerts are stored with `replay = true` and never mix with live ones.
+- **Tests:** `cd backend && pip install -r requirements-dev.txt && python -m pytest`. Database tests run inside a rolled-back transaction and are skipped without `DATABASE_URL`.
 - **Data downloads** (EIA workbooks, FIRMS CSVs, rasters, etc.) go in a `data/` folder, which is gitignored. Exception: `backend/data/sites.json` is committed so the app never downloads at runtime. Rebuild it with `cd backend && python -m scripts.load_sites`.
 
 ## Running locally
