@@ -10,7 +10,7 @@ import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
-import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
+import { HAZARD_LABEL, factorHazardLabel, riskLevel } from "@/lib/risk";
 import { formatAgo, formatSiteDateTime, formatSiteTime, timeZoneAbbr } from "@/lib/time";
 import { usePolling } from "@/lib/usePolling";
 
@@ -374,7 +374,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
             {detail.top_factors.map((f) => (
               <li key={`${f.hazard}-${f.label}`} className="text-sm">
                 <div className="flex justify-between gap-2">
-                  <span><span className="font-medium">{HAZARD_LABEL[f.hazard]}</span> · {f.label}</span>
+                  <span><span className="font-medium">{factorHazardLabel(f.hazard)}</span> · {f.label}</span>
                   <span className="shrink-0 tabular-nums text-muted">{Math.round(f.weight * 100)}%</span>
                 </div>
                 <div className="mt-1 h-2 rounded-pill bg-bg" aria-hidden="true">
