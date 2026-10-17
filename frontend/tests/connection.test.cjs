@@ -88,3 +88,14 @@ test("score history uses the encoded site path and errors never turn into sample
   await assert.rejects(api.getScoreHistory("big-bend"), /History unavailable/);
   assert.equal(api.DEMO_DATA.scoreHistory.site_id, "big-bend");
 });
+
+test("storm-cell requests use the API contract path and reject errors without mock fallback", async () => {
+  let status = 200, requested;
+  const cells = [{ id: "cell-1", lat: 28, lon: -82, radius_mi: 10 }];
+  const { api } = load(async (url) => { requested = url; return json(status, status === 200 ? cells : { detail: "Forecast unavailable" }); });
+  assert.deepEqual(await api.getLightningCells(), cells);
+  assert.equal(requested, "http://api.test/lightning/cells");
+  status = 503;
+  await assert.rejects(api.getLightningCells(), /Forecast unavailable/);
+  assert.ok(api.DEMO_DATA.lightningCells.length > 0);
+});
