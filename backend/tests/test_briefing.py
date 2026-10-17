@@ -239,11 +239,17 @@ def test_short_rate_limit_waits_and_retries(monkeypatch, gemini_on):
 
 # ---------- Claude first, then Gemini, then the template ----------
 
-def _http(code: int, retry_after: str | None = None):
-    import io
-    import urllib.error
-    headers = {"retry-after": retry_after} if retry_after else {}
-    return urllib.error.HTTPError("https://api.anthropic.com", code, "error", headers, io.BytesIO(b"{}"))
+def _api_error(code: int):
+    import anthropic
+    import httpx2
+    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    return anthropic.APIStatusError("error", response=httpx2.Response(code, request=request), body=None)
+
+
+def _connection_error():
+    import anthropic
+    import httpx2
+    return anthropic.APITimeoutError(request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
 
 
 def test_claude_writes_first_and_records_model(monkeypatch, claude_on, gemini_on):
@@ -270,57 +276,34 @@ def test_claude_ungrounded_gets_one_retry_then_gemini(monkeypatch, claude_on, ge
 
 
 def test_claude_failure_falls_to_gemini_then_template(monkeypatch, claude_on, gemini_on):
-    for failure in (_http(401), _http(400), writer.Refused("general_harms"), ValueError("bad JSON")):
-        fake_claude(monkeypatch, failure)
+    for failure in (_api_error(401), _api_error(400), _api_error(529), _connection_error(),
+                    writer.Refused("general_harms"), ValueError("bad JSON"), KeyError("risks")):
+        calls = fake_claude(monkeypatch, failure)
         fake(monkeypatch, GOOD)
         assert writer.write(BUSY).generator == "gemini", failure
-    fake_claude(monkeypatch, _http(401))
+        assert len(calls) == 1          # the SDK already retried; no second Claude call
+    fake_claude(monkeypatch, _api_error(401))
     fake(monkeypatch, TimeoutError(), TimeoutError())
     assert writer.write(BUSY).generator == "template"
 
 
-def test_claude_short_rate_limit_or_overload_waits_once(monkeypatch, claude_on):
-    monkeypatch.setattr(writer.time, "sleep", lambda s: None)
-    for failure in (_http(429, "3"), _http(529), _http(500)):
-        calls = fake_claude(monkeypatch, failure, GOOD)
-        assert writer.write(BUSY).generator == "claude" and len(calls) == 2
-    calls = fake_claude(monkeypatch, _http(429, "600"), GOOD)    # long wait: go on to the next writer
-    assert writer.write(BUSY).generator == "template" and len(calls) == 1
-
-
-def test_claude_timeout_retries_once(monkeypatch, claude_on):
-    calls = fake_claude(monkeypatch, TimeoutError(), GOOD)
-    assert writer.write(BUSY).generator == "claude" and len(calls) == 2
-    fake_claude(monkeypatch, TimeoutError(), TimeoutError())
-    assert writer.write(BUSY).generator == "template"
-
-
-class _Response:
-    def __init__(self, data): self.data = json.dumps(data).encode()
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-    def read(self, *a): return self.data
-
-
 def test_claude_request_and_response_shape(monkeypatch):
+    from types import SimpleNamespace as NS
     sent = {}
+    reply = NS(model="claude-sonnet-5-5", stop_reason="end_turn", stop_details=None,
+               content=[NS(type="text", text=json.dumps(GOOD))])
 
-    def urlopen(request, timeout):
-        sent.update(body=json.loads(request.data), headers=dict(request.header_items()))
-        return _Response({"model": "claude-sonnet-5-5", "stop_reason": "end_turn",
-                          "content": [{"type": "text", "text": json.dumps(GOOD)}]})
-    monkeypatch.setattr(writer.urllib.request, "urlopen", urlopen)
+    class Client:
+        beta = NS(messages=NS(create=lambda **kw: sent.update(kw) or reply))
+    monkeypatch.setattr(writer, "_claude_client", lambda key: Client)
     out, model = writer._call_claude(BUSY, "k", "claude-sonnet-5-5", "too long")
-    body = sent["body"]
     assert out == GOOD and model == "claude-sonnet-5-5"
-    assert body["model"] == "claude-sonnet-5-5" and body["system"] == writer.SYSTEM
-    assert body["output_config"]["format"] == {"type": "json_schema", "schema": writer.CLAUDE_SCHEMA}
-    assert "temperature" not in body and "thinking" not in body     # Sonnet 5.5 rejects both forms
-    assert "too long" in body["messages"][0]["content"]
-    assert sent["headers"]["Anthropic-version"] == "2023-06-01"
+    assert sent["model"] == "claude-sonnet-5-5" and sent["system"] == writer.SYSTEM
+    assert sent["output_config"]["format"] == {"type": "json_schema", "schema": writer.CLAUDE_SCHEMA}
+    assert "temperature" not in sent and "thinking" not in sent     # Sonnet 5.5 rejects both forms
+    assert sent["fallbacks"] == "default" and sent["betas"] == ["server-side-fallback-2026-07-01"]
+    assert "too long" in sent["messages"][0]["content"]
 
-    monkeypatch.setattr(writer.urllib.request, "urlopen", lambda r, timeout: _Response(
-        {"stop_reason": "refusal", "stop_details": {"category": "general_harms"}, "content": []}))
+    reply.stop_reason, reply.stop_details, reply.content = "refusal", NS(category="general_harms"), []
     with pytest.raises(writer.Refused):
         writer._call_claude(BUSY, "k", "claude-sonnet-5-5", None)
-
