@@ -1,6 +1,7 @@
 """Briefing writer: grounding check, template, go/no-go rule, Gemini fallbacks, 6 PM timing."""
 
 import copy
+import json
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -182,3 +183,28 @@ def test_gemini_timeout_retries_once_then_template(monkeypatch, gemini_on):
     assert writer.write(BUSY).generator == "gemini" and len(calls) == 2
     fake(monkeypatch, TimeoutError(), TimeoutError())
     assert writer.write(BUSY).generator == "template"
+
+
+def _http_429(body: dict):
+    import io
+    import urllib.error
+    return urllib.error.HTTPError("https://gemini", 429, "Too Many Requests", {}, io.BytesIO(json.dumps(body).encode()))
+
+
+def test_quota_used_up_pauses_gemini(monkeypatch, gemini_on):
+    monkeypatch.setattr(writer, "_paused_until", 0.0)
+    daily = {"error": {"code": 429, "message": "Quota exceeded ... limit: 20 ... Please retry in 20h11m15s"}}
+    calls = fake(monkeypatch, _http_429(daily), GOOD)
+    assert writer.write(BUSY).generator == "template" and len(calls) == 1
+    assert 20 * 3600 < writer.gemini_paused_seconds() <= 20 * 3600 + 11 * 60 + 15
+    assert writer.write(BUSY).generator == "template" and len(calls) == 1   # no call while paused
+
+
+def test_short_rate_limit_waits_and_retries(monkeypatch, gemini_on):
+    monkeypatch.setattr(writer, "_paused_until", 0.0)
+    monkeypatch.setattr(writer.time, "sleep", lambda s: None)
+    short = {"error": {"code": 429, "message": "slow down",
+                       "details": [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "7s"}]}}
+    calls = fake(monkeypatch, _http_429(short), GOOD)
+    assert writer.write(BUSY).generator == "gemini" and len(calls) == 2
+    assert writer.gemini_paused_seconds() == 0

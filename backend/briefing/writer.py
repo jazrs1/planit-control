@@ -226,6 +226,35 @@ def _call_gemini(inputs: dict, key: str, model: str, feedback: str | None) -> di
 
 _last_call = 0.0
 _rate_lock = threading.Lock()
+# A 429 asking us to wait longer than this means a quota is used up (the free tier's limit is per
+# day): skip Gemini until then instead of failing every remaining site one by one.
+QUOTA_PAUSE_AFTER_SECONDS = 60
+_paused_until = 0.0   # time.monotonic()
+
+
+def _retry_delay_seconds(err: urllib.error.HTTPError) -> float | None:
+    """How long Gemini asks us to wait, from RetryInfo.retryDelay ("72675s") or the message
+    ("Please retry in 20h11m15s"). None if it doesn't say."""
+    try:
+        error = json.loads(err.read() or b"{}").get("error", {})
+    except (ValueError, OSError):
+        return None
+    for detail in error.get("details", []):
+        if detail.get("@type", "").endswith("RetryInfo") and str(detail.get("retryDelay", "")).endswith("s"):
+            try:
+                return float(detail["retryDelay"][:-1])
+            except ValueError:
+                pass
+    m = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", error.get("message", ""))
+    if m and any(m.groups()):
+        h, mi, s = (float(g) if g else 0.0 for g in m.groups())
+        return h * 3600 + mi * 60 + s
+    return None
+
+
+def gemini_paused_seconds() -> float:
+    """Seconds until Gemini is tried again after a used-up quota (0 when it isn't paused)."""
+    return max(0.0, _paused_until - time.monotonic())
 GEMINI_TIMEOUT_SECONDS = 150   # calls took 12-90 s in testing
 
 
@@ -242,7 +271,7 @@ def _wait_turn(min_interval: float) -> None:
 def write(inputs: dict) -> Written:
     """Gemini if configured and grounded, else the template. Never raises."""
     settings = get_settings()
-    if not settings.gemini_api_key:
+    if not settings.gemini_api_key or gemini_paused_seconds() > 0:
         return template(inputs)
     feedback = None
     for attempt in range(2):
@@ -251,10 +280,17 @@ def write(inputs: dict) -> Written:
             out = _call_gemini(inputs, settings.gemini_api_key, settings.gemini_model, feedback)
             headline, risks, actions = out["headline"], list(out["risks"])[:3], list(out["actions"])[:4]
         except urllib.error.HTTPError as err:
+            if err.code == 429:
+                delay = _retry_delay_seconds(err)
+                if delay is not None and delay > QUOTA_PAUSE_AFTER_SECONDS:
+                    global _paused_until
+                    _paused_until = max(_paused_until, time.monotonic() + delay)
+                    log.warning("Gemini quota used up; using the template for the next %.1f h", delay / 3600)
+                    return template(inputs)
+                if attempt == 0:
+                    time.sleep(delay if delay is not None else 10)   # short rate limit: wait it out once
+                    continue
             log.warning("Gemini HTTP %s for %s; using template", err.code, inputs["site"]["name"])
-            if err.code == 429 and attempt == 0:
-                time.sleep(10)
-                continue
             return template(inputs)
         except TimeoutError:
             if attempt == 0:
