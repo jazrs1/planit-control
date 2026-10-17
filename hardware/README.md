@@ -10,7 +10,7 @@ A desk-sized alarm for one job site: red / yellow / green lights, a buzzer and a
 | All clear | green | `ALL CLEAR` | — |
 | No data (backend down, bad reply, or nothing from the bridge for 15 s) | blinking yellow | `NO DATA` | — |
 
-Line 1 is the site name (first 16 characters). Green only appears after the backend explicitly says `clear`. If the countdown reaches 00:00 before the backend confirms the all-clear, the beacon stays red at `STOP WORK 00:00`. The push button silences the beeps until the state changes.
+Line 1 is the site name (first 16 characters). Green only appears after the backend explicitly says `clear`. If the countdown reaches 00:00 before the backend confirms the all-clear, the beacon stays red at `STOP WORK 00:00`. A short press of the push button silences the beeps until the state changes. Holding it for **2 seconds** switches to the bridge's next site (when it was started with more than one `--site`): the LCD shows `Switching site` / `NO DATA` until the new site's first update, a moment later, then the new site's name and state.
 
 ## Parts (Elegoo Uno R3 kit)
 
@@ -76,10 +76,11 @@ python bridge.py --demo
 **Real mode** (backend running, see the repo `README.md`):
 
 ```bash
-python bridge.py http://localhost:8000 okeechobee-clean-energy-center
+python bridge.py http://localhost:8000 --site okeechobee-clean-energy-center
+python bridge.py https://api.stormsafecrews.us --site vandolah-power-station --site okeechobee-clean-energy-center
 ```
 
-The site id is the slug from `GET /sites` (e.g. `big-bend`, `vandolah-power-station`). The port is auto-detected; if you have several serial devices, pass it: `--port COM5` or `--port /dev/ttyACM0`. Opening the port resets the Uno, so the bridge waits 3 seconds before its first line. Any network error, HTTP error or unexpected reply sends `UNKNOWN`. If the USB cable is pulled, the bridge keeps retrying until it's plugged back in. Ctrl+C sends `UNKNOWN` before exiting so the beacon doesn't keep showing a stale state.
+The site id is the slug from `GET /sites` (e.g. `big-bend`, `vandolah-power-station`). Repeat `--site` to switch between sites with a long press; the bridge starts on the first one. The older form `python bridge.py URL SITE_ID` still works. The bridge only reads public GET endpoints; it never needs `ADMIN_TOKEN` or any other secret. The port is auto-detected (on Linux, the one `/dev/ttyACM*` or `/dev/ttyUSB*`); if you have several serial devices, pass it: `--port COM5` or `--port /dev/ttyACM0`. Opening the port resets the Uno, so the bridge waits 3 seconds before its first line. Any network error, HTTP error or unexpected reply sends `UNKNOWN`. If the USB cable is pulled or the network drops, the bridge keeps retrying (logging each problem once, not on every retry) and recovers on its own. Ctrl+C sends `UNKNOWN` before exiting so the beacon doesn't keep showing a stale state.
 
 ### Serial protocol
 
@@ -94,6 +95,29 @@ UNKNOWN
 ```
 
 `<seconds_until_all_clear>` may be `-` if the backend doesn't know it; the beacon then shows `STOP WORK` with no time. The optional `x<speed>` (e.g. `x30`) is sent only while a replay runs: the countdown is then in simulated seconds, so the beacon counts down that many seconds per real second and resyncs on every line. Without it the countdown runs in real time, so plain `STOP <seconds> <site name>` still works. Anything it can't parse counts as `UNKNOWN`.
+
+The beacon sends one line back: `SITE` when the button is held for 2 seconds.
+
+## Raspberry Pi setup
+
+A Raspberry Pi (Raspberry Pi OS Lite, 64-bit) can run the bridge instead of a laptop, with the Uno plugged into one of its USB ports. `pi/install.sh` installs `python3-serial` with apt, adds the user to the `dialout` group (serial port access), copies `bridge.py` to `/opt/planit-beacon/`, and enables `pi/planit-beacon.service`, which starts the bridge at boot and restarts it if it exits. The service watches Vandolah and Okeechobee on `https://api.stormsafecrews.us`; edit `ExecStart` in the service file to change the backend or sites. Nothing secret goes on the Pi.
+
+From the repo root on your laptop:
+
+```bash
+ssh planit@planit-beacon.local mkdir -p planit-beacon
+scp hardware/bridge.py hardware/pi/install.sh hardware/pi/planit-beacon.service planit@planit-beacon.local:planit-beacon/
+ssh planit@planit-beacon.local sh planit-beacon/install.sh
+```
+
+Check it:
+
+```bash
+ssh planit@planit-beacon.local systemctl status planit-beacon
+ssh planit@planit-beacon.local journalctl -u planit-beacon -f
+```
+
+To update the bridge later, copy the files and run `install.sh` again. The beacon comes back on its own after the Pi loses power, about a minute after it's plugged back in. It always starts on the first site.
 
 ## Judge demo: Aug 4, 2025 storm replay
 
@@ -110,7 +134,7 @@ Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H
 ### 1. Yellow, then red: Vandolah Power Station
 
 ```bash
-python bridge.py http://localhost:8000 vandolah-power-station
+python bridge.py http://localhost:8000 --site vandolah-power-station --site okeechobee-clean-energy-center
 ```
 
 1. The beacon shows green `ALL CLEAR` (assuming no live storm right now).
@@ -121,10 +145,8 @@ The forecast needs about 15 simulated minutes of lightning before it tracks any 
 
 ### 2. The countdown that resets: Okeechobee Clean Energy Center
 
-```bash
-python bridge.py http://localhost:8000 okeechobee-clean-energy-center
-```
+Hold the beacon's button for 2 seconds to switch to Okeechobee (or start the bridge with `--site okeechobee-clean-energy-center`).
 
 Okeechobee was the busiest site of the storm. Its first strike within 10 miles comes 9 seconds into the hour, so it goes **red** almost as soon as the replay starts (too early for a yellow warning). Every new strike pushes the all-clear back to 30 minutes after it, and Okeechobee had 177 of those resets, so you can watch the countdown tick down at 30× and jump back up to about `30:00` again and again. It stays red for the rest of the hour.
 
-You can run part 2 in the same replay: once Vandolah is red, Ctrl+C the bridge and start it for Okeechobee (the beacon resets and runs its self-test, then shows Okeechobee within about 5 seconds). Or stop and restart the replay to watch Okeechobee from the start.
+You can run part 2 in the same replay: once Vandolah is red, hold the button to switch to Okeechobee. Or stop and restart the replay to watch Okeechobee from the start.
