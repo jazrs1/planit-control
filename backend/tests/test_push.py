@@ -31,6 +31,7 @@ from app.schemas import PushNotification
 from lightning import alert_hook
 from push import notify, webpush
 from scripts import generate_vapid_keys as keygen
+from tests.push_schema import ensure_push_schema
 
 T0 = datetime(2031, 1, 6, 17, 0, tzinfo=timezone.utc)
 MIN = timedelta(minutes=1)
@@ -219,7 +220,7 @@ def test_send_builds_the_push(sent):
     first, second = calls
     assert first["subscription_info"] == {"endpoint": FCM + "x", "keys": {"p256dh": "k", "auth": "a"}}
     assert json.loads(first["data"])["title"] == "STOP WORK: Big Bend, lightning 3.2 mi away"
-    assert first["headers"] == {"Urgency": "high"} and first["ttl"] == 1800 and first["timeout"] == 10
+    assert first["headers"] == {"Urgency": "high"} and first["ttl"] == 1800 and first["timeout"] == webpush.SEND_TIMEOUT_SECONDS
     assert first["vapid_claims"] == {"sub": "https://jazrs1.github.io"}
     assert first["vapid_claims"] is not second["vapid_claims"]   # pywebpush writes aud/exp into it
 
@@ -322,7 +323,6 @@ def test_forecast_pushes_only_new_advisories(monkeypatch):
 
 # ---------- database ----------
 
-MIGRATION = BACKEND_DIR / "db" / "migrations" / "009_push_notifications.sql"
 MILES_PER_DEG_LAT = engine.EARTH_RADIUS_MI * math.pi / 180
 TEST_SITES = [engine.Site("test-push-a", 25.0, -84.5), engine.Site("test-push-b", 25.5, -84.5)]
 
@@ -350,10 +350,7 @@ def conn():
         pytest.skip("DATABASE_URL not set")
     with psycopg.connect(url, row_factory=dict_row, connect_timeout=15) as conn:
         try:
-            if conn.execute("SELECT to_regclass('push_subscriptions') AS t").fetchone()["t"] is None:
-                # Tables only: the index on alert_events would lock that shared table for the whole test.
-                sql = MIGRATION.read_text().split("CREATE INDEX alert_events_recorded_idx")[0]
-                conn.execute(sql)
+            ensure_push_schema(conn)
             for i, s in enumerate(TEST_SITES):
                 conn.execute(
                     """INSERT INTO sites (plant_id, id, name, utility, county, lat, lon, technology, capacity_mw, timezone)
@@ -377,7 +374,8 @@ def outbox(monkeypatch, push_on):
 
 
 def subscribe(conn, name, site_ids=None):
-    return webpush.upsert(conn, f"{FCM}{name}", {"p256dh": "k", "auth": "a"}, site_ids, "crew")["id"]
+    row, _ = webpush.subscribe(conn, f"{FCM}{name}", {"p256dh": f"k-{name}", "auth": "a"}, site_ids, "crew", T0)
+    return row["id"]
 
 
 def strike(site, miles, at):
@@ -433,13 +431,14 @@ def test_expired_subscriptions_are_removed_and_failures_counted(conn, outbox):
 
 
 def test_a_crashing_send_leaves_alerts_alone(conn, monkeypatch, push_on, caplog):
-    subscribe(conn, "all")
+    sub = subscribe(conn, "all")
     monkeypatch.setattr(webpush, "send", lambda sub, m: (_ for _ in ()).throw(RuntimeError("network")))
     monkeypatch.setattr("app.db.get_pool", lambda: FakePool(conn))
     engine.process(conn, [strike(TEST_SITES[0], 4, T0)], T0, TEST_SITES, replay=True)
     before = alerts_snapshot(conn)
     notify._guard(notify.dispatch_alerts, T0, True)
-    assert "Push notifications failed" in caplog.text and alerts_snapshot(conn) == before
+    assert f"Push to {sub} crashed: RuntimeError" in caplog.text and alerts_snapshot(conn) == before
+    assert conn.execute("SELECT failures FROM push_subscriptions WHERE id = %s", (sub,)).fetchone()["failures"] == 1
 
 
 def test_flood_alert_pushes_live(conn, outbox):
@@ -490,6 +489,7 @@ def test_briefing_summary_per_subscription(conn, outbox):
 @pytest.fixture
 def client(conn, push_on, outbox):
     push_route.test_limit.reset()
+    push_route.new_per_client.reset()
     app = FastAPI()
     app.include_router(push_route.router)
     app.dependency_overrides[get_pool] = lambda: FakePool(conn)
@@ -505,7 +505,9 @@ def test_routes_round_trip(client):
     assert client.get("/push/public-key").json() == {"public_key": PUBLIC}
     first = client.post("/push/subscribe", json=body(site_ids=["big-bend", "big-bend"]))
     assert first.status_code == 201 and first.json()["site_ids"] == ["big-bend"]
-    again = client.post("/push/subscribe", json=body(site_ids=None, role="crew")).json()
+    again = client.post("/push/subscribe", json=body(site_ids=None, role="crew"))
+    assert again.status_code == 200   # same endpoint: an update, not a second subscription
+    again = again.json()
     assert again["id"] == first.json()["id"] and again["site_ids"] is None and again["role"] == "crew"
     assert client.post("/push/test", json={"endpoint": FCM + "route"}).json() == {"sent": True, "removed": False}
     assert client.post("/push/test", json={"endpoint": FCM + "route"}).status_code == 429

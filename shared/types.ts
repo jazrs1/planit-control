@@ -518,8 +518,10 @@ export interface WebPushSubscription {
   expirationTime?: number | null;
 }
 
-/** POST /push/subscribe (201 PushSubscriptionInfo). Subscribing the same endpoint again replaces
- * its sites and role. */
+/** POST /push/subscribe: 201 PushSubscriptionInfo for a new subscription, 200 for an endpoint that's
+ * already subscribed (its sites and role are replaced; re-POST on every page load to keep it alive:
+ * subscriptions not seen for 14 days are deleted). 409: another subscription's keys. 429: 10 new
+ * subscriptions per hour per network. 503: the 1,000-subscription cap, or push isn't set up. */
 export interface PushSubscribeRequest {
   subscription: WebPushSubscription;
   /** null (or omitted): every site. Otherwise at least one site id. */

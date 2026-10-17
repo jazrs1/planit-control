@@ -22,7 +22,7 @@ events from the last RECENT are considered, so a server that was down doesn't pu
 import asyncio
 import logging
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -42,7 +42,12 @@ REPLAY_PREFIX = "[REPLAY] "
 # Live: real minutes. Replay: simulated minutes (a 30x replay covers 60 of them in 2 real minutes).
 RECENT = {False: timedelta(minutes=10), True: timedelta(minutes=60)}
 SWEEP_SECONDS = 60
-SEND_WORKERS = 8
+PRUNE_EVERY = 60                    # sweeps between prunes of stale and failing subscriptions (hourly)
+# Every send runs in parallel (up to SEND_WORKERS at once), each with webpush.SEND_TIMEOUT_SECONDS, and
+# a whole fan-out stops waiting after DELIVERY_DEADLINE_SECONDS: a slow or broken push service can hold
+# up only its own subscriptions, and the next notification never waits behind it.
+SEND_WORKERS = 32
+DELIVERY_DEADLINE_SECONDS = 15
 GO_LABELS = {"go": "GO", "caution": "CAUTION", "no_go": "NO-GO"}
 
 
@@ -193,11 +198,23 @@ def claim(conn: Connection, key: str, kind: str, site_id: str | None, replay: bo
 
 
 def _send_all(pairs: list[tuple[dict, Message]]) -> dict[str, str]:
+    """Send all in parallel; whatever hasn't answered by the deadline counts as failed."""
     if not pairs:
         return {}
-    with ThreadPoolExecutor(max_workers=min(SEND_WORKERS, len(pairs)), thread_name_prefix="push-send") as senders:
-        outcomes = list(senders.map(lambda p: webpush.send(*p), pairs))
-    return {sub["id"]: o for (sub, _), o in zip(pairs, outcomes)}
+    senders = ThreadPoolExecutor(max_workers=min(SEND_WORKERS, len(pairs)), thread_name_prefix="push-send")
+    futures = {senders.submit(webpush.send, sub, message): sub["id"] for sub, message in pairs}
+    done, late = wait(futures, timeout=DELIVERY_DEADLINE_SECONDS)
+    senders.shutdown(wait=False, cancel_futures=True)   # don't wait for stragglers: they time out on their own
+    outcomes = {}
+    for f in done:
+        if f.exception() is not None:   # send() never raises; just in case, one crash stays one failure
+            log.warning("Push to %s crashed: %s", futures[f], type(f.exception()).__name__)
+        outcomes[futures[f]] = f.result() if f.exception() is None else "failed"
+    outcomes.update({futures[f]: "failed" for f in late})
+    if late:
+        log.warning("Push: %d of %d sends didn't finish within %d s (counted as failed)",
+                    len(late), len(pairs), DELIVERY_DEADLINE_SECONDS)
+    return outcomes
 
 
 def deliver(pool, message: Message, site_id: str | None) -> int:
@@ -339,12 +356,25 @@ def _guard(fn, *args) -> None:
         log.exception("Push notifications failed (alerts are unaffected)")
 
 
+def prune_subscriptions(pool) -> int:
+    with pool.connection() as conn:
+        return webpush.prune(conn, clock.real_now())
+
+
 async def run_sweep_loop() -> None:
-    """Every minute: catch recent events nobody pushed (live, and the replay while one runs)."""
+    """Every minute: catch recent events nobody pushed (live, and the replay while one runs).
+    Every hour: delete subscriptions not seen for 14 days or failing."""
+    sweeps = 0
     while True:
         alerts_changed(clock.real_now(), replay=False)
         if clock.is_simulated():
             alerts_changed(clock.now(), replay=True)
+        if sweeps % PRUNE_EVERY == 0:
+            try:
+                _worker.submit(_guard, prune_subscriptions)
+            except Exception:  # noqa: BLE001
+                log.exception("Couldn't queue the push subscription prune")
+        sweeps += 1
         await asyncio.sleep(SWEEP_SECONDS)
 
 
