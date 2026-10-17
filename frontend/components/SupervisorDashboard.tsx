@@ -59,7 +59,10 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const demo = alertsStatus === "demo";
   const replaying = replay?.running ?? false;
   const sites = demo ? DEMO_DATA.sites : liveSites;
-  const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
+  // During a replay /lightning/recent also returns real flashes (LightningFlash.replay = false). Until the
+  // map ages each layer on its own clock, the dashboard keeps showing only the replay's, as before, so
+  // flash counts never mix real and replay and real flashes aren't drawn against the simulated clock.
+  const flashes = demo ? DEMO_DATA.lightning : replaying ? liveFlashes.filter((flash) => flash.replay !== false) : liveFlashes;
   const cells = demo ? DEMO_DATA.lightningCells : liveCells;
   // Fade by age on the backend clock (simulated during replay, the demo clock in demo mode).
   // Offline, freeze the fade where it was: with no new data, letting flashes drain away would make

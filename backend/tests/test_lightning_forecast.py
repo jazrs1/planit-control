@@ -368,20 +368,26 @@ def test_beacon_priority_with_stale_data():
         assert b["state"] == "unknown" and b["seconds_to_all_clear"] is None and b["minutes_to_arrival"] is None
 
 
-def test_combined_beacon_highest_priority_wins():
-    def b(state, seconds=None, minutes=None):
+def test_combined_beacon_real_first():
+    def b(state, replay, seconds=None, minutes=None):
         return {"site_id": "s", "state": state, "seconds_to_all_clear": seconds, "minutes_to_arrival": minutes,
-                "as_of": None}
-    assert approach.combine_beacons([b("clear"), b("stop", 600)])["state"] == "stop"
-    assert approach.combine_beacons([b("flood"), b("clear")])["state"] == "flood"
-    assert approach.combine_beacons([b("approaching", minutes=20), b("flood")])["state"] == "approaching"
-    assert approach.combine_beacons([b("clear"), b("unknown")])["state"] == "unknown"
-    assert approach.combine_beacons([b("unknown"), b("stop", 60)])["state"] == "stop"
-    assert approach.combine_beacons([b("stop", 300), b("stop", 1200)])["seconds_to_all_clear"] == 1200   # longer wait
-    real_stop, replay_stop = {**b("stop", 600), "replay": False}, {**b("stop", 1500), "replay": True}
-    for pair in ([real_stop, replay_stop], [replay_stop, real_stop]):   # 1500 simulated s is 50 real s at 30x
-        assert approach.combine_beacons(pair) is real_stop
-    assert approach.combine_beacons([b("approaching", minutes=25), b("approaching", minutes=8)])["minutes_to_arrival"] == 8
+                "as_of": None, "replay": replay}
+    combine = approach.combine_beacons
+    # Any real state other than clear wins over every replay state, stop included.
+    for real_state in ("approaching", "unknown", "flood"):
+        shown = combine([b(real_state, False, minutes=12 if real_state == "approaching" else None), b("stop", True, 1500)])
+        assert (shown["state"], shown["replay"]) == (real_state, False)
+    assert combine([b("flood", False), b("approaching", True, minutes=8)])["state"] == "flood"
+    real_stop, replay_stop = b("stop", False, 600), b("stop", True, 1500)
+    for pair in ([real_stop, replay_stop], [replay_stop, real_stop]):   # order doesn't matter
+        assert combine(pair) is real_stop
+    # The replay shows only when the real state is clear, and then it says so.
+    shown = combine([b("clear", False), b("stop", True, 1500)])
+    assert (shown["state"], shown["replay"], shown["seconds_to_all_clear"]) == ("stop", True, 1500)
+    assert combine([b("clear", False), b("approaching", True, minutes=20)])["replay"] is True
+    assert combine([b("clear", False), b("clear", True)])["replay"] is False      # both clear: the real one
+    assert combine([b("clear", False)])["replay"] is False                         # no replay running
+    assert combine([b("approaching", True, minutes=5)])["replay"] is True         # no real layer (ingest off)
 
 
 def test_beacon_during_a_replay_keeps_real_flood_and_real_advisories(conn, monkeypatch):  # noqa: F811
@@ -421,7 +427,13 @@ def test_beacon_during_a_replay_keeps_real_flood_and_real_advisories(conn, monke
                     VALUES ('sanford', 'lightning', %s, %s, %s, 3.0, true)""",
                  (sim - timedelta(minutes=2), sim + timedelta(minutes=28), sim - timedelta(minutes=2)))
     body = state()
-    assert body["state"] == "stop" and body["seconds_to_all_clear"] == 28 * 60    # the replay's stop-work wins
+    assert body["state"] == "approaching" and body["replay"] is False   # a real advisory beats a replay stop-work
+    conn.execute("DELETE FROM lightning_advisories WHERE site_id = 'sanford' AND NOT replay")
+    body = state()
+    assert body["state"] == "flood" and body["replay"] is False        # so does a real flood alert
+    conn.execute("DELETE FROM alerts WHERE site_id = 'sanford' AND type = 'flood' AND NOT replay")
+    body = state()
+    assert body["state"] == "stop" and body["seconds_to_all_clear"] == 28 * 60    # real is clear: the replay shows
     assert body["replay"] is True                                                 # its countdown is simulated
 
 
@@ -553,9 +565,9 @@ def test_beacon_with_live_ingestion_turned_off_shows_the_replay(conn, monkeypatc
     assert body["state"] == "stop" and body["replay"] is False and 24 * 60 < body["seconds_to_all_clear"] <= 25 * 60
 
 
-def test_beacon_with_live_ingestion_stalled_stays_unknown_above_the_replay(conn, monkeypatch):  # noqa: F811
-    # Ingestion is on but hasn't succeeded for an hour: real data is unknown, which outranks the
-    # replay's clear and approaching (only a stop-work is higher).
+def test_beacon_real_unknown_beats_a_replay_stop_work(conn, monkeypatch):  # noqa: F811
+    # Ingestion is on but hasn't succeeded for an hour: real data is unknown, which outranks every replay
+    # state, its stop-work included (a demo must never cover up missing real data).
     state, sim, real = _replay_beacon_setup(conn, monkeypatch, ingest_enabled=True,
                                             last_success=lambda sim, real: {True: sim, False: real - timedelta(hours=1)})
     assert state()["state"] == "unknown"
@@ -563,7 +575,7 @@ def test_beacon_with_live_ingestion_stalled_stays_unknown_above_the_replay(conn,
     assert state()["state"] == "unknown"
     _stop(conn, sim, 28, replay=True)
     body = state()
-    assert body["state"] == "stop" and body["replay"] is True
+    assert body["state"] == "unknown" and body["replay"] is False   # real unknown beats even a replay stop-work
 
 
 @pytest.mark.parametrize("ingest_enabled", [True, False])
@@ -577,3 +589,24 @@ def test_beacon_real_stop_work_beats_an_overlapping_replay_one(conn, monkeypatch
     body = state()
     assert body["state"] == "stop" and body["replay"] is False
     assert 9 * 60 < body["seconds_to_all_clear"] <= 10 * 60
+
+
+def test_beacon_real_approaching_beats_a_replay_stop_work(conn, monkeypatch):  # noqa: F811
+    state, sim, real = _replay_beacon_setup(conn, monkeypatch, ingest_enabled=True,
+                                            last_success=lambda sim, real: {True: sim, False: real})
+    _stop(conn, sim, 28, replay=True)
+    conn.execute("""INSERT INTO lightning_advisories (site_id, replay, started_at, updated_at, arrival_at, first_arrival_at,
+                                                      from_bearing_deg, heading_deg, speed_mph, distance_mi, cell_flashes)
+                    VALUES ('sanford', false, %s, %s, %s, %s, 250, 70, 22, 18.5, 140)""",
+                 (real - timedelta(minutes=4), real, real + timedelta(minutes=9, seconds=30), real + timedelta(minutes=12)))
+    body = state()
+    assert body["state"] == "approaching" and body["replay"] is False and body["minutes_to_arrival"] == 10
+
+
+def test_beacon_real_clear_shows_the_replay_stop_work(conn, monkeypatch):  # noqa: F811
+    state, sim, real = _replay_beacon_setup(conn, monkeypatch, ingest_enabled=True,
+                                            last_success=lambda sim, real: {True: sim, False: real})
+    assert state()["state"] == "clear" and state()["replay"] is False   # both clear: the real one
+    _stop(conn, sim, 28, replay=True)
+    body = state()
+    assert body["state"] == "stop" and body["replay"] is True and body["seconds_to_all_clear"] == 28 * 60
