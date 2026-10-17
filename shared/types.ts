@@ -509,6 +509,74 @@ export interface ModelInfo {
   last_scored_at: string | null;
 }
 
+// ---------- Web push: GET /push/public-key, POST /push/subscribe, /push/unsubscribe, /push/test ----------
+
+/** GET /push/public-key: pass it (base64url) as PushManager.subscribe()'s applicationServerKey. */
+export interface PushPublicKey {
+  public_key: string;
+}
+
+export type PushRole = "crew" | "supervisor";
+
+/** The browser's own PushSubscription.toJSON() shape (send it as-is; expirationTime is ignored). */
+export interface WebPushSubscription {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  expirationTime?: number | null;
+}
+
+/** POST /push/subscribe (201 PushSubscriptionInfo). Subscribing the same endpoint again replaces
+ * its sites and role. */
+export interface PushSubscribeRequest {
+  subscription: WebPushSubscription;
+  /** null (or omitted): every site. Otherwise at least one site id. */
+  site_ids?: string[] | null;
+  role: PushRole;
+}
+
+export interface PushSubscriptionInfo {
+  id: string;
+  site_ids: string[] | null;
+  role: PushRole;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of POST /push/unsubscribe and POST /push/test. */
+export interface PushEndpointRequest {
+  endpoint: string;
+}
+
+export interface PushUnsubscribeResponse {
+  removed: boolean;
+}
+
+/** POST /push/test (at most one per subscription every 10 s; 429 otherwise). */
+export interface PushTestResponse {
+  sent: boolean;
+  /** The push service says this subscription no longer exists; it was deleted, so subscribe again. */
+  removed: boolean;
+}
+
+export type PushKind = "stop_work" | "approaching" | "all_clear" | "flood" | "briefings" | "test";
+
+/** The JSON payload of every push message, for the service worker's "push" event:
+ * showNotification(title, { body, tag, data: { url } }). Replay pushes have replay: true and a
+ * "[REPLAY] " title prefix. */
+export interface PushNotification {
+  title: string;
+  body: string;
+  kind: PushKind;
+  site_id: string | null;
+  replay: boolean;
+  /** Frontend path to open on click, e.g. "/sites/big-bend", "/briefings". */
+  url: string;
+  /** Same tag replaces the earlier notification: "lightning:<site>" covers approaching, stop work
+   * and all clear; "flood:<site>", "briefings", "test". */
+  tag: string;
+  sent_at: string;
+}
+
 // ---------- Errors ----------
 
 export interface ApiError {

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Alert, LightningFlash, Site } from "@shared/types";
+import type { Alert, LightningCell, LightningFlash, Site } from "@shared/types";
 import type { GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { riskLevel } from "@/lib/risk";
+import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 
 const LIGHTNING_SOURCE = "recent-lightning";
+const CELLS_SOURCE = "storm-cells";
 /** Flashes older than this are gone; matches the /lightning/recent window the dashboard asks for. */
 export const LIGHTNING_WINDOW_MIN = 15;
 /** A tile that loads this long after the last error means the tile server has recovered. */
@@ -32,13 +34,18 @@ type SiteMapProps = {
   alerts: Alert[];
   /** Recent flashes, any order. */
   flashes: LightningFlash[];
-  /** "Now" for fading flashes by age: the backend clock, so replayed flashes fade in simulated time. */
+  cells: LightningCell[];
+  cellsUnconfirmed: boolean;
+  demo: boolean;
+  /** Backend clock for cell freshness, simulated during replay. */
   nowMs: number;
+  /** Freeze flash fading during a failed flash poll without freezing the cell freshness clock. */
+  flashNowMs: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
 };
 
-export default function SiteMap({ sites, alerts, flashes, nowMs, selectedId, onSelect }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -95,11 +102,43 @@ export default function SiteMap({ sites, alerts, flashes, nowMs, selectedId, onS
     return () => { disposed = true; };
   }, [ready, sites, alerts, onSelect, selectedId]);
 
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo);
+    const source = instance.getSource<GeoJSONSource>(CELLS_SOURCE);
+    if (source) { void source.setData(data); return; }
+    const tokens = getComputedStyle(document.documentElement);
+    const amber = tokens.getPropertyValue("--pc-risk-amber").trim();
+    const muted = tokens.getPropertyValue("--pc-text-muted").trim();
+    instance.addSource(CELLS_SOURCE, { type: "geojson", data });
+    const before = instance.getLayer(LIGHTNING_SOURCE) ? LIGHTNING_SOURCE : undefined;
+    instance.addLayer({
+      id: `${CELLS_SOURCE}-fill`, type: "fill", source: CELLS_SOURCE,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: {
+        "fill-color": ["case", ["get", "uncertain"], tokens.getPropertyValue("--pc-border").trim(), tokens.getPropertyValue("--pc-risk-amber-bg").trim()],
+        "fill-opacity": 0.35,
+      },
+    }, before);
+    instance.addLayer({
+      id: `${CELLS_SOURCE}-outline`, type: "line", source: CELLS_SOURCE,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: { "line-color": ["case", ["get", "uncertain"], muted, amber], "line-width": 2, "line-dasharray": [3, 2] },
+    }, before);
+    instance.addLayer({
+      id: `${CELLS_SOURCE}-arrows`, type: "line", source: CELLS_SOURCE,
+      filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["case", ["get", "uncertain"], muted, amber], "line-width": 3 },
+    }, before);
+  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs]);
+
   // Recent lightning: a GeoJSON circle layer under the site markers (markers are DOM, always on top).
   useEffect(() => {
     const instance = map.current;
     if (!styleLoaded || !instance) return;
-    const data = lightningGeoJson(flashes, nowMs);
+    const data = lightningGeoJson(flashes, flashNowMs);
     const source = instance.getSource<GeoJSONSource>(LIGHTNING_SOURCE);
     if (source) {
       void source.setData(data);
@@ -122,7 +161,7 @@ export default function SiteMap({ sites, alerts, flashes, nowMs, selectedId, onS
         "circle-stroke-opacity": ["*", 0.5, ["get", "opacity"]],
       },
     });
-  }, [styleLoaded, flashes, nowMs]);
+  }, [styleLoaded, flashes, flashNowMs]);
 
   useEffect(() => {
     if (!ready || !selectedId) return;
@@ -130,5 +169,12 @@ export default function SiteMap({ sites, alerts, flashes, nowMs, selectedId, onS
     if (site) map.current?.easeTo({ center: [site.lon, site.lat], duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500 });
   }, [ready, selectedId, sites]);
 
-  return <><div ref={container} className="h-full w-full" />{error && <p role="status" className="absolute top-3 left-3 max-w-64 rounded-card border border-border bg-surface p-3 text-sm text-muted">Map tiles unavailable. Site details remain available in the ranked list.</p>}</>;
+  return <><div ref={container} className="h-full w-full" />
+    <ul className="sr-only" aria-label="Storm cell motion">
+      {cells.map((cell) => <li key={cell.id}>
+        {demo && "Demo data · "}Storm cell at {cell.lat.toFixed(2)}, {cell.lon.toFixed(2)}, radius {cell.radius_mi.toFixed(1)} mi. {cell.tracked ? cell.heading_deg !== null && cell.speed_mph !== null && cell.speed_mph >= 2 ? `Moving toward ${cell.moving_toward ?? `${cell.heading_deg} degrees`} at ${Math.round(cell.speed_mph)} mph.` : "Stationary." : "Motion unconfirmed."}
+        {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs))) && " Last known · Not confirmed."}
+      </li>)}
+    </ul>
+    {error && <p role="status" className="absolute top-3 left-3 max-w-64 rounded-card border border-border bg-surface p-3 text-sm text-muted">Map tiles unavailable. Site details remain available in the ranked list.</p>}</>;
 }

@@ -77,4 +77,8 @@ def evaluate(pool: ConnectionPool, now: datetime) -> dict[str, list[str]]:
 
         api_cache.invalidate()  # committed above: show the change on the next request
         log.info("Flood alerts: %s", changes)
+    if changes["created"]:
+        from push import notify
+
+        notify.alerts_changed(now, replay=False)   # committed; queues the push and returns at once
     return changes

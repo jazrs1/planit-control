@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { HazardIndex, HazardType } from "@shared/types";
+import type { HazardIndex } from "@shared/types";
+import ModelExplanation from "@/components/ModelExplanation";
+import { getModelInfo, orNull } from "@/lib/api";
 import { pageMetadata } from "@/lib/metadata";
-import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
+import { riskLevel } from "@/lib/risk";
 
 // "How it works" for judges and supervisors. Every fact here was checked against the backend
-// (hazards/scheduler.py, hazards/sources/*, hazards/scoring.py, lightning/*) and docs/alert-engine.md.
-// When docs/ml-model.md lands, fill in the "Machine learning model" section below.
+// (hazards/scheduler.py, hazards/sources/*, hazards/risk.py, lightning/*), docs/alert-engine.md
+// and docs/ml-model.md. Model evaluation numbers come from /model/info on each page request.
 
 export const metadata = pageMetadata("How it works", "Data sources, the lightning stop-work rule, the hazard index, honest limits and replay mode.");
 
@@ -15,6 +17,7 @@ const SECTIONS = [
   { id: "sources", label: "Data sources" },
   { id: "stop-work", label: "Stop-work rule" },
   { id: "index", label: "Hazard index" },
+  { id: "model", label: "Machine learning model" },
   { id: "limits", label: "Honest limits" },
   { id: "replay", label: "Replay mode" },
 ];
@@ -31,16 +34,6 @@ const SOURCES: Source[] = [
   { name: "iNaturalist", from: "Wildlife sightings", gives: "Alligators and venomous snakes seen within 5 km (about 3 mi) in the last 30 days.", every: "Every 6 h" },
   { name: "Crew reports", from: "Field crews in this app", gives: "Photo, pin and category from the field. A report within 2 mi in the last 48 h raises the matching hazard (flooding, heat, ground, fire, wildlife) to at least Watch; downed lines get their own crew-hazards card.", every: "Live" },
   { name: "EIA-860M", from: "U.S. Energy Information Administration", gives: "The 55 real Florida power plants we track: largest first, with regional minimums.", every: "Loaded once" },
-];
-
-/** Sub-score rules, condensed from backend/hazards/scoring.py. */
-const SUB_SCORES: { hazard: HazardType; rules: string }[] = [
-  { hazard: "lightning", rules: "Active stop-work 9 · Severe Thunderstorm Watch 4 · Severe Thunderstorm or Tornado Warning 7" },
-  { hazard: "heat", rules: "OSHA heat index band: lower 0–2, moderate 5, high 7.5, very high 9.5 · NWS Heat Advisory 6, Heat Warning 8" },
-  { hazard: "flood", rules: "High-risk FEMA zone 1 · rain in past 24 h: 1 in → 3, 2 in → 6 (+1 in a flood zone or near a river) · next 24 h: 1 in → 3, 2 in → 5 · NWS advisory 4, watch 5, warning 8 · flood-risk alert 7" },
-  { hazard: "soil_saturation", rules: "Dry 0 · moist 2 · saturated 5 (+2 after 2 in of rain in 24 h)" },
-  { hazard: "wildfire", rules: "Fire within 5 mi 8 if seen on 2+ satellite passes in 24 h or high confidence, else 6 · 10 mi 6 · 25 mi 4 · Fire Weather Watch 3 · Red Flag Warning 5" },
-  { hazard: "wildlife", rules: "Crew report nearby 5 · venomous snake 4 · alligator 2 · +1 with 5 or more sightings (max 6)" },
 ];
 
 const BAND_STYLE = {
@@ -91,7 +84,8 @@ const TIMELINE = [
 ] as const;
 const pct = (min: number) => `${(min / AXIS_MIN) * 100}%`;
 
-export default function HowItWorksPage() {
+export default async function HowItWorksPage() {
+  const modelInfo = await orNull(getModelInfo());
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-6">
       <header>
@@ -105,7 +99,7 @@ export default function HowItWorksPage() {
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm sm:text-base">
           <li><strong>9 data sources</strong>, from satellite lightning every 20 seconds to FEMA flood maps, joined per site.</li>
           <li><strong>Lightning within 10 miles stops work</strong> for 30 minutes, and every new strike restarts the clock. It runs on strike time, so late data can&apos;t end it early.</li>
-          <li><strong>A 0–10 hazard index</strong> for today and tomorrow: green, amber, red. Today it&apos;s a transparent rule-based score; a machine learning model will replace it.</li>
+          <li><strong>A hybrid 0–10 hazard index</strong> for today and tomorrow: a trained weather model plus safety rules for heat, fire and crew reports. Official warnings and lightning stop-work can only raise it.</li>
           <li><strong>Unknown looks unknown.</strong> If the server goes quiet, the app says &quot;Status unknown&quot;, never &quot;All clear&quot;.</li>
           <li><strong>Replay mode</strong> plays a real 2025 storm through the real pipeline, so you can watch it work.</li>
         </ul>
@@ -219,50 +213,19 @@ export default function HowItWorksPage() {
           })}
         </div>
 
-        <h3 className="text-base font-bold">Today: a rule-based score you can check by hand</h3>
+        <h3 className="text-base font-bold">A hybrid: the highest risk wins</h3>
         <ol className="list-decimal space-y-1 pl-5">
-          <li>Each hazard gets its own 0–10 sub-score from fixed rules (below).</li>
-          <li><strong>Index = the highest sub-score, + 0.5 for each other hazard at 4 or above</strong>, capped at 10.</li>
-          <li>A crew report within 2 mi in the last 48 h raises its hazard&apos;s sub-score to at least 4 (Watch) today.</li>
-          <li>While a site has an active lightning stop-work, today&apos;s index is at least 9.0.</li>
-          <li>Tomorrow uses the same rules on tomorrow&apos;s forecast, without the lightning override (lightning can&apos;t be forecast to the mile).</li>
+          <li><strong>The model learns storms and floods</strong> from the forecast, turning its estimated probability into a 0–10 weather score. An index of 7 does not mean a 70% chance.</li>
+          <li><strong>Take the highest score</strong> from the model, OSHA heat-index bands, wildfire detections, wildlife and crew reports. A mild forecast can never average away dangerous heat or a reported hazard.</li>
+          <li><strong>Official NWS warnings set minimum scores:</strong> at least 9 for a Hurricane Warning, 7 for other supported warnings, and 4 for watches or advisories. Floors only raise a lower score. A nearby downed-line report also sets today&apos;s minimum to 7; our flood-risk alert sets it to 4.</li>
+          <li><strong>Lightning stop-work overrides today&apos;s index to at least 9.0.</strong> The stop-work engine runs independently; no model forecast can shorten or clear its wait.</li>
+          <li>Tomorrow uses tomorrow&apos;s forecast, peak heat, and watches or warnings in effect then. Today&apos;s crew-report floors, advisories and lightning stop-work do not carry over. If the model cannot score, safety rules still run.</li>
         </ol>
-        <details className="rounded-card border border-border bg-bg p-3">
-          <summary className="cursor-pointer font-semibold text-brand">Sub-score rules for each hazard</summary>
-          <dl className="mt-3 space-y-2 text-sm">
-            {SUB_SCORES.map((r) => (
-              <div key={r.hazard}>
-                <dt className="font-semibold">{HAZARD_LABEL[r.hazard]}</dt>
-                <dd className="text-muted">{r.rules}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
-
-        <section aria-labelledby="ml-title" className="rounded-card border-2 border-dashed border-brand p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-brand">Coming soon · placeholder</p>
-          <h3 id="ml-title" className="text-base font-bold">Machine learning model</h3>
-          <p className="mt-1 text-muted">A trained model will replace the rule-based score behind the same interface, so every screen keeps working. This section will be filled in from docs/ml-model.md.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {[
-              { title: "Training data", body: "Which years, sites and labels the model learned from." },
-              { title: "Test-year results", body: "How it scored on a year it never saw." },
-              { title: "Baselines", body: "Compared with the rule-based score and simple forecasts." },
-            ].map((p) => (
-              <div key={p.title} className="rounded-card border border-dashed border-border bg-bg p-3">
-                <p className="font-semibold">{p.title}</p>
-                <p className="text-xs text-muted">{p.body}</p>
-                <p className="mt-2 text-xs font-semibold text-muted">To be added</p>
-              </div>
-            ))}
-            <div className="rounded-card border border-dashed border-border bg-bg p-3">
-              <p className="font-semibold">Calibration chart</p>
-              <div className="mt-2 flex h-24 items-center justify-center rounded-card border border-dashed border-border text-xs text-muted" role="img" aria-label="Calibration chart placeholder">
-                Chart to be added
-              </div>
-            </div>
-          </div>
-        </section>
+        {modelInfo && <details className="rounded-card border border-border bg-bg p-3">
+          <summary className="cursor-pointer font-semibold text-brand">Hybrid rules from the model service</summary>
+          <p className="mt-2 text-sm text-muted">{modelInfo.hybrid}</p>
+        </details>}
+        <ModelExplanation info={modelInfo} />
       </Section>
 
       <Section id="limits" title="Honest limits" takeaway="What this system can't tell you, so nobody over-trusts it.">
@@ -270,9 +233,11 @@ export default function HowItWorksPage() {
           {[
             { t: "Rainfall is a model estimate.", d: "Open-Meteo rain totals come from weather models, not a rain gauge at the site. Real totals can be higher or lower." },
             { t: "Wildfire depends on satellite passes.", d: "VIIRS satellites see a given spot only a few times a day, so a new fire can burn for hours before it shows up. Hot spots within 1 km of a plant are treated as plant heat and ignored, so a real fire inside that ring would be missed. Without a FIRMS key, wildfire data is off and the card says so." },
-            { t: "It predicts hazardous weather days, not injuries.", d: "A high index means conditions are dangerous, not that someone will get hurt, and a low index doesn't mean a site is safe. It supports a supervisor's judgment; it doesn't replace it." },
+            { t: "It predicts hazardous weather days, not injuries.", d: "A high index flags conditions to check; it does not mean someone will get hurt. A low index does not mean a site is safe. It supports a supervisor's judgment; it doesn't replace it." },
             { t: "Lightning positions are approximate.", d: "Satellite pixels are about 8–14 km across, so a strike reported at 9.8 mi could be a little closer or farther. A strike reaches us 20–40 seconds after it happens." },
-            { t: "Today's index is a placeholder.", d: "Until the machine learning model lands, the index is the rule-based score above." },
+            { t: "Hazardous days are rare, and exact probabilities are uncertain.", d: "There are few reported events to learn from. The model ranks risky days better than it estimates exact chances; the highest probabilities can be overconfident. Day-ahead probability gains over the baselines are not statistically conclusive." },
+            { t: "Reporting bias affects the model.", d: "NOAA records reported events, not every event that happened. Rural sites and nights are under-reported; lightning is usually logged only after damage or injury. Location partly reflects where reports come from, so a low score at a remote site is weaker evidence of a quiet day." },
+            { t: "Heat and wildfire cannot be learned reliably from these labels.", d: "Heat reports are too sparse to validate the model's heat predictions, and weather alone captures wildfire poorly without drought or fuel conditions. OSHA heat bands and satellite fire detections supply the safety rules for these hazards." },
           ].map((l) => (
             <li key={l.t} className="rounded-card border-l-4 border-risk-amber bg-bg p-3">
               <p className="font-semibold">{l.t}</p>

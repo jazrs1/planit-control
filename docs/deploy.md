@@ -102,7 +102,7 @@ deploy/copy-to-server.sh root@203.0.113.10 \
   - with `--uploads`, the report photos in `backend/uploads/`.
 - **After copying**, it restarts the API and waits for `/health`.
 - **Your local `.env` is never changed.** In the server's copy, the script:
-  - forces `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED` and `BRIEFING_ENABLED` to `true`, since the server is the only machine that polls;
+  - forces `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED`, `BRIEFING_ENABLED` and `PUSH_ENABLED` to `true`, since the server is the only machine that polls and sends push notifications;
   - sets `CORS_ORIGINS` to the `--cors` list.
 
   So the same command still works after you turn your laptop's flags off.
@@ -132,9 +132,10 @@ Once the server is healthy, **your laptop must stop polling and ingesting**. Oth
 LIGHTNING_INGEST_ENABLED=false   # GOES-19 lightning, every 20 s, and the stop-work alert engine that runs with it
 HAZARD_POLLING_ENABLED=false     # Open-Meteo weather, NWS alerts, FIRMS fires, iNaturalist, FEMA/river lookups, flood alerts, hazard scores
 BRIEFING_ENABLED=false           # the 6 PM briefings (Claude / Gemini)
+PUSH_ENABLED=false               # web push notifications (stop-work, approaching, all clear, flood, briefings)
 ```
 
-These three cover every background job (`backend/app/main.py`, `lifespan`).
+These four cover every background job (`backend/app/main.py`, `lifespan`). Keep the same `VAPID_*` keys on both machines: subscriptions are tied to the public key. Two senders never push the same event twice (each event is claimed in `push_log` first), but only the server should send.
 
 **Why it matters:**
 - Lightning rows are deduplicated, so a few minutes of overlap does no harm. Two stop-work engines running at once, though, would both open, extend and close the same alerts.
@@ -277,6 +278,10 @@ Running `--rollback` twice goes back to the newer commit, since the rollback its
 | `API_CACHE_SECONDS` | `2.5` | — | |
 | `BRIEFING_ENABLED` | `true` (forced) | **`false`** | 6 PM briefings. |
 | `BRIEFING_HOUR` | `18` | — | Site-local hour. |
+| `VAPID_PRIVATE_KEY` | **required for push** | same | Web push signing key, from `python -m scripts.generate_vapid_keys` (writes both keys into `backend/.env`; prints only the public one). A secret. **Never change it once browsers have subscribed**, or every device must subscribe again. |
+| `VAPID_PUBLIC_KEY` | **required for push** | same | Served at `GET /push/public-key`. Generated with the private key. |
+| `VAPID_SUBJECT` | your frontend origin, e.g. `https://planit.example.com` | same | Contact sent to the push services: `mailto:name@host`, or an `https` origin **without a path** (pywebpush rejects paths). Default `https://jazrs1.github.io`. An invalid value turns push off. |
+| `PUSH_ENABLED` | `true` (forced) | **`false`** | Sending push notifications. The `/push/*` routes still work with it off. |
 | `UPLOADS_DIR` | set by the systemd unit to `/var/lib/planit/uploads` (overrides `.env`) | empty (`backend/uploads`) | |
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` | not used yet | — | Read by config, used by no route. |
 

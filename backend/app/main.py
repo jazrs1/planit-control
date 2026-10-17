@@ -9,11 +9,12 @@ from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.config import get_settings
-from app.routers import alerts, briefing, lightning, model, replay, reports, sites, uploads
+from app.routers import alerts, briefing, lightning, model, push, replay, reports, sites, uploads
 from briefing import service as briefing_service
 from hazards import scheduler as hazard_scheduler
 from lightning import live
 from lightning import replay as replay_runner
+from push import notify as push_notify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
 
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
         tasks += hazard_scheduler.start(db.get_pool())
     if settings.briefing_enabled and settings.database_url:
         tasks.append(asyncio.create_task(briefing_service.run_loop(db.get_pool())))
+    if settings.push_enabled and settings.push_configured and settings.database_url:
+        tasks.append(asyncio.create_task(push_notify.run_sweep_loop()))
     yield
     await replay_runner.runner.stop()
     for task in tasks:
@@ -54,6 +57,7 @@ app.include_router(briefing.list_router)
 app.include_router(uploads.router)
 app.include_router(lightning.router)
 app.include_router(replay.router)
+app.include_router(push.router)
 app.include_router(model.router)
 
 uploads.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
