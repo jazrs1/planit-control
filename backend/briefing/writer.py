@@ -1,12 +1,18 @@
 """Turns a briefing's input JSON into the crew supervisor's text.
 
-  1. Gemini (GEMINI_MODEL, default gemini-3.8-flash) writes a headline, the top 3 risks with times,
-     and concrete actions, as structured JSON, from the input JSON only.
-  2. The result is checked: every number in it must appear in the input JSON, hazard words must
-     match it (no "saturated" soil that is only moist, no NWS alert that isn't in effect, no
-     thunderstorms at 0% chance), and the whole briefing must be under 150 words. One retry with the problems listed; then
-  3. a template built from the same JSON (always grounded by construction) is used instead.
-     The template is also used when GEMINI_API_KEY is missing or Gemini fails.
+A model writes a headline, the top 3 risks with times, and concrete actions, as structured JSON,
+from the input JSON only. Every answer is checked: every number in it must appear in the input
+JSON, hazard words must match it (no "saturated" soil that is only moist, no NWS alert that isn't
+in effect, no thunderstorms at 0% chance), and the whole briefing must be under 150 words. A
+rejected answer gets one retry with the problems listed. Writers, in order:
+
+  1. Claude (CLAUDE_MODEL, default claude-sonnet-5-5), if ANTHROPIC_API_KEY is set;
+  2. Gemini (GEMINI_MODEL, default gemini-3.8-flash), if GEMINI_API_KEY is set and its free-tier
+     quota isn't used up;
+  3. a template built from the same JSON (always grounded by construction).
+
+Each writer is used when the one before it is not configured, fails, or is rejected twice. The
+briefing records which one wrote it (`generator`) and the model that answered (`model`).
 
 The go / caution / no-go decision is never the writer's: it comes from the input (briefing/inputs.py).
 """
@@ -24,7 +30,8 @@ from app.config import get_settings
 
 log = logging.getLogger(__name__)
 
-API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+CLAUDE_API = "https://api.anthropic.com/v1/messages"
 MAX_WORDS = 150
 HEADLINE_WORD = {"go": "GO", "caution": "CAUTION", "no_go": "NO-GO"}
 _NUMBER = re.compile(r"\d{1,2}:\d{2}|\d+(?:\.\d+)?")
@@ -45,7 +52,8 @@ matching action (stay clear of the line and treat it as energized; check on the 
 and rest). If there is little risk, say so plainly instead of inventing risks. The whole briefing must be
 under {MAX_WORDS} words."""
 
-SCHEMA = {
+# Gemini's schema dialect (upper-case types).
+GEMINI_SCHEMA = {
     "type": "OBJECT",
     "properties": {
         "headline": {"type": "STRING"},
@@ -55,6 +63,18 @@ SCHEMA = {
     "required": ["headline", "risks", "actions"],
 }
 
+# Claude structured output (JSON Schema; every object needs additionalProperties false).
+CLAUDE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "headline": {"type": "string"},
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "actions": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["headline", "risks", "actions"],
+    "additionalProperties": False,
+}
+
 
 @dataclass
 class Written:
@@ -62,8 +82,8 @@ class Written:
     risks: list[str]
     actions: list[str]
     text: str
-    generator: str          # "gemini" | "template"
-    model: str | None
+    generator: str          # "claude" | "gemini" | "template"
+    model: str | None       # the model that answered; None for the template
 
 
 # ---------- grounding ----------
@@ -198,22 +218,132 @@ def template(inputs: dict) -> Written:
     return Written(headline, top, actions[:3], text, "template", None)
 
 
-# ---------- Gemini ----------
-
-def _call_gemini(inputs: dict, key: str, model: str, feedback: str | None) -> dict:
+def _prompt(inputs: dict, feedback: str | None) -> str:
     prompt = json.dumps(inputs, ensure_ascii=False)
     if feedback:
         prompt += f"\n\nYour previous answer was rejected: {feedback}. Fix that and answer again."
+    return prompt
+
+
+def _parts(out: dict) -> tuple[str, list[str], list[str]]:
+    return out["headline"], list(out["risks"])[:3], list(out["actions"])[:4]
+
+
+def _checked(inputs: dict, out: dict, generator: str, model: str) -> tuple[Written | None, str | None]:
+    """The composed briefing if it passes the grounding and word checks, else (None, problems)."""
+    headline, risks, actions = _parts(out)
+    text = compose(inputs["go_status"], inputs["day"], headline, risks, actions)
+    issues = problems(text, inputs)
+    if issues:
+        return None, "; ".join(issues)
+    return Written(headline, risks, actions, text, generator, model), None
+
+
+# ---------- Claude ----------
+
+CLAUDE_TIMEOUT_SECONDS = 120
+# Short structured writing from a small JSON: medium effort keeps calls fast; the grounding check
+# (with one retry) catches what slips through.
+CLAUDE_EFFORT = "medium"
+# A 429 or overload asking us to wait longer than this sends the site on to Gemini instead.
+CLAUDE_MAX_WAIT_SECONDS = 30
+
+
+class Refused(Exception):
+    pass
+
+
+def _call_claude(inputs: dict, key: str, model: str, feedback: str | None) -> tuple[dict, str]:
+    """(headline/risks/actions, the model that answered). The server-side fallback re-runs a
+    request a safety classifier declines on Anthropic's recommended model for that category, so
+    the answering model can differ from `model`."""
+    body = {
+        "model": model,
+        "max_tokens": 16000,
+        "system": SYSTEM,
+        "messages": [{"role": "user", "content": _prompt(inputs, feedback)}],
+        "output_config": {"effort": CLAUDE_EFFORT,
+                          "format": {"type": "json_schema", "schema": CLAUDE_SCHEMA}},
+        "fallbacks": "default",
+    }
+    request = urllib.request.Request(
+        CLAUDE_API, data=json.dumps(body).encode(), method="POST",
+        headers={"Content-Type": "application/json", "x-api-key": key,
+                 "anthropic-version": "2023-06-01",
+                 "anthropic-beta": "server-side-fallback-2026-07-01"})
+    with urllib.request.urlopen(request, timeout=CLAUDE_TIMEOUT_SECONDS) as resp:
+        data = json.load(resp)
+    if data.get("stop_reason") == "refusal":
+        raise Refused((data.get("stop_details") or {}).get("category"))
+    if data.get("stop_reason") != "end_turn":
+        raise ValueError(f"Claude stop_reason {data.get('stop_reason')}")
+    text = next(b["text"] for b in data["content"] if b["type"] == "text")
+    return json.loads(text), data.get("model") or model
+
+
+def _retry_after(err: urllib.error.HTTPError) -> float | None:
+    try:
+        return float(err.headers.get("retry-after"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _try_claude(inputs: dict) -> Written | None:
+    """Claude's briefing if it passes the checks (one retry), else None. Never raises."""
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        return None
+    name, feedback = inputs["site"]["name"], None
+    for attempt in range(2):
+        try:
+            out, model = _call_claude(inputs, settings.anthropic_api_key, settings.claude_model, feedback)
+        except urllib.error.HTTPError as err:
+            # 429 rate limit, 529 overloaded, 5xx: wait once if the wait is short.
+            if (err.code == 429 or err.code >= 500) and attempt == 0:
+                delay = _retry_after(err)
+                if delay is None or delay <= CLAUDE_MAX_WAIT_SECONDS:
+                    time.sleep(delay if delay is not None else 5)
+                    continue
+            log.warning("Claude HTTP %s for %s; trying the next writer", err.code, name)
+            return None
+        except (TimeoutError, urllib.error.URLError) as err:
+            if attempt == 0:
+                log.info("Claude %s for %s; retrying once", type(err).__name__, name)
+                continue
+            log.warning("Claude failed twice for %s (%s); trying the next writer", name, type(err).__name__)
+            return None
+        except Refused as err:
+            log.warning("Claude declined %s (%s); trying the next writer", name, err)
+            return None
+        except Exception as err:  # noqa: BLE001 - bad JSON, unexpected shape: next writer
+            log.warning("Claude failed for %s (%s); trying the next writer", name, type(err).__name__)
+            return None
+        try:
+            written, feedback = _checked(inputs, out, "claude", model)
+        except (KeyError, TypeError) as err:
+            log.warning("Claude answer for %s missing fields (%s); trying the next writer", name, err)
+            return None
+        if written:
+            return written
+        log.info("Claude briefing for %s rejected (%s)%s", name, feedback,
+                 ", retrying" if attempt == 0 else "; trying the next writer")
+    return None
+
+
+# ---------- Gemini ----------
+
+def _call_gemini(inputs: dict, key: str, model: str, feedback: str | None) -> dict:
+    prompt = _prompt(inputs, feedback)
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         # thinkingLevel "low" is the lowest gemini-3.8-flash accepts (verified: invalid values get a 400).
-        "generationConfig": {"responseMimeType": "application/json", "responseSchema": SCHEMA,
+        "generationConfig": {"responseMimeType": "application/json", "responseSchema": GEMINI_SCHEMA,
                              "temperature": 0.2, "maxOutputTokens": 4096,
                              "thinkingConfig": {"thinkingLevel": "low"}},
     }
     request = urllib.request.Request(
-        API.format(model=model), data=json.dumps(body).encode(), method="POST",
+        GEMINI_API.format(model=model), data=json.dumps(body).encode(), method="POST",
         headers={"Content-Type": "application/json", "x-goog-api-key": key})
     with urllib.request.urlopen(request, timeout=GEMINI_TIMEOUT_SECONDS) as resp:
         data = json.load(resp)
@@ -268,17 +398,17 @@ def _wait_turn(min_interval: float) -> None:
         _last_call = time.monotonic()
 
 
-def write(inputs: dict) -> Written:
-    """Gemini if configured and grounded, else the template. Never raises."""
+def _try_gemini(inputs: dict) -> Written | None:
+    """Gemini's briefing if it passes the checks (one retry), else None. Never raises."""
     settings = get_settings()
     if not settings.gemini_api_key or gemini_paused_seconds() > 0:
-        return template(inputs)
+        return None
     feedback = None
     for attempt in range(2):
         _wait_turn(settings.gemini_min_interval_seconds)  # stay under the per-minute rate limit
         try:
             out = _call_gemini(inputs, settings.gemini_api_key, settings.gemini_model, feedback)
-            headline, risks, actions = out["headline"], list(out["risks"])[:3], list(out["actions"])[:4]
+            written, feedback = _checked(inputs, out, "gemini", settings.gemini_model)
         except urllib.error.HTTPError as err:
             if err.code == 429:
                 delay = _retry_delay_seconds(err)
@@ -286,26 +416,28 @@ def write(inputs: dict) -> Written:
                     global _paused_until
                     _paused_until = max(_paused_until, time.monotonic() + delay)
                     log.warning("Gemini quota used up; using the template for the next %.1f h", delay / 3600)
-                    return template(inputs)
+                    return None
                 if attempt == 0:
                     time.sleep(delay if delay is not None else 10)   # short rate limit: wait it out once
                     continue
-            log.warning("Gemini HTTP %s for %s; using template", err.code, inputs["site"]["name"])
-            return template(inputs)
+            log.warning("Gemini HTTP %s for %s; using the template", err.code, inputs["site"]["name"])
+            return None
         except TimeoutError:
             if attempt == 0:
                 log.info("Gemini timed out for %s; retrying once", inputs["site"]["name"])
                 continue
-            log.warning("Gemini timed out twice for %s; using template", inputs["site"]["name"])
-            return template(inputs)
+            log.warning("Gemini timed out twice for %s; using the template", inputs["site"]["name"])
+            return None
         except Exception as err:  # noqa: BLE001 - network, bad JSON, blocked output: fall back
-            log.warning("Gemini failed for %s (%s); using template", inputs["site"]["name"], type(err).__name__)
-            return template(inputs)
-        text = compose(inputs["go_status"], inputs["day"], headline, risks, actions)
-        issues = problems(text, inputs)
-        if not issues:
-            return Written(headline, risks, actions, text, "gemini", settings.gemini_model)
-        feedback = "; ".join(issues)
+            log.warning("Gemini failed for %s (%s); using the template", inputs["site"]["name"], type(err).__name__)
+            return None
+        if written:
+            return written
         log.info("Gemini briefing for %s rejected (%s)%s", inputs["site"]["name"], feedback,
-                 ", retrying" if attempt == 0 else "; using template")
-    return template(inputs)
+                 ", retrying" if attempt == 0 else "; using the template")
+    return None
+
+
+def write(inputs: dict) -> Written:
+    """Claude, then Gemini, then the template (see the module docstring). Never raises."""
+    return _try_claude(inputs) or _try_gemini(inputs) or template(inputs)
