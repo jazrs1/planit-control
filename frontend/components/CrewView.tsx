@@ -7,6 +7,7 @@ import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import AlertBanner from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import CrewReadings from "@/components/CrewReadings";
+import ReadAloudToggle from "@/components/ReadAloudToggle";
 import CrewBriefing from "@/components/CrewBriefing";
 import PushSettings from "@/components/PushSettings";
 import { DEMO_DATA, getSites } from "@/lib/api";
@@ -72,6 +73,7 @@ function CrewSite({ site }: { site: Site }) {
       {replayLightning && replayDone && <p className="text-sm text-muted">{replayClearedLabel(replayLightning, site.timezone)}</p>}
       {replayFlood && <AlertBanner alert={replayFlood} site={site} compact unconfirmed={alertsUnknown} />}
     </section>
+    <div className="pc-panel p-4"><ReadAloudToggle site={site} approach={detail?.lightning_approach} /></div>
     <CrewReadings detail={detail} stale={detailFailed} />
     <CrewBriefing briefing={briefing} site={site} failed={briefingFailed} loading={loading} />
     {status === "demo" ? <p className="pc-panel pc-panel--unknown p-4 font-semibold">Exit demo mode to report a real hazard.</p> : <Link data-crew-report href={`/report?site=${encodeURIComponent(site.id)}`} className="pc-btn pc-btn--primary pc-btn--large fixed inset-x-4 inset-be-[calc(env(safe-area-inset-bottom,0px)+1rem)] z-50 shadow-float sm:static sm:w-full sm:shadow-none">
