@@ -1,0 +1,2870 @@
+{
+ "meta": {
+  "version": 1,
+  "trained_at": "2026-10-17T04:14:44+00:00",
+  "features": [
+   "tmax_f",
+   "heat_index_max_f",
+   "rain_in",
+   "rain_rate_max_in",
+   "rain_prior3_in",
+   "rain_prior7_in",
+   "gust_max_mph",
+   "cape_max",
+   "thunder_hours",
+   "soil_moisture_pct",
+   "doy_sin",
+   "doy_cos",
+   "lat",
+   "lon"
+  ],
+  "lightgbm_params": {
+   "objective": "binary",
+   "metric": "average_precision",
+   "learning_rate": 0.03,
+   "min_child_samples": 100,
+   "feature_fraction": 0.8,
+   "bagging_fraction": 0.8,
+   "bagging_freq": 1,
+   "lambda_l2": 1.0,
+   "seed": 7,
+   "deterministic": true,
+   "force_row_wise": true,
+   "verbose": -1,
+   "num_leaves": 7,
+   "scale_pos_weight": 1.0,
+   "monotone_constraints": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "monotone_constraints_method": "advanced"
+  },
+  "num_boost_round": 904,
+  "label": "NOAA Storm Events crew-relevant event within 15 mi or in the site's NWS zone/county, by site-local date",
+  "weather_source": "Open-Meteo gfs_seamless (HRRR over Florida); training on the Historical Forecast API",
+  "split": {
+   "train": [
+    2022,
+    2023
+   ],
+   "validation": 2024,
+   "test": 2025
+  },
+  "calibration": {
+   "method": "platt",
+   "fit_on": 2024,
+   "a": 0.8426598902564706,
+   "b": -0.5899066092792541
+  },
+  "index": {
+   "reference_year": 2024,
+   "percentiles": [
+    0.0,
+    0.65,
+    0.9,
+    0.99,
+    0.999
+   ],
+   "probability_anchors": [
+    0.0,
+    0.010127067666338278,
+    0.05179231331126548,
+    0.5150556461618019,
+    0.9041587028099359
+   ],
+   "index_values": [
+    0.0,
+    4.0,
+    7.0,
+    9.0,
+    10.0
+   ]
+  },
+  "baselines": {
+   "climatology_by_month": {
+    "1": 0.008504398826979473,
+    "2": 0.0006493506493506494,
+    "3": 0.017595307917888565,
+    "4": 0.036060606060606064,
+    "5": 0.030205278592375366,
+    "6": 0.0496969696969697,
+    "7": 0.03988269794721408,
+    "8": 0.0530791788856305,
+    "9": 0.054242424242424245,
+    "10": 0.012316715542521995,
+    "11": 0.029393939393939392,
+    "12": 0.011730205278592375
+   },
+   "rule": {
+    "rain_in_at_least": 1.0,
+    "heat_index_f_at_least": 108.0,
+    "fires": 0.13479623824451412,
+    "quiet": 0.01853115362571982
+   }
+  }
+ },
+ "tuning": {
+  "chosen": {
+   "num_leaves": 7,
+   "pos_weight": 1.0,
+   "monotone": true,
+   "rounds": 452,
+   "inner_val_pr_auc": 0.2675597925372104
+  },
+  "grid": [
+   {
+    "num_leaves": 7,
+    "pos_weight": 1.0,
+    "monotone": true,
+    "rounds": 452,
+    "inner_val_pr_auc": 0.2675597925372104
+   },
+   {
+    "num_leaves": 7,
+    "pos_weight": 1.0,
+    "monotone": false,
+    "rounds": 353,
+    "inner_val_pr_auc": 0.26097169901521994
+   },
+   {
+    "num_leaves": 7,
+    "pos_weight": 5.7,
+    "monotone": true,
+    "rounds": 340,
+    "inner_val_pr_auc": 0.26207935472882293
+   },
+   {
+    "num_leaves": 7,
+    "pos_weight": 5.7,
+    "monotone": false,
+    "rounds": 340,
+    "inner_val_pr_auc": 0.25987589950700296
+   },
+   {
+    "num_leaves": 7,
+    "pos_weight": 32.7,
+    "monotone": true,
+    "rounds": 391,
+    "inner_val_pr_auc": 0.24961138093748314
+   },
+   {
+    "num_leaves": 7,
+    "pos_weight": 32.7,
+    "monotone": false,
+    "rounds": 422,
+    "inner_val_pr_auc": 0.2441337303341906
+   },
+   {
+    "num_leaves": 15,
+    "pos_weight": 1.0,
+    "monotone": true,
+    "rounds": 211,
+    "inner_val_pr_auc": 0.26682930792932225
+   },
+   {
+    "num_leaves": 15,
+    "pos_weight": 1.0,
+    "monotone": false,
+    "rounds": 205,
+    "inner_val_pr_auc": 0.2588755486839313
+   },
+   {
+    "num_leaves": 15,
+    "pos_weight": 5.7,
+    "monotone": true,
+    "rounds": 292,
+    "inner_val_pr_auc": 0.25903845192208386
+   },
+   {
+    "num_leaves": 15,
+    "pos_weight": 5.7,
+    "monotone": false,
+    "rounds": 233,
+    "inner_val_pr_auc": 0.25367973724318904
+   },
+   {
+    "num_leaves": 15,
+    "pos_weight": 32.7,
+    "monotone": true,
+    "rounds": 356,
+    "inner_val_pr_auc": 0.25675615991197126
+   },
+   {
+    "num_leaves": 15,
+    "pos_weight": 32.7,
+    "monotone": false,
+    "rounds": 321,
+    "inner_val_pr_auc": 0.2512130199117097
+   },
+   {
+    "num_leaves": 31,
+    "pos_weight": 1.0,
+    "monotone": true,
+    "rounds": 199,
+    "inner_val_pr_auc": 0.26569338328151415
+   },
+   {
+    "num_leaves": 31,
+    "pos_weight": 1.0,
+    "monotone": false,
+    "rounds": 186,
+    "inner_val_pr_auc": 0.2525615598507255
+   },
+   {
+    "num_leaves": 31,
+    "pos_weight": 5.7,
+    "monotone": true,
+    "rounds": 136,
+    "inner_val_pr_auc": 0.2639651078668888
+   },
+   {
+    "num_leaves": 31,
+    "pos_weight": 5.7,
+    "monotone": false,
+    "rounds": 166,
+    "inner_val_pr_auc": 0.254521095742391
+   },
+   {
+    "num_leaves": 31,
+    "pos_weight": 32.7,
+    "monotone": true,
+    "rounds": 187,
+    "inner_val_pr_auc": 0.25455473292272524
+   },
+   {
+    "num_leaves": 31,
+    "pos_weight": 32.7,
+    "monotone": false,
+    "rounds": 203,
+    "inner_val_pr_auc": 0.2519410988263805
+   }
+  ]
+ },
+ "data": {
+  "train": {
+   "rows": 40150,
+   "events": 1152,
+   "base_rate": 0.028692403486924034,
+   "storm_rate": 0.01982565379825654,
+   "flood_rate": 0.009165628891656289,
+   "heat_rate": 0.0015940224159402242,
+   "fire_rate": 0.00024906600249066
+  },
+  "validation": {
+   "rows": 20130,
+   "events": 555,
+   "base_rate": 0.027570789865871834,
+   "storm_rate": 0.02061599602583209,
+   "flood_rate": 0.00909090909090909,
+   "heat_rate": 0.0,
+   "fire_rate": 0.0003974167908594138
+  },
+  "test": {
+   "rows": 20075,
+   "events": 476,
+   "base_rate": 0.023711083437110834,
+   "storm_rate": 0.010311332503113325,
+   "flood_rate": 0.008617683686176837,
+   "heat_rate": 0.0,
+   "fire_rate": 0.0058779576587795765
+  }
+ },
+ "base_rate_by_year": {
+  "2018": {
+   "hazard": 0.01888,
+   "storm": 0.01524,
+   "flood": 0.00379,
+   "heat": 0.0,
+   "fire": 0.0004
+  },
+  "2019": {
+   "hazard": 0.02092,
+   "storm": 0.01405,
+   "flood": 0.00583,
+   "heat": 0.0,
+   "fire": 0.00189
+  },
+  "2020": {
+   "hazard": 0.0308,
+   "storm": 0.01863,
+   "flood": 0.01187,
+   "heat": 0.0,
+   "fire": 0.00209
+  },
+  "2021": {
+   "hazard": 0.01938,
+   "storm": 0.01061,
+   "flood": 0.00922,
+   "heat": 0.0,
+   "fire": 0.0006
+  },
+  "2022": {
+   "hazard": 0.02969,
+   "storm": 0.02291,
+   "flood": 0.00907,
+   "heat": 0.0006,
+   "fire": 0.0
+  },
+  "2023": {
+   "hazard": 0.0277,
+   "storm": 0.01674,
+   "flood": 0.00927,
+   "heat": 0.00259,
+   "fire": 0.0005
+  },
+  "2024": {
+   "hazard": 0.02757,
+   "storm": 0.02062,
+   "flood": 0.00909,
+   "heat": 0.0,
+   "fire": 0.0004
+  },
+  "2025": {
+   "hazard": 0.02371,
+   "storm": 0.01031,
+   "flood": 0.00862,
+   "heat": 0.0,
+   "fire": 0.00588
+  }
+ },
+ "base_rate_by_month_train": {
+  "1": 0.008504398826979473,
+  "2": 0.0006493506493506494,
+  "3": 0.017595307917888565,
+  "4": 0.036060606060606064,
+  "5": 0.030205278592375366,
+  "6": 0.0496969696969697,
+  "7": 0.03988269794721408,
+  "8": 0.0530791788856305,
+  "9": 0.054242424242424245,
+  "10": 0.012316715542521995,
+  "11": 0.029393939393939392,
+  "12": 0.011730205278592375
+ },
+ "validation": {
+  "rows": 20130,
+  "dates": 366,
+  "events": 555,
+  "model": {
+   "pr_auc": 0.4680572437791488,
+   "roc_auc": 0.9194884999942471,
+   "brier": 0.019172005186051357,
+   "log_loss": 0.07719445405768564,
+   "mean_pred": 0.027570789865871834,
+   "base_rate": 0.027570789865871834
+  },
+  "model_uncalibrated": {
+   "pr_auc": 0.4680572437791488,
+   "roc_auc": 0.9194884999942471,
+   "brier": 0.019846946693099003,
+   "log_loss": 0.07883248450427237,
+   "mean_pred": 0.0327733825417924,
+   "base_rate": 0.027570789865871834
+  },
+  "model_isotonic": {
+   "pr_auc": 0.46805724377914876,
+   "roc_auc": 0.9194884999942471,
+   "brier": 0.01911439734205075,
+   "log_loss": 0.07681105687301046,
+   "mean_pred": 0.027394726093676953,
+   "base_rate": 0.027570789865871834
+  },
+  "climatology": {
+   "pr_auc": 0.04914908474937266,
+   "roc_auc": 0.643505114309712,
+   "brier": 0.02669241510319377,
+   "log_loss": 0.12557406627895604,
+   "mean_pred": 0.028615783123979846,
+   "base_rate": 0.027570789865871834
+  },
+  "rule": {
+   "pr_auc": 0.06225430921863906,
+   "roc_auc": 0.6506589347968659,
+   "brier": 0.026029519101281238,
+   "log_loss": 0.11714221324852904,
+   "mean_pred": 0.028875454000894224,
+   "base_rate": 0.027570789865871834,
+   "fires_share": 0.08897168405365127,
+   "precision": 0.11836962590731435,
+   "recall": 0.38198198198198197
+  },
+  "model_at_rule_alert_rate": {
+   "flagged_share": 0.08897168405365127,
+   "precision": 0.21552205471803462,
+   "recall": 0.6954954954954955
+  },
+  "model_at_red": {
+   "flagged_share": 0.10158966716343766,
+   "precision": 0.19755501222493888,
+   "recall": 0.7279279279279279
+  },
+  "bootstrap_vs_baselines": {
+   "climatology": {
+    "pr_auc_diff": 0.4189081590297762,
+    "pr_auc_diff_ci95": [
+     0.23123234960226322,
+     0.5487294698442391
+    ],
+    "brier_diff": -0.007520409917142413,
+    "brier_diff_ci95": [
+     -0.014067785591415655,
+     -0.0024355816929654815
+    ],
+    "share_of_resamples_model_better_pr_auc": 1.0
+   },
+   "rule": {
+    "pr_auc_diff": 0.40580293456050975,
+    "pr_auc_diff_ci95": [
+     0.2269095947849028,
+     0.5241411989466046
+    ],
+    "brier_diff": -0.006857513915229881,
+    "brier_diff_ci95": [
+     -0.012702080822919576,
+     -0.002408146590453974
+    ],
+    "share_of_resamples_model_better_pr_auc": 1.0
+   }
+  },
+  "bands": [
+   {
+    "band": "green",
+    "share_of_days": 0.6469448584202683,
+    "event_rate": 0.0029179144590340167,
+    "share_of_events": 0.06846846846846846
+   },
+   {
+    "band": "amber",
+    "share_of_days": 0.2514654744162941,
+    "event_rate": 0.022323192414065586,
+    "share_of_events": 0.2036036036036036
+   },
+   {
+    "band": "red",
+    "share_of_days": 0.10158966716343766,
+    "event_rate": 0.19755501222493888,
+    "share_of_events": 0.7279279279279279
+   }
+  ],
+  "per_hazard": {
+   "storm": {
+    "positives": 415,
+    "pr_auc": 0.5091464172727335,
+    "roc_auc": 0.9414151661171697,
+    "recall_at_red": 0.7831325301204819
+   },
+   "flood": {
+    "positives": 183,
+    "pr_auc": 0.10056138020180261,
+    "roc_auc": 0.8789845001823138,
+    "recall_at_red": 0.6721311475409836
+   },
+   "heat": {
+    "positives": 0,
+    "pr_auc": NaN,
+    "roc_auc": NaN,
+    "recall_at_red": null
+   },
+   "fire": {
+    "positives": 8,
+    "pr_auc": 0.0012259691566787099,
+    "roc_auc": 0.7942550442301958,
+    "recall_at_red": 0.375
+   }
+  },
+  "reliability": {
+   "model": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 10197,
+     "mean_pred": 0.001540175276126203,
+     "observed": 0.001372952829263509,
+     "events": 14
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 2826,
+     "mean_pred": 0.007200069321050832,
+     "observed": 0.008492569002123142,
+     "events": 24
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 2562,
+     "mean_pred": 0.01432827272646279,
+     "observed": 0.01249024199843872,
+     "events": 32
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1243,
+     "mean_pred": 0.02453999628108364,
+     "observed": 0.029766693483507644,
+     "events": 37
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 1218,
+     "mean_pred": 0.03876766683016541,
+     "observed": 0.0361247947454844,
+     "events": 44
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 663,
+     "mean_pred": 0.06096805025629304,
+     "observed": 0.06787330316742081,
+     "events": 45
+    },
+    {
+     "lo": 0.075,
+     "hi": 0.1,
+     "n": 320,
+     "mean_pred": 0.08634574451120319,
+     "observed": 0.096875,
+     "events": 31
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.15,
+     "n": 360,
+     "mean_pred": 0.12174988761509432,
+     "observed": 0.12222222222222222,
+     "events": 44
+    },
+    {
+     "lo": 0.15,
+     "hi": 0.2,
+     "n": 161,
+     "mean_pred": 0.1728766084757403,
+     "observed": 0.16149068322981366,
+     "events": 26
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 214,
+     "mean_pred": 0.24361828428708437,
+     "observed": 0.2336448598130841,
+     "events": 50
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.5,
+     "n": 155,
+     "mean_pred": 0.3929415126033699,
+     "observed": 0.32903225806451614,
+     "events": 51
+    },
+    {
+     "lo": 0.5,
+     "hi": 1.0,
+     "n": 211,
+     "mean_pred": 0.7192434698854577,
+     "observed": 0.7440758293838863,
+     "events": 157
+    }
+   ],
+   "climatology": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 1595,
+     "mean_pred": 0.0006493506493506496,
+     "observed": 0.006269592476489028,
+     "events": 10
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 1705,
+     "mean_pred": 0.00850439882697947,
+     "observed": 0.015249266862170088,
+     "events": 26
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 5115,
+     "mean_pred": 0.013880742913000978,
+     "observed": 0.024828934506353862,
+     "events": 127
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1650,
+     "mean_pred": 0.029393939393939403,
+     "observed": 0.0018181818181818182,
+     "events": 3
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 6710,
+     "mean_pred": 0.038897168405365126,
+     "observed": 0.02608047690014903,
+     "events": 175
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 3355,
+     "mean_pred": 0.05365126676602087,
+     "observed": 0.06378539493293592,
+     "events": 214
+    }
+   ],
+   "uncalibrated": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 11218,
+     "mean_pred": 0.0013050302279944662,
+     "observed": 0.0018719914423248351,
+     "events": 21
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 2334,
+     "mean_pred": 0.00723939271382533,
+     "observed": 0.008997429305912597,
+     "events": 21
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 2097,
+     "mean_pred": 0.01436384397702551,
+     "observed": 0.013829279923700524,
+     "events": 29
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1068,
+     "mean_pred": 0.024567519357768425,
+     "observed": 0.027153558052434457,
+     "events": 29
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 1060,
+     "mean_pred": 0.03874614527358064,
+     "observed": 0.03962264150943396,
+     "events": 42
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 669,
+     "mean_pred": 0.060983234410408885,
+     "observed": 0.04783258594917788,
+     "events": 32
+    },
+    {
+     "lo": 0.075,
+     "hi": 0.1,
+     "n": 349,
+     "mean_pred": 0.08672924083342133,
+     "observed": 0.08595988538681948,
+     "events": 30
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.15,
+     "n": 358,
+     "mean_pred": 0.12217551168962365,
+     "observed": 0.11452513966480447,
+     "events": 41
+    },
+    {
+     "lo": 0.15,
+     "hi": 0.2,
+     "n": 219,
+     "mean_pred": 0.17231124303526316,
+     "observed": 0.1141552511415525,
+     "events": 25
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 218,
+     "mean_pred": 0.24547584547181406,
+     "observed": 0.15137614678899083,
+     "events": 33
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.5,
+     "n": 226,
+     "mean_pred": 0.3791848376765769,
+     "observed": 0.252212389380531,
+     "events": 57
+    },
+    {
+     "lo": 0.5,
+     "hi": 1.0,
+     "n": 314,
+     "mean_pred": 0.7611809601333084,
+     "observed": 0.6210191082802548,
+     "events": 195
+    }
+   ]
+  }
+ },
+ "test_today": {
+  "rows": 20075,
+  "dates": 365,
+  "events": 476,
+  "model": {
+   "pr_auc": 0.1284664916220416,
+   "roc_auc": 0.8418910500064101,
+   "brier": 0.02219321657260053,
+   "log_loss": 0.0948436693045433,
+   "mean_pred": 0.017217664587445045,
+   "base_rate": 0.023711083437110834
+  },
+  "model_uncalibrated": {
+   "pr_auc": 0.1284664916220416,
+   "roc_auc": 0.8418910500064101,
+   "brier": 0.02265710590973466,
+   "log_loss": 0.09673708340635344,
+   "mean_pred": 0.01999376505033261,
+   "base_rate": 0.023711083437110834
+  },
+  "model_isotonic": {
+   "pr_auc": 0.12840806602187624,
+   "roc_auc": 0.8413955050870799,
+   "brier": 0.02221792907442379,
+   "log_loss": 0.09761686580342235,
+   "mean_pred": 0.017017538220616,
+   "base_rate": 0.023711083437110834
+  },
+  "climatology": {
+   "pr_auc": 0.031778746441906106,
+   "roc_auc": 0.6153575619747363,
+   "brier": 0.023190311676833986,
+   "log_loss": 0.11246220569572783,
+   "mean_pred": 0.028692403486924034,
+   "base_rate": 0.023711083437110834
+  },
+  "rule": {
+   "pr_auc": 0.03962137095411425,
+   "roc_auc": 0.5994098695654597,
+   "brier": 0.023078270032834053,
+   "log_loss": 0.10912332924097867,
+   "mean_pred": 0.0277165296758024,
+   "base_rate": 0.023711083437110834,
+   "fires_share": 0.07900373599003736,
+   "precision": 0.08196721311475409,
+   "recall": 0.27310924369747897
+  },
+  "model_at_rule_alert_rate": {
+   "flagged_share": 0.07900373599003736,
+   "precision": 0.1343001261034048,
+   "recall": 0.4474789915966387
+  },
+  "model_at_red": {
+   "flagged_share": 0.07701120797011209,
+   "precision": 0.13583441138421734,
+   "recall": 0.4411764705882353
+  },
+  "bootstrap_vs_baselines": {
+   "climatology": {
+    "pr_auc_diff": 0.0966877451801355,
+    "pr_auc_diff_ci95": [
+     0.07180677987666605,
+     0.13132414758791475
+    ],
+    "brier_diff": -0.0009970951042334551,
+    "brier_diff_ci95": [
+     -0.0017152612712877835,
+     -0.0003279293372270164
+    ],
+    "share_of_resamples_model_better_pr_auc": 1.0
+   },
+   "rule": {
+    "pr_auc_diff": 0.08884512066792735,
+    "pr_auc_diff_ci95": [
+     0.06364240179582839,
+     0.1231411970324929
+    ],
+    "brier_diff": -0.0008850534602335217,
+    "brier_diff_ci95": [
+     -0.0016020950197733956,
+     -0.0002205894983880674
+    ],
+    "share_of_resamples_model_better_pr_auc": 1.0
+   }
+  },
+  "bands": [
+   {
+    "band": "green",
+    "share_of_days": 0.6670983810709838,
+    "event_rate": 0.005899044205495818,
+    "share_of_events": 0.16596638655462184
+   },
+   {
+    "band": "amber",
+    "share_of_days": 0.25589041095890414,
+    "event_rate": 0.03640256959314775,
+    "share_of_events": 0.39285714285714285
+   },
+   {
+    "band": "red",
+    "share_of_days": 0.07701120797011209,
+    "event_rate": 0.13583441138421734,
+    "share_of_events": 0.4411764705882353
+   }
+  ],
+  "per_hazard": {
+   "storm": {
+    "positives": 207,
+    "pr_auc": 0.08196236657168338,
+    "roc_auc": 0.8934336184032002,
+    "recall_at_red": 0.5555555555555556
+   },
+   "flood": {
+    "positives": 173,
+    "pr_auc": 0.07389921020094267,
+    "roc_auc": 0.8986653097286531,
+    "recall_at_red": 0.5953757225433526
+   },
+   "heat": {
+    "positives": 0,
+    "pr_auc": NaN,
+    "roc_auc": NaN,
+    "recall_at_red": null
+   },
+   "fire": {
+    "positives": 118,
+    "pr_auc": 0.00891323644216448,
+    "roc_auc": 0.665818798552481,
+    "recall_at_red": 0.07627118644067797
+   }
+  },
+  "reliability": {
+   "model": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 10727,
+     "mean_pred": 0.0013687137347099649,
+     "observed": 0.003915353780180852,
+     "events": 42
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 2665,
+     "mean_pred": 0.007218965158869889,
+     "observed": 0.013883677298311446,
+     "events": 37
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 2675,
+     "mean_pred": 0.014273484104839498,
+     "observed": 0.023177570093457944,
+     "events": 62
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1264,
+     "mean_pred": 0.024540130974298552,
+     "observed": 0.041930379746835444,
+     "events": 53
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 1149,
+     "mean_pred": 0.0386691561038626,
+     "observed": 0.05918189730200174,
+     "events": 68
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 636,
+     "mean_pred": 0.06102839278583825,
+     "observed": 0.08018867924528301,
+     "events": 51
+    },
+    {
+     "lo": 0.075,
+     "hi": 0.1,
+     "n": 282,
+     "mean_pred": 0.08719443816359113,
+     "observed": 0.10638297872340426,
+     "events": 30
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.15,
+     "n": 299,
+     "mean_pred": 0.12188002004041805,
+     "observed": 0.1806020066889632,
+     "events": 54
+    },
+    {
+     "lo": 0.15,
+     "hi": 0.2,
+     "n": 159,
+     "mean_pred": 0.17234579448152662,
+     "observed": 0.22012578616352202,
+     "events": 35
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 128,
+     "mean_pred": 0.23848876881746184,
+     "observed": 0.21875,
+     "events": 28
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.5,
+     "n": 69,
+     "mean_pred": 0.3836255537912669,
+     "observed": 0.2318840579710145,
+     "events": 16
+    },
+    {
+     "lo": 0.5,
+     "hi": 1.0,
+     "n": 22,
+     "mean_pred": 0.6294547276469985,
+     "observed": 0.0,
+     "events": 0
+    }
+   ],
+   "climatology": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 1540,
+     "mean_pred": 0.0006493506493506495,
+     "observed": 0.006493506493506494,
+     "events": 10
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 1705,
+     "mean_pred": 0.00850439882697947,
+     "observed": 0.0035190615835777126,
+     "events": 6
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 5115,
+     "mean_pred": 0.013880742913000978,
+     "observed": 0.025219941348973606,
+     "events": 129
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1650,
+     "mean_pred": 0.029393939393939403,
+     "observed": 0.0006060606060606061,
+     "events": 1
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 6710,
+     "mean_pred": 0.038897168405365126,
+     "observed": 0.03293591654247392,
+     "events": 221
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 3355,
+     "mean_pred": 0.05365126676602087,
+     "observed": 0.03248882265275708,
+     "events": 109
+    }
+   ],
+   "uncalibrated": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 11661,
+     "mean_pred": 0.0011627646935258263,
+     "observed": 0.004716576622931138,
+     "events": 55
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 2270,
+     "mean_pred": 0.007250959156013321,
+     "observed": 0.014977973568281937,
+     "events": 34
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 2216,
+     "mean_pred": 0.014285707929585357,
+     "observed": 0.02391696750902527,
+     "events": 53
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1056,
+     "mean_pred": 0.024558168124328372,
+     "observed": 0.04261363636363636,
+     "events": 45
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 1029,
+     "mean_pred": 0.03849658510806795,
+     "observed": 0.05442176870748299,
+     "events": 56
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 620,
+     "mean_pred": 0.06077145064913296,
+     "observed": 0.07741935483870968,
+     "events": 48
+    },
+    {
+     "lo": 0.075,
+     "hi": 0.1,
+     "n": 324,
+     "mean_pred": 0.0858091832668577,
+     "observed": 0.08641975308641975,
+     "events": 28
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.15,
+     "n": 335,
+     "mean_pred": 0.12290638765997848,
+     "observed": 0.1253731343283582,
+     "events": 42
+    },
+    {
+     "lo": 0.15,
+     "hi": 0.2,
+     "n": 175,
+     "mean_pred": 0.1739632971377808,
+     "observed": 0.19428571428571428,
+     "events": 34
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 194,
+     "mean_pred": 0.24281757700921364,
+     "observed": 0.211340206185567,
+     "events": 41
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.5,
+     "n": 134,
+     "mean_pred": 0.3713756116976426,
+     "observed": 0.22388059701492538,
+     "events": 30
+    },
+    {
+     "lo": 0.5,
+     "hi": 1.0,
+     "n": 61,
+     "mean_pred": 0.6587538208068525,
+     "observed": 0.16393442622950818,
+     "events": 10
+    }
+   ]
+  }
+ },
+ "replay_day_today": {
+  "date": "2025-08-04",
+  "sites": 55,
+  "hazardous_sites": 5,
+  "mean_index": 5.169090909090911,
+  "red_sites": 12,
+  "amber_sites": 31,
+  "hazardous_sites_red": 1,
+  "rank_of_day_by_mean_index": 30,
+  "days_in_year": 365,
+  "per_site": [
+   {
+    "site_id": "j-d-kennedy",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.3317,
+    "hazard_index": 8.2,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 4,960 J/kg)",
+     "0.4 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "lansing-smith",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.2502,
+    "hazard_index": 7.9,
+    "factors": [
+     "2.0 in of rain forecast",
+     "Site has a history of severe-weather reports",
+     "Wet ground (21% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "northside-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.2067,
+    "hazard_index": 7.7,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 5,140 J/kg)",
+     "Wet ground (22% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "port-everglades",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.2166,
+    "hazard_index": 7.7,
+    "factors": [
+     "2.3 in of rain forecast",
+     "Unstable air for storms (CAPE 4,650 J/kg)",
+     "Wet ground (21% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "arvah-b-hopkins",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.171,
+    "hazard_index": 7.5,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 3,400 J/kg)",
+     "0.1 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "s-o-purdom",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1605,
+    "hazard_index": 7.5,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "0.8 in of rain forecast",
+     "Unstable air for storms (CAPE 3,170 J/kg)"
+    ]
+   },
+   {
+    "site_id": "fpl-chipola-river-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1394,
+    "hazard_index": 7.4,
+    "factors": [
+     "0.8 in of rain forecast",
+     "Site has a history of severe-weather reports",
+     "Wet ground (22% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "fpl-shirer-branch-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1529,
+    "hazard_index": 7.4,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "0.5 in of rain forecast",
+     "Wet ground (22% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "stanton-energy-center",
+    "hazard": 1,
+    "event_types": "Tornado",
+    "probability": 0.1075,
+    "hazard_index": 7.2,
+    "factors": [
+     "Unstable air for storms (CAPE 4,640 J/kg)",
+     "2.2 in of rain forecast",
+     "Heat index 111\u00b0F"
+    ]
+   },
+   {
+    "site_id": "sanford",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0778,
+    "hazard_index": 7.1,
+    "factors": [
+     "7.3 in of rain forecast",
+     "Unstable air for storms (CAPE 3,490 J/kg)",
+     "Extreme downpours forecast (3+ in/hr)"
+    ]
+   },
+   {
+    "site_id": "brandy-branch",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0636,
+    "hazard_index": 7.1,
+    "factors": [
+     "Unstable air for storms (CAPE 4,200 J/kg)",
+     "Site has a history of severe-weather reports",
+     "0.1 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "dania-beach-7",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0553,
+    "hazard_index": 7.0,
+    "factors": [
+     "Unstable air for storms (CAPE 3,890 J/kg)",
+     "Wet ground (21% soil moisture)",
+     "Heat index 110\u00b0F"
+    ]
+   },
+   {
+    "site_id": "osceola-generating-station-fl",
+    "hazard": 1,
+    "event_types": "Tornado",
+    "probability": 0.0505,
+    "hazard_index": 6.9,
+    "factors": [
+     "6.6 in of rain forecast",
+     "Unstable air for storms (CAPE 4,300 J/kg)",
+     "Extreme downpours forecast (3+ in/hr)"
+    ]
+   },
+   {
+    "site_id": "oleander-power-project-lp",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0489,
+    "hazard_index": 6.8,
+    "factors": [
+     "Unstable air for storms (CAPE 4,860 J/kg)",
+     "0.5 in of rain forecast",
+     "Heat index 108\u00b0F"
+    ]
+   },
+   {
+    "site_id": "intercession-city",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.048,
+    "hazard_index": 6.7,
+    "factors": [
+     "0.7 in of rain forecast",
+     "Unstable air for storms (CAPE 3,500 J/kg)",
+     "High of 96\u00b0F"
+    ]
+   },
+   {
+    "site_id": "h-l-culbreath-bayside-power-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0451,
+    "hazard_index": 6.5,
+    "factors": [
+     "Unstable air for storms (CAPE 5,320 J/kg)",
+     "0.3 in of rain forecast",
+     "Wet ground (18% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "shady-hills-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0441,
+    "hazard_index": 6.4,
+    "factors": [
+     "Unstable air for storms (CAPE 5,100 J/kg)",
+     "0.2 in of rain forecast",
+     "Heat index 108\u00b0F"
+    ]
+   },
+   {
+    "site_id": "cane-island",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0408,
+    "hazard_index": 6.2,
+    "factors": [
+     "1.2 in of rain forecast",
+     "Unstable air for storms (CAPE 3,210 J/kg)",
+     "High of 95\u00b0F"
+    ]
+   },
+   {
+    "site_id": "miami-dade-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0405,
+    "hazard_index": 6.2,
+    "factors": [
+     "Unstable air for storms (CAPE 4,950 J/kg)",
+     "Wet ground (26% soil moisture)",
+     "0.1 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "greenland-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0389,
+    "hazard_index": 6.1,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 4,520 J/kg)",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "seminole-fl",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0377,
+    "hazard_index": 6.0,
+    "factors": [
+     "Unstable air for storms (CAPE 3,180 J/kg)",
+     "Site has a history of severe-weather reports",
+     "0.2 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "gulf-clean-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0338,
+    "hazard_index": 5.7,
+    "factors": [
+     "2.2 in of rain forecast",
+     "Wet ground (18% soil moisture)",
+     "Downpours up to 2.1 in/hr forecast"
+    ]
+   },
+   {
+    "site_id": "fort-myers",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.029,
+    "hazard_index": 5.4,
+    "factors": [
+     "Unstable air for storms (CAPE 4,930 J/kg)",
+     "Heat index 108\u00b0F",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "debary",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0299,
+    "hazard_index": 5.4,
+    "factors": [
+     "Unstable air for storms (CAPE 4,030 J/kg)",
+     "1.5 in of rain forecast",
+     "High of 94\u00b0F"
+    ]
+   },
+   {
+    "site_id": "indian-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0298,
+    "hazard_index": 5.4,
+    "factors": [
+     "Unstable air for storms (CAPE 4,410 J/kg)",
+     "0.2 in of rain forecast",
+     "Wet ground (18% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "deerhaven-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0302,
+    "hazard_index": 5.4,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 3,120 J/kg)",
+     "High of 91\u00b0F"
+    ]
+   },
+   {
+    "site_id": "santa-rosa-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.029,
+    "hazard_index": 5.4,
+    "factors": [
+     "0.3 in of rain forecast",
+     "Wet ground (18% soil moisture)",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "turkey-point",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0289,
+    "hazard_index": 5.3,
+    "factors": [
+     "Unstable air for storms (CAPE 4,680 J/kg)",
+     "Wet ground (28% soil moisture)",
+     "0.2 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "cape-canaveral",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0281,
+    "hazard_index": 5.3,
+    "factors": [
+     "Unstable air for storms (CAPE 4,410 J/kg)",
+     "0.2 in of rain forecast",
+     "Wet ground (18% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "blue-heron-solar",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0244,
+    "hazard_index": 5.0,
+    "factors": [
+     "7.2 in of rain forecast",
+     "Unstable air for storms (CAPE 4,370 J/kg)",
+     "Heat index 109\u00b0F"
+    ]
+   },
+   {
+    "site_id": "okeechobee-clean-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0217,
+    "hazard_index": 4.8,
+    "factors": [
+     "Unstable air for storms (CAPE 4,340 J/kg)",
+     "1.3 in of rain forecast",
+     "High of 98\u00b0F"
+    ]
+   },
+   {
+    "site_id": "p-l-bartow",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0211,
+    "hazard_index": 4.8,
+    "factors": [
+     "Unstable air for storms (CAPE 4,560 J/kg)",
+     "High of 93\u00b0F",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "hammock-solar",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0193,
+    "hazard_index": 4.7,
+    "factors": [
+     "Unstable air for storms (CAPE 4,260 J/kg)",
+     "0.4 in of rain forecast",
+     "Heat index 110\u00b0F"
+    ]
+   },
+   {
+    "site_id": "suwannee-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0188,
+    "hazard_index": 4.6,
+    "factors": [
+     "Unstable air for storms (CAPE 3,490 J/kg)",
+     "Site has a history of severe-weather reports",
+     "High of 89\u00b0F"
+    ]
+   },
+   {
+    "site_id": "blackwater-river-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0165,
+    "hazard_index": 4.5,
+    "factors": [
+     "0.1 in of rain forecast",
+     "Unstable air for storms (CAPE 2,140 J/kg)",
+     "5.7 in of rain in the past 3 days"
+    ]
+   },
+   {
+    "site_id": "sawgrass-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0167,
+    "hazard_index": 4.5,
+    "factors": [
+     "Unstable air for storms (CAPE 5,250 J/kg)",
+     "0.6 in of rain forecast",
+     "Heat index 112\u00b0F"
+    ]
+   },
+   {
+    "site_id": "anclote",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0153,
+    "hazard_index": 4.4,
+    "factors": [
+     "Unstable air for storms (CAPE 4,290 J/kg)",
+     "Site has a history of severe-weather reports",
+     "High of 90\u00b0F"
+    ]
+   },
+   {
+    "site_id": "west-county-energy-center",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0137,
+    "hazard_index": 4.3,
+    "factors": [
+     "Unstable air for storms (CAPE 4,120 J/kg)",
+     "High of 101\u00b0F",
+     "Heat index 109\u00b0F"
+    ]
+   },
+   {
+    "site_id": "riviera",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0144,
+    "hazard_index": 4.3,
+    "factors": [
+     "Unstable air for storms (CAPE 4,670 J/kg)",
+     "Heat index 112\u00b0F",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "okeelanta-cogeneration",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0147,
+    "hazard_index": 4.3,
+    "factors": [
+     "Unstable air for storms (CAPE 5,070 J/kg)",
+     "0.4 in of rain forecast",
+     "Heat index 108\u00b0F"
+    ]
+   },
+   {
+    "site_id": "bayboro",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0124,
+    "hazard_index": 4.2,
+    "factors": [
+     "Unstable air for storms (CAPE 4,270 J/kg)",
+     "High of 92\u00b0F",
+     "Heat index 107\u00b0F"
+    ]
+   },
+   {
+    "site_id": "manatee",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0115,
+    "hazard_index": 4.1,
+    "factors": [
+     "Unstable air for storms (CAPE 4,350 J/kg)",
+     "High of 94\u00b0F",
+     "Heat index 107\u00b0F"
+    ]
+   },
+   {
+    "site_id": "big-bend",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0107,
+    "hazard_index": 4.0,
+    "factors": [
+     "Unstable air for storms (CAPE 4,660 J/kg)",
+     "High of 91\u00b0F",
+     "Wet ground (16% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "st-lucie",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0091,
+    "hazard_index": 3.6,
+    "factors": [
+     "Unstable air for storms (CAPE 4,840 J/kg)",
+     "Heat index 110\u00b0F",
+     "High of 91\u00b0F"
+    ]
+   },
+   {
+    "site_id": "hines-energy-complex",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0077,
+    "hazard_index": 3.0,
+    "factors": [
+     "Unstable air for storms (CAPE 4,570 J/kg)",
+     "Heat index 108\u00b0F",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "osprey-energy-center-power-plant",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0073,
+    "hazard_index": 2.9,
+    "factors": [
+     "Unstable air for storms (CAPE 3,380 J/kg)",
+     "High of 97\u00b0F",
+     "1.0 in of rain in the past 3 days"
+    ]
+   },
+   {
+    "site_id": "treasure-coast-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0073,
+    "hazard_index": 2.9,
+    "factors": [
+     "Unstable air for storms (CAPE 4,050 J/kg)",
+     "High of 96\u00b0F",
+     "Heat index 106\u00b0F"
+    ]
+   },
+   {
+    "site_id": "polk",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0071,
+    "hazard_index": 2.8,
+    "factors": [
+     "Unstable air for storms (CAPE 3,250 J/kg)",
+     "Heat index 109\u00b0F",
+     "High of 98\u00b0F"
+    ]
+   },
+   {
+    "site_id": "crystal-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0069,
+    "hazard_index": 2.7,
+    "factors": [
+     "Unstable air for storms (CAPE 4,520 J/kg)",
+     "Site has a history of severe-weather reports",
+     "Heat index 105\u00b0F"
+    ]
+   },
+   {
+    "site_id": "orange-cogeneration-facility",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0067,
+    "hazard_index": 2.6,
+    "factors": [
+     "Unstable air for storms (CAPE 3,120 J/kg)",
+     "High of 96\u00b0F",
+     "Heat index 105\u00b0F"
+    ]
+   },
+   {
+    "site_id": "vandolah-power-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0064,
+    "hazard_index": 2.5,
+    "factors": [
+     "Unstable air for storms (CAPE 3,870 J/kg)",
+     "Heat index 107\u00b0F",
+     "High of 95\u00b0F"
+    ]
+   },
+   {
+    "site_id": "midulla-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0054,
+    "hazard_index": 2.1,
+    "factors": [
+     "Unstable air for storms (CAPE 3,780 J/kg)",
+     "Heat index 108\u00b0F",
+     "High of 95\u00b0F"
+    ]
+   },
+   {
+    "site_id": "tiger-bay",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0052,
+    "hazard_index": 2.1,
+    "factors": [
+     "Unstable air for storms (CAPE 4,280 J/kg)",
+     "High of 94\u00b0F",
+     "Heat index 106\u00b0F"
+    ]
+   },
+   {
+    "site_id": "martin",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0051,
+    "hazard_index": 2.0,
+    "factors": [
+     "Unstable air for storms (CAPE 4,480 J/kg)",
+     "Heat index 109\u00b0F",
+     "High of 96\u00b0F"
+    ]
+   },
+   {
+    "site_id": "c-d-mcintosh-jr",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0046,
+    "hazard_index": 1.8,
+    "factors": [
+     "Unstable air for storms (CAPE 3,100 J/kg)",
+     "High of 96\u00b0F",
+     "Heat index 105\u00b0F"
+    ]
+   }
+  ]
+ },
+ "test_tomorrow": {
+  "rows": 20075,
+  "dates": 365,
+  "events": 476,
+  "model": {
+   "pr_auc": 0.10208709791861945,
+   "roc_auc": 0.8252814519348226,
+   "brier": 0.022713844531588208,
+   "log_loss": 0.09988531797847183,
+   "mean_pred": 0.016193321191659452,
+   "base_rate": 0.023711083437110834
+  },
+  "model_uncalibrated": {
+   "pr_auc": 0.10208709791861945,
+   "roc_auc": 0.8252814519348226,
+   "brier": 0.0233619007384813,
+   "log_loss": 0.1026672851933332,
+   "mean_pred": 0.018818469261904294,
+   "base_rate": 0.023711083437110834
+  },
+  "model_isotonic": {
+   "pr_auc": 0.10202006590301728,
+   "roc_auc": 0.8248744469470016,
+   "brier": 0.022632637973046373,
+   "log_loss": 0.10263052251998696,
+   "mean_pred": 0.015994250382273967,
+   "base_rate": 0.023711083437110834
+  },
+  "climatology": {
+   "pr_auc": 0.031778746441906106,
+   "roc_auc": 0.6153575619747363,
+   "brier": 0.023190311676833986,
+   "log_loss": 0.11246220569572783,
+   "mean_pred": 0.028692403486924034,
+   "base_rate": 0.023711083437110834
+  },
+  "rule": {
+   "pr_auc": 0.03378287226052968,
+   "roc_auc": 0.5643864847331861,
+   "brier": 0.023133307689912577,
+   "log_loss": 0.11055660865373702,
+   "mean_pred": 0.024675973291002053,
+   "base_rate": 0.023711083437110834,
+   "fires_share": 0.05285180572851806,
+   "precision": 0.08011310084825636,
+   "recall": 0.17857142857142858
+  },
+  "model_at_rule_alert_rate": {
+   "flagged_share": 0.05285180572851806,
+   "precision": 0.13383600377002827,
+   "recall": 0.29831932773109243
+  },
+  "model_at_red": {
+   "flagged_share": 0.07342465753424658,
+   "precision": 0.12618724559023067,
+   "recall": 0.3907563025210084
+  },
+  "bootstrap_vs_baselines": {
+   "climatology": {
+    "pr_auc_diff": 0.07030835147671334,
+    "pr_auc_diff_ci95": [
+     0.05130885681184292,
+     0.09933441991181771
+    ],
+    "brier_diff": -0.00047646714524577846,
+    "brier_diff_ci95": [
+     -0.001138089479996425,
+     0.000155945096965638
+    ],
+    "share_of_resamples_model_better_pr_auc": 1.0
+   },
+   "rule": {
+    "pr_auc_diff": 0.06830422565808977,
+    "pr_auc_diff_ci95": [
+     0.05093442245975484,
+     0.09446417027904949
+    ],
+    "brier_diff": -0.00041946315832436937,
+    "brier_diff_ci95": [
+     -0.0010325316994256974,
+     0.00020581017907465388
+    ],
+    "share_of_resamples_model_better_pr_auc": 1.0
+   }
+  },
+  "bands": [
+   {
+    "band": "green",
+    "share_of_days": 0.6920049813200498,
+    "event_rate": 0.007630290814857472,
+    "share_of_events": 0.22268907563025211
+   },
+   {
+    "band": "amber",
+    "share_of_days": 0.23457036114570362,
+    "event_rate": 0.03907411339987259,
+    "share_of_events": 0.3865546218487395
+   },
+   {
+    "band": "red",
+    "share_of_days": 0.07342465753424658,
+    "event_rate": 0.12618724559023067,
+    "share_of_events": 0.3907563025210084
+   }
+  ],
+  "per_hazard": {
+   "storm": {
+    "positives": 207,
+    "pr_auc": 0.0674802638134648,
+    "roc_auc": 0.8725328715415462,
+    "recall_at_red": 0.5072463768115942
+   },
+   "flood": {
+    "positives": 173,
+    "pr_auc": 0.04654213855658331,
+    "roc_auc": 0.8768645553965878,
+    "recall_at_red": 0.4624277456647399
+   },
+   "heat": {
+    "positives": 0,
+    "pr_auc": NaN,
+    "roc_auc": NaN,
+    "recall_at_red": null
+   },
+   "fire": {
+    "positives": 118,
+    "pr_auc": 0.00850633441704383,
+    "roc_auc": 0.6448130429576131,
+    "recall_at_red": 0.1016949152542373
+   }
+  },
+  "reliability": {
+   "model": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 11404,
+     "mean_pred": 0.0013385356950859255,
+     "observed": 0.004472115047351806,
+     "events": 51
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 2488,
+     "mean_pred": 0.00722285326720033,
+     "observed": 0.022106109324758844,
+     "events": 55
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 2478,
+     "mean_pred": 0.01417620282267106,
+     "observed": 0.023809523809523808,
+     "events": 59
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1131,
+     "mean_pred": 0.02451499583996003,
+     "observed": 0.04509283819628647,
+     "events": 51
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 1065,
+     "mean_pred": 0.038212548035461966,
+     "observed": 0.06854460093896714,
+     "events": 73
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 554,
+     "mean_pred": 0.061004011261030854,
+     "observed": 0.10108303249097472,
+     "events": 56
+    },
+    {
+     "lo": 0.075,
+     "hi": 0.1,
+     "n": 299,
+     "mean_pred": 0.08677820552356096,
+     "observed": 0.12709030100334448,
+     "events": 38
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.15,
+     "n": 311,
+     "mean_pred": 0.12181689836817634,
+     "observed": 0.1382636655948553,
+     "events": 43
+    },
+    {
+     "lo": 0.15,
+     "hi": 0.2,
+     "n": 131,
+     "mean_pred": 0.17458655713575627,
+     "observed": 0.11450381679389313,
+     "events": 15
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 126,
+     "mean_pred": 0.24177592272158108,
+     "observed": 0.1984126984126984,
+     "events": 25
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.5,
+     "n": 70,
+     "mean_pred": 0.36676357461838216,
+     "observed": 0.11428571428571428,
+     "events": 8
+    },
+    {
+     "lo": 0.5,
+     "hi": 1.0,
+     "n": 18,
+     "mean_pred": 0.6476851014455459,
+     "observed": 0.1111111111111111,
+     "events": 2
+    }
+   ],
+   "climatology": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 1540,
+     "mean_pred": 0.0006493506493506495,
+     "observed": 0.006493506493506494,
+     "events": 10
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 1705,
+     "mean_pred": 0.00850439882697947,
+     "observed": 0.0035190615835777126,
+     "events": 6
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 5115,
+     "mean_pred": 0.013880742913000978,
+     "observed": 0.025219941348973606,
+     "events": 129
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 1650,
+     "mean_pred": 0.029393939393939403,
+     "observed": 0.0006060606060606061,
+     "events": 1
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 6710,
+     "mean_pred": 0.038897168405365126,
+     "observed": 0.03293591654247392,
+     "events": 221
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 3355,
+     "mean_pred": 0.05365126676602087,
+     "observed": 0.03248882265275708,
+     "events": 109
+    }
+   ],
+   "uncalibrated": [
+    {
+     "lo": 0.0,
+     "hi": 0.005,
+     "n": 12260,
+     "mean_pred": 0.0011065948908073006,
+     "observed": 0.0052202283849918435,
+     "events": 64
+    },
+    {
+     "lo": 0.005,
+     "hi": 0.01,
+     "n": 2172,
+     "mean_pred": 0.007259441143027062,
+     "observed": 0.026243093922651933,
+     "events": 57
+    },
+    {
+     "lo": 0.01,
+     "hi": 0.02,
+     "n": 1997,
+     "mean_pred": 0.014229033169760687,
+     "observed": 0.022533800701051578,
+     "events": 45
+    },
+    {
+     "lo": 0.02,
+     "hi": 0.03,
+     "n": 968,
+     "mean_pred": 0.02452535781249088,
+     "observed": 0.04132231404958678,
+     "events": 40
+    },
+    {
+     "lo": 0.03,
+     "hi": 0.05,
+     "n": 956,
+     "mean_pred": 0.03828727270906833,
+     "observed": 0.06694560669456066,
+     "events": 64
+    },
+    {
+     "lo": 0.05,
+     "hi": 0.075,
+     "n": 545,
+     "mean_pred": 0.06094857727447887,
+     "observed": 0.10091743119266056,
+     "events": 55
+    },
+    {
+     "lo": 0.075,
+     "hi": 0.1,
+     "n": 302,
+     "mean_pred": 0.08685804431657346,
+     "observed": 0.09271523178807947,
+     "events": 28
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.15,
+     "n": 342,
+     "mean_pred": 0.12395726394921566,
+     "observed": 0.13450292397660818,
+     "events": 46
+    },
+    {
+     "lo": 0.15,
+     "hi": 0.2,
+     "n": 174,
+     "mean_pred": 0.17420287651019783,
+     "observed": 0.14367816091954022,
+     "events": 25
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 174,
+     "mean_pred": 0.24652995254310525,
+     "observed": 0.12643678160919541,
+     "events": 22
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.5,
+     "n": 134,
+     "mean_pred": 0.38549369557849866,
+     "observed": 0.16417910447761194,
+     "events": 22
+    },
+    {
+     "lo": 0.5,
+     "hi": 1.0,
+     "n": 51,
+     "mean_pred": 0.6467195463682807,
+     "observed": 0.1568627450980392,
+     "events": 8
+    }
+   ]
+  }
+ },
+ "replay_day_tomorrow": {
+  "date": "2025-08-04",
+  "sites": 55,
+  "hazardous_sites": 5,
+  "mean_index": 4.865454545454545,
+  "red_sites": 13,
+  "amber_sites": 27,
+  "hazardous_sites_red": 0,
+  "rank_of_day_by_mean_index": 42,
+  "days_in_year": 365,
+  "per_site": [
+   {
+    "site_id": "arvah-b-hopkins",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.3089,
+    "hazard_index": 8.1,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 3,600 J/kg)",
+     "0.9 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "s-o-purdom",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.2138,
+    "hazard_index": 7.7,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "3.1 in of rain forecast",
+     "Unstable air for storms (CAPE 3,510 J/kg)"
+    ]
+   },
+   {
+    "site_id": "northside-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.139,
+    "hazard_index": 7.4,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 4,180 J/kg)",
+     "Wet ground (20% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "lansing-smith",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1403,
+    "hazard_index": 7.4,
+    "factors": [
+     "2.5 in of rain forecast",
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 3,490 J/kg)"
+    ]
+   },
+   {
+    "site_id": "fpl-chipola-river-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1437,
+    "hazard_index": 7.4,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "0.7 in of rain forecast",
+     "Unstable air for storms (CAPE 3,030 J/kg)"
+    ]
+   },
+   {
+    "site_id": "gulf-clean-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0988,
+    "hazard_index": 7.2,
+    "factors": [
+     "1.9 in of rain forecast",
+     "Unstable air for storms (CAPE 2,610 J/kg)",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "fpl-shirer-branch-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1084,
+    "hazard_index": 7.2,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 3,210 J/kg)",
+     "0.2 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "intercession-city",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0652,
+    "hazard_index": 7.1,
+    "factors": [
+     "Wind gusts to 34 mph",
+     "Unstable air for storms (CAPE 2,330 J/kg)",
+     "0.1 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "cane-island",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0753,
+    "hazard_index": 7.1,
+    "factors": [
+     "0.9 in of rain forecast",
+     "Wind gusts to 32 mph",
+     "Unstable air for storms (CAPE 2,330 J/kg)"
+    ]
+   },
+   {
+    "site_id": "greenland-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0732,
+    "hazard_index": 7.1,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 4,030 J/kg)",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "santa-rosa-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0688,
+    "hazard_index": 7.1,
+    "factors": [
+     "Unstable air for storms (CAPE 2,810 J/kg)",
+     "0.2 in of rain forecast",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "hammock-solar",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0681,
+    "hazard_index": 7.1,
+    "factors": [
+     "4.6 in of rain forecast",
+     "Wind gusts to 33 mph",
+     "Unstable air for storms (CAPE 2,340 J/kg)"
+    ]
+   },
+   {
+    "site_id": "blue-heron-solar",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0729,
+    "hazard_index": 7.1,
+    "factors": [
+     "7.9 in of rain forecast",
+     "Wind gusts to 34 mph",
+     "Unstable air for storms (CAPE 3,390 J/kg)"
+    ]
+   },
+   {
+    "site_id": "j-d-kennedy",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0498,
+    "hazard_index": 6.9,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 2,940 J/kg)",
+     "Wet ground (20% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "blackwater-river-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0416,
+    "hazard_index": 6.3,
+    "factors": [
+     "0.4 in of rain forecast",
+     "Unstable air for storms (CAPE 2,640 J/kg)",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "crystal-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0363,
+    "hazard_index": 5.9,
+    "factors": [
+     "Unstable air for storms (CAPE 3,590 J/kg)",
+     "1.1 in of rain forecast",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "dania-beach-7",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0355,
+    "hazard_index": 5.8,
+    "factors": [
+     "0.4 in of rain forecast",
+     "Unstable air for storms (CAPE 2,920 J/kg)",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "h-l-culbreath-bayside-power-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0318,
+    "hazard_index": 5.6,
+    "factors": [
+     "Unstable air for storms (CAPE 3,350 J/kg)",
+     "Wet ground (19% soil moisture)",
+     "High of 92\u00b0F"
+    ]
+   },
+   {
+    "site_id": "oleander-power-project-lp",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0307,
+    "hazard_index": 5.5,
+    "factors": [
+     "0.5 in of rain forecast",
+     "Unstable air for storms (CAPE 3,210 J/kg)",
+     "Wet ground (18% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "big-bend",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0293,
+    "hazard_index": 5.4,
+    "factors": [
+     "0.7 in of rain forecast",
+     "Unstable air for storms (CAPE 3,320 J/kg)",
+     "Downpours up to 0.7 in/hr forecast"
+    ]
+   },
+   {
+    "site_id": "brandy-branch",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0298,
+    "hazard_index": 5.4,
+    "factors": [
+     "Unstable air for storms (CAPE 2,930 J/kg)",
+     "Site has a history of severe-weather reports",
+     "Wet ground (18% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "suwannee-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0286,
+    "hazard_index": 5.3,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 2,380 J/kg)",
+     "High of 96\u00b0F"
+    ]
+   },
+   {
+    "site_id": "shady-hills-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0261,
+    "hazard_index": 5.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,760 J/kg)",
+     "0.4 in of rain forecast",
+     "High of 90\u00b0F"
+    ]
+   },
+   {
+    "site_id": "sanford",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0258,
+    "hazard_index": 5.1,
+    "factors": [
+     "Unstable air for storms (CAPE 2,570 J/kg)",
+     "Wind gusts to 30 mph",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "turkey-point",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0233,
+    "hazard_index": 5.0,
+    "factors": [
+     "Unstable air for storms (CAPE 3,640 J/kg)",
+     "0.3 in of rain forecast",
+     "Wet ground (26% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "treasure-coast-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0222,
+    "hazard_index": 4.9,
+    "factors": [
+     "0.5 in of rain forecast",
+     "Unstable air for storms (CAPE 3,130 J/kg)",
+     "Downpours up to 0.3 in/hr forecast"
+    ]
+   },
+   {
+    "site_id": "fort-myers",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0211,
+    "hazard_index": 4.8,
+    "factors": [
+     "Unstable air for storms (CAPE 2,950 J/kg)",
+     "High of 92\u00b0F",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "orange-cogeneration-facility",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0181,
+    "hazard_index": 4.6,
+    "factors": [
+     "Unstable air for storms (CAPE 2,190 J/kg)",
+     "Wind gusts to 30 mph",
+     "0.0 in of rain forecast"
+    ]
+   },
+   {
+    "site_id": "port-everglades",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0165,
+    "hazard_index": 4.5,
+    "factors": [
+     "Unstable air for storms (CAPE 3,120 J/kg)",
+     "Wet ground (20% soil moisture)",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "deerhaven-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0175,
+    "hazard_index": 4.5,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 2,090 J/kg)",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "seminole-fl",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0158,
+    "hazard_index": 4.4,
+    "factors": [
+     "Site has a history of severe-weather reports",
+     "Unstable air for storms (CAPE 2,890 J/kg)",
+     "High of 96\u00b0F"
+    ]
+   },
+   {
+    "site_id": "p-l-bartow",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0162,
+    "hazard_index": 4.4,
+    "factors": [
+     "Unstable air for storms (CAPE 3,090 J/kg)",
+     "Site has a history of severe-weather reports",
+     "High of 91\u00b0F"
+    ]
+   },
+   {
+    "site_id": "c-d-mcintosh-jr",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0145,
+    "hazard_index": 4.3,
+    "factors": [
+     "Wind gusts to 33 mph",
+     "Unstable air for storms (CAPE 2,390 J/kg)",
+     "High of 95\u00b0F"
+    ]
+   },
+   {
+    "site_id": "st-lucie",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0125,
+    "hazard_index": 4.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,460 J/kg)",
+     "High of 90\u00b0F",
+     "Downpours up to 0.0 in/hr forecast"
+    ]
+   },
+   {
+    "site_id": "cape-canaveral",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0128,
+    "hazard_index": 4.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,270 J/kg)",
+     "Wet ground (18% soil moisture)",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "anclote",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0134,
+    "hazard_index": 4.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,340 J/kg)",
+     "Peak storm season (August)",
+     "Site has a history of severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "indian-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0134,
+    "hazard_index": 4.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,270 J/kg)",
+     "Wet ground (18% soil moisture)",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "stanton-energy-center",
+    "hazard": 1,
+    "event_types": "Tornado",
+    "probability": 0.0114,
+    "hazard_index": 4.1,
+    "factors": [
+     "Unstable air for storms (CAPE 2,660 J/kg)",
+     "High of 95\u00b0F",
+     "Wet ground (17% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "okeelanta-cogeneration",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0111,
+    "hazard_index": 4.1,
+    "factors": [
+     "0.9 in of rain forecast",
+     "Unstable air for storms (CAPE 2,500 J/kg)",
+     "Wet ground (19% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "miami-dade-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0104,
+    "hazard_index": 4.0,
+    "factors": [
+     "Unstable air for storms (CAPE 3,400 J/kg)",
+     "Wet ground (25% soil moisture)",
+     "1.5 in of rain in the past 3 days"
+    ]
+   },
+   {
+    "site_id": "debary",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0095,
+    "hazard_index": 3.8,
+    "factors": [
+     "Unstable air for storms (CAPE 2,400 J/kg)",
+     "Site has a history of severe-weather reports",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "okeechobee-clean-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0093,
+    "hazard_index": 3.7,
+    "factors": [
+     "Unstable air for storms (CAPE 3,420 J/kg)",
+     "0.2 in of rain forecast",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "bayboro",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.009,
+    "hazard_index": 3.5,
+    "factors": [
+     "Unstable air for storms (CAPE 3,770 J/kg)",
+     "High of 91\u00b0F",
+     "Peak storm season (August)"
+    ]
+   },
+   {
+    "site_id": "west-county-energy-center",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0086,
+    "hazard_index": 3.4,
+    "factors": [
+     "Unstable air for storms (CAPE 3,270 J/kg)",
+     "Wet ground (18% soil moisture)",
+     "High of 95\u00b0F"
+    ]
+   },
+   {
+    "site_id": "manatee",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0081,
+    "hazard_index": 3.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,200 J/kg)",
+     "High of 94\u00b0F",
+     "Peak storm season (August)"
+    ]
+   },
+   {
+    "site_id": "hines-energy-complex",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.008,
+    "hazard_index": 3.2,
+    "factors": [
+     "Unstable air for storms (CAPE 2,760 J/kg)",
+     "0.0 in of rain forecast",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "sawgrass-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0082,
+    "hazard_index": 3.2,
+    "factors": [
+     "Unstable air for storms (CAPE 2,940 J/kg)",
+     "0.0 in of rain forecast",
+     "High of 94\u00b0F"
+    ]
+   },
+   {
+    "site_id": "osceola-generating-station-fl",
+    "hazard": 1,
+    "event_types": "Tornado",
+    "probability": 0.0079,
+    "hazard_index": 3.1,
+    "factors": [
+     "Unstable air for storms (CAPE 2,700 J/kg)",
+     "0.1 in of rain forecast",
+     "High of 92\u00b0F"
+    ]
+   },
+   {
+    "site_id": "riviera",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0068,
+    "hazard_index": 2.7,
+    "factors": [
+     "Unstable air for storms (CAPE 3,480 J/kg)",
+     "Wet ground (18% soil moisture)",
+     "High of 89\u00b0F"
+    ]
+   },
+   {
+    "site_id": "osprey-energy-center-power-plant",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0063,
+    "hazard_index": 2.5,
+    "factors": [
+     "Unstable air for storms (CAPE 2,220 J/kg)",
+     "High of 94\u00b0F",
+     "1.0 in of rain in the past 3 days"
+    ]
+   },
+   {
+    "site_id": "tiger-bay",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0061,
+    "hazard_index": 2.4,
+    "factors": [
+     "Unstable air for storms (CAPE 2,960 J/kg)",
+     "High of 93\u00b0F",
+     "Downpours up to 0.0 in/hr forecast"
+    ]
+   },
+   {
+    "site_id": "vandolah-power-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0039,
+    "hazard_index": 1.6,
+    "factors": [
+     "Unstable air for storms (CAPE 2,820 J/kg)",
+     "High of 95\u00b0F",
+     "Wet ground (16% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "polk",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0038,
+    "hazard_index": 1.5,
+    "factors": [
+     "Unstable air for storms (CAPE 2,950 J/kg)",
+     "High of 94\u00b0F",
+     "Heat index 104\u00b0F"
+    ]
+   },
+   {
+    "site_id": "midulla-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0032,
+    "hazard_index": 1.3,
+    "factors": [
+     "Unstable air for storms (CAPE 2,550 J/kg)",
+     "High of 93\u00b0F",
+     "Peak storm season (August)"
+    ]
+   },
+   {
+    "site_id": "martin",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0018,
+    "hazard_index": 0.7,
+    "factors": [
+     "Unstable air for storms (CAPE 2,910 J/kg)",
+     "High of 94\u00b0F",
+     "Peak storm season (August)"
+    ]
+   }
+  ]
+ },
+ "importance_test": {
+  "cape_max": 0.9788,
+  "location": 0.772,
+  "season": 0.5728,
+  "soil_moisture_pct": 0.4773,
+  "rain_in": 0.4058,
+  "gust_max_mph": 0.2665,
+  "tmax_f": 0.1831,
+  "heat_index_max_f": 0.1565,
+  "rain_rate_max_in": 0.1243,
+  "rain_prior3_in": 0.0922,
+  "rain_prior7_in": 0.0391,
+  "thunder_hours": 0.0
+ },
+ "ablations": {
+  "all_features": {
+   "inner_val_pr_auc": 0.2675597925372104,
+   "test_pr_auc_uncalibrated": 0.1284664916220416
+  },
+  "no_soil_moisture": {
+   "inner_val_pr_auc": 0.2608554833772021,
+   "test_pr_auc_uncalibrated": 0.1302727057894489
+  },
+  "no_site_location": {
+   "inner_val_pr_auc": 0.21714275271051459,
+   "test_pr_auc_uncalibrated": 0.087589739753118
+  }
+ }
+}
