@@ -11,7 +11,7 @@
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from hazards.heat import osha_risk_band
@@ -179,6 +179,44 @@ def soil(inp: Inputs) -> Hazard:
                   f"{tomorrow_level.capitalize()} soil expected")
 
 
+# ---------- rain forecasts in text: our model vs NWS ----------
+
+DISAGREE_RATIO, DISAGREE_IN = 2.0, 1.0   # forecasts disagree: more than 2x apart and more than 1 in apart
+NWS_NEXT_24H_MAX_AGE = timedelta(hours=6)   # older, its window no longer matches our "next 24 h"
+
+
+def rain_disagreement(ours: float | None, nws: float | None) -> str | None:
+    """'0.9-9.6 in' when our forecast and NWS differ by more than 2x and by more than 1 in, else None."""
+    if ours is None or nws is None:
+        return None
+    lo, hi = sorted((round(ours, 1), round(nws, 1)))
+    return f"{lo}-{hi} in" if hi > DISAGREE_RATIO * lo and hi - lo > DISAGREE_IN else None
+
+
+def rain_text(ours: float, nws: float | None, what: str) -> str:
+    """'8.0 in <what>', or '0.9-8.0 in <what> (forecasts disagree)': one rule for every rain forecast the
+    backend writes into text (cards, factor labels, briefings)."""
+    disagree = rain_disagreement(ours, nws)
+    return f"{disagree} {what} (forecasts disagree)" if disagree else f"{ours:.1f} in {what}"
+
+
+def nws_rain(inp: Inputs, which: str) -> float | None:
+    """The NWS forecast stored by the 6 PM briefing run (briefing/inputs.fetch_nws_rain) for the same window:
+    'next_24h' (only while under 6 h old), 'today' or 'tomorrow' (site-local calendar days)."""
+    now = inp.now or datetime.now(timezone.utc)
+    if which == "next_24h":
+        v = inp.readings.get(("flood", "rain_next_24h_nws_in"))
+        return v[0] if v and now - v[1] <= NWS_NEXT_24H_MAX_AGE else None
+    tz = ZoneInfo(inp.site["timezone"])
+    today = now.astimezone(tz).date()
+    target = today if which == "today" else today + timedelta(days=1)
+    for metric, offset in (("rain_today_nws_in", 0), ("rain_tomorrow_nws_in", 1)):
+        v = inp.readings.get(("flood", metric))
+        if v and v[1].astimezone(tz).date() + timedelta(days=offset) == target:
+            return v[0]
+    return None
+
+
 def flood(inp: Inputs) -> Hazard:
     site = inp.site
     r12, r24, r72 = (_value(inp, "flood", m) for m in ("rain_past_12h_in", "rain_past_24h_in", "rain_past_72h_in"))
@@ -200,7 +238,8 @@ def flood(inp: Inputs) -> Hazard:
                  if zone and zone != "unmapped" else "No FEMA flood map here")
     river_text = f"; {site['river_name']} within 1 mi" if site.get("near_river") else ""
     if r12 is not None:
-        reading = f"{r12:.1f} in of rain in 12 h, {r24:.1f} in in 24 h; {nxt:.1f} in expected next 24 h. {zone_text}{river_text}"
+        upcoming = rain_text(nxt, nws_rain(inp, "next_24h"), "expected next 24 h") if nxt is not None else "no forecast"
+        reading = f"{r12:.1f} in of rain in 12 h, {r24:.1f} in in 24 h; {upcoming}. {zone_text}{river_text}"
     else:
         reading = f"No live rain data yet. {zone_text}{river_text}"
     if nws_alert:
@@ -216,14 +255,18 @@ def flood(inp: Inputs) -> Hazard:
         "source": nws_alert["headline"] if nws_alert else (
             f"Rain rule: {r12:.1f} in in 12 h in a flood-prone area" if inp.flood_alert else zone_text),
         "rain_past_12h_in": r12, "rain_past_24h_in": r24, "rain_past_72h_in": r72, "rain_next_24h_in": nxt,
+        # NWS gridpoint forecast for the next 24 h, stored by the 6 PM briefing run (cross-check; not scored).
+        "rain_next_24h_nws_in": _value(inp, "flood", "rain_next_24h_nws_in"),
         "fema_flood_zone": zone, "in_special_flood_hazard_area": site.get("fema_sfha"),
         "near_river": site.get("near_river"),
         "hazard_status": status_for(today), "reading": reading, "as_of": _as_of(inp, "flood", "rain_past_12h_in"),
     }
     label = (nws_alert["event"] if nws_alert else "Flood-risk alert: heavy rain in flood-prone area" if inp.flood_alert
-             else f"{r24:.1f} in of rain in 24 h" if r24 and r24 >= 1 else f"{nxt:.1f} in of rain expected" if nxt and nxt >= 1
+             else f"{r24:.1f} in of rain in 24 h" if r24 and r24 >= 1
+             else rain_text(nxt, nws_rain(inp, "next_24h"), "of rain expected") if nxt and nxt >= 1
              else zone_text)
-    return Hazard(card, today, tomorrow, label, f"{tmrw:.1f} in of rain forecast tomorrow" if tmrw else "")
+    return Hazard(card, today, tomorrow, label,
+                  rain_text(tmrw, nws_rain(inp, "tomorrow"), "of rain forecast tomorrow") if tmrw else "")
 
 
 def wildfire(inp: Inputs) -> Hazard:

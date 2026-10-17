@@ -39,11 +39,12 @@ Returns:
 """
 
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from hazards.scoring import STOP_WORK_FACTOR, Inputs, ago, score_site
+from hazards.scoring import STOP_WORK_FACTOR, Inputs, ago, nws_rain, rain_text, score_site
 
 STOP_WORK_MIN = 9.0
 HURRICANE_FLOOR = 9.0
@@ -198,6 +199,21 @@ def _rule_part(rules: dict, hazard: str, when: str) -> Component | None:
     return part
 
 
+_MODEL_RAIN = re.compile(r"^(\d+(?:\.\d+)?) in of rain forecast$")
+
+
+def _nws_checked(model: dict | None, nws: float | None) -> dict | None:
+    """The model part with its rain factor's label following the same rule as every rain forecast in text
+    (scoring.rain_text): a range and "(forecasts disagree)" when the model's rain and NWS disagree."""
+    if not model or nws is None:
+        return model
+    factors = []
+    for f in model.get("factors") or []:
+        m = _MODEL_RAIN.match(f.get("label", "")) if f.get("factor") == "rain_in" else None
+        factors.append({**f, "label": rain_text(float(m.group(1)), nws, "of rain forecast")} if m else f)
+    return {**model, "factors": factors}
+
+
 def local_days(inputs: Inputs) -> tuple[str, str]:
     """Today's and tomorrow's site-local dates (ISO). Live data, so real time, not the replay clock."""
     now = inputs.now or datetime.now(timezone.utc)
@@ -210,7 +226,8 @@ def predict(inputs: Inputs, species_counts: dict[str, int]) -> dict:
     rules, crew = scored["rules"], scored["crew"]
     now = inputs.now or datetime.now(timezone.utc)
     today, tomorrow = local_days(inputs)
-    model_today, model_tomorrow = inputs.model.get(today), inputs.model.get(tomorrow)
+    model_today = _nws_checked(inputs.model.get(today), nws_rain(inputs, "today"))
+    model_tomorrow = _nws_checked(inputs.model.get(tomorrow), nws_rain(inputs, "tomorrow"))
 
     index_today, top_today, factors_today = combine(
         [_model_component(model_today)]

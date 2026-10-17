@@ -42,7 +42,9 @@ def key_numbers(inputs: dict) -> tuple[dict, list[str]]:
         "hazard_index": inputs["hazard_index"],
         "max_heat_index_f": num(heat and heat["peak_heat_index_f"], "max_heat_index_f"),
         "lightning_probability_pct": max(p["thunderstorm_chance_pct"] for p in inputs["periods"]),
-        "rain_in": inputs["rain_total_in"],
+        # One rain figure; when our forecast and NWS disagree, the lower one (never the higher as fact).
+        "rain_in": (min(inputs["rain_total_in"], inputs["rain_nws"]["total_in"])
+                    if inputs.get("rain_forecasts_disagree") and inputs.get("rain_nws") else inputs["rain_total_in"]),
         "soil_moisture_pct": num(soil and soil["moisture_pct"], "soil_moisture_pct"),
         "wildfire_detections_25mi": num(fire, "wildfire_detections_25mi"),
     }, unavailable

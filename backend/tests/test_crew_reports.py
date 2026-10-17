@@ -150,10 +150,14 @@ def test_only_recent_nearby_reports_feed_the_site(conn):
 
 # ---------- briefing ----------
 
-def test_downed_line_or_heat_illness_raise_go_to_caution():
-    assert go_status(1.0, 0, [], ["downed_line"]) == "caution"
-    assert go_status(1.0, 0, [], ["heat_illness"]) == "caution"
-    assert go_status(1.0, 0, [], ["flooding"]) == "go"
+def test_crew_reports_in_the_verdict():
+    from tests.test_briefing import CALM, verdict
+    def crew(category):
+        return [{"category": category, "reported": "2 h ago", "reported_at": "4 PM", "distance_mi": 0.8}]
+    assert verdict({**CALM, "crew_reports_last_48_h_within_2_mi": crew("Downed line")}) == "no_go"        # hard stop
+    assert verdict({**CALM, "crew_reports_last_48_h_within_2_mi": crew("Flooding or washout")}) == "no_go"
+    assert verdict({**CALM, "crew_reports_last_48_h_within_2_mi": crew("Heat illness")}) == "caution"
+    assert verdict({**CALM, "crew_reports_last_48_h_within_2_mi": crew("Wildlife (Snake)")}) == "go"
 
 
 def test_template_mentions_crew_reports_and_stays_grounded():
