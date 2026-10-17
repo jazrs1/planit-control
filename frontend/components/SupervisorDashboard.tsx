@@ -117,8 +117,17 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   usePolling(pollReports, demo || liveSites === null ? null : REPORTS_MS);
   const reports = (demo ? DEMO_DATA.reports : liveReports) ?? [];
   // Fires and wildlife: polled only while their layer is on. A failed refresh keeps the last points.
-  const pollFires = useCallback(async () => { try { setLiveFires(await getFires()); } catch { /* keep the last fires */ } }, []);
-  const pollWildlife = useCallback(async () => { try { setLiveWildlife(await getWildlife()); } catch { /* keep the last sightings */ } }, []);
+  // null until the first answer; a failed refresh keeps the last points and marks them unknown.
+  const [firesFailed, setFiresFailed] = useState(false);
+  const [wildlifeFailed, setWildlifeFailed] = useState(false);
+  const [firesLoaded, setFiresLoaded] = useState(false);
+  const [wildlifeLoaded, setWildlifeLoaded] = useState(false);
+  const pollFires = useCallback(async () => {
+    try { setLiveFires(await getFires()); setFiresFailed(false); setFiresLoaded(true); } catch { setFiresFailed(true); }
+  }, []);
+  const pollWildlife = useCallback(async () => {
+    try { setLiveWildlife(await getWildlife()); setWildlifeFailed(false); setWildlifeLoaded(true); } catch { setWildlifeFailed(true); }
+  }, []);
   const fires = (demo ? DEMO_DATA.fires : liveFires) ?? [];
   const wildlife = (demo ? DEMO_DATA.wildlife : liveWildlife) ?? [];
 
@@ -149,12 +158,18 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const layersPanel = useRef<HTMLDetailsElement>(null);
   // Layers start open on a wide screen and collapsed on a phone.
   useEffect(() => { if (layersPanel.current && window.matchMedia("(min-width: 64rem)").matches) layersPanel.current.open = true; }, [sites === null]);
+  const [scrollTo, setScrollTo] = useState<string | null>(null);
   const selectFromMap = useCallback((id: string) => {
-    // On a phone the row may be past the top 10: show them all so the row can scroll into view.
+    // On a phone the row may be past the top 10: show them all, then scroll once it has rendered.
     setShowAll(true);
     setSelectedId(id);
-    rows.current.get(id)?.scrollIntoView({ block: "nearest" });
+    setScrollTo(id);
   }, []);
+  useEffect(() => {
+    if (!scrollTo) return;
+    rows.current.get(scrollTo)?.scrollIntoView({ block: "nearest" });
+    setScrollTo(null);
+  }, [scrollTo, showAll]);
 
   const statusLine = demo
     ? <p role="status" className="flex flex-wrap items-center gap-2 text-sm font-semibold text-muted">
@@ -188,6 +203,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // A real count or no count: cells we can't confirm are drawn grey and described, never counted with "?".
   const cellsText = cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…"
     : cellsUnconfirmed ? "last known · Not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed" : `${cells.length} active`;
+  // A map layer's count, or why there isn't one: never a "0" for data we couldn't fetch.
+  const pointsText = (count: number, loaded: boolean, failed: boolean, unit: string) =>
+    !loaded ? failed ? "Unavailable · can't load" : "Loading…" : failed ? `${count} ${unit} · last known` : `${count} ${unit}`;
   const fullHeight = "lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))]";
 
   // Wide screens: the map fills the page and the panels float over it (layers top-left, legend and the
@@ -227,8 +245,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {layerRow("cells", "Storm cells", cellsText, "rounded-pill border border-risk-amber-solid bg-risk-amber-solid/25")}
                 {layerRow("sites", "Sites", `${sites.length} sites`, "rounded-pill bg-muted")}
                 {layerRow("reports", "Crew reports", `${reports.length} ${reports.length === 1 ? "report" : "reports"}`, "rounded-pill bg-brand ring-2 ring-surface outline outline-border")}
-                {layerRow("fires", "Fires", `${fires.length} detections · last 24 h`, "rounded-pill bg-risk-red-solid ring-2 ring-surface outline outline-border")}
-                {layerRow("wildlife", "Wildlife", layers.wildlife ? `${wildlife.length} sightings · last 30 days` : "Alligators and venomous snakes", "rounded-pill border-2 border-text bg-surface")}
+                {layerRow("fires", "Fires", pointsText(fires.length, demo || firesLoaded, !demo && firesFailed, "detections · last 24 h"), "rounded-pill bg-risk-red-solid ring-2 ring-surface outline outline-border")}
+                {layerRow("wildlife", "Wildlife", layers.wildlife ? pointsText(wildlife.length, demo || wildlifeLoaded, !demo && wildlifeFailed, "sightings · last 30 days") : "Alligators and venomous snakes", "rounded-pill border-2 border-text bg-surface")}
               </ul>
             </details>
           </section>
