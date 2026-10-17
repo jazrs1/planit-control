@@ -441,3 +441,100 @@ def test_review_request_shape(monkeypatch):
     reply.stop_reason = "refusal"
     with pytest.raises(ValueError):
         REAL_CALL_REVIEW(BUSY, "text", "k", "claude-haiku-5-5")
+
+
+# ---------- template: verdict, main factor, risks and actions agree ----------
+
+# Orange Cogeneration's input on Oct 17, 2026 (trimmed): NO-GO from a fire 4 mi away. The old template
+# listed only moist ground and "Normal operations".
+FIRE_NO_GO = {**copy.deepcopy(CALM), "go_status": "no_go", "hazard_index": 8.0, "top_hazard": "wildfire",
+              "top_factors": [{"hazard": "wildfire", "label": "Fire detected 4 mi away"},
+                              {"hazard": "heat", "label": "Heat index peak 80°F tomorrow"},
+                              {"hazard": "soil_saturation", "label": "Moist soil expected"}],
+              "soil": {"level": "moist", "moisture_pct": 19, "crew_note": "Moist ground: soft spots possible off pavement"},
+              "wildfire": {"detections_within_25_mi": 10}}
+
+
+def _check_consistent(inputs):
+    w = writer.template(inputs)
+    assert writer.problems(w.text, inputs) == []                  # grounded, no invented hazards, < 150 words
+    if inputs["go_status"] != "go":
+        assert not any("Normal operations" in a for a in w.actions)
+    return w
+
+
+def test_template_no_go_names_the_fire_that_caused_it():
+    w = _check_consistent(FIRE_NO_GO)
+    assert w.text.startswith("NO-GO") and "main factor: Fire detected 4 mi away" in w.headline
+    assert w.risks[0].startswith("Fire detected 4 mi away") and "10 fire detection" in w.risks[0]
+    assert "fire" in w.actions[0] and "escape route" in w.actions[0]
+
+
+def test_template_no_go_from_a_model_factor_leads_with_it():
+    gusts = {**copy.deepcopy(CALM), "go_status": "no_go", "hazard_index": 7.4, "top_hazard": "lightning",
+             "top_factors": [{"hazard": "lightning", "label": "Wind gusts to 36 mph"},
+                             {"hazard": "flood", "label": "0.1 in of rain forecast"}]}
+    w = _check_consistent(gusts)
+    assert "main factor: Wind gusts to 36 mph" in w.headline and w.risks[0] == "Wind gusts to 36 mph."
+    assert "stop work for strikes within 10 mi" in w.actions[0]
+
+
+def test_template_caution_from_the_index_leads_with_its_top_factor():
+    w = _check_consistent(BUSY)
+    assert w.text.startswith("CAUTION") and "main factor: Heat index peak 108°F tomorrow" in w.headline
+    assert w.risks[0].startswith("Heat index peaks at 108°F") and "NWS Heat Advisory" in w.risks[0]
+    assert w.actions[0].startswith("Start at 6:41 AM")
+
+
+def test_template_caution_raised_by_storms_names_the_storms_not_the_index():
+    stormy = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 2.5,
+              "thunderstorms_likely_from": "2 PM", "thunderstorm_chance_work_hours_pct": 45,
+              "top_factors": [{"hazard": "heat", "label": "Heat index peak 88°F tomorrow"}]}
+    stormy["periods"][1]["thunderstorm_chance_pct"] = 45
+    w = _check_consistent(stormy)
+    assert "main factor: thunderstorms likely from 2 PM" in w.headline
+    assert w.risks[0].startswith("Thunderstorms likely from 2 PM") and "Expect lightning stops after 2 PM" in w.actions[0]
+
+
+def test_template_caution_raised_by_an_nws_watch_names_the_watch():
+    watched = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 2.0,
+               "nws_alerts": [{"event": "Flood Watch", "until": "Fri 8 AM"}]}
+    w = _check_consistent(watched)
+    assert "main factor: NWS Flood Watch until Fri 8 AM" in w.headline
+    assert "Flood Watch" in w.risks[0] and "flooded roads" in w.actions[0]
+
+
+def test_template_go_says_normal_operations_only_when_nothing_needs_an_action():
+    w = _check_consistent(CALM)
+    assert w.text.startswith("GO") and "low overall risk" in w.headline
+    assert w.actions == ["Normal operations; hold the standard tailboard safety briefing."]
+    moist = {**copy.deepcopy(CALM), "soil": {"level": "moist", "moisture_pct": 18, "crew_note": "Moist ground"},
+             "top_factors": [{"hazard": "soil_saturation", "label": "Moist soil expected"}]}
+    w = _check_consistent(moist)
+    assert w.text.startswith("GO") and "main factor: Moist soil expected" in w.headline
+    assert w.risks[0].startswith("Moist ground") and any("mats" in a for a in w.actions)
+    assert not any("Normal operations" in a for a in w.actions)
+
+
+def test_template_stays_short_and_grounded_on_a_crowded_day():
+    crowded = {**copy.deepcopy(BUSY), "go_status": "no_go", "hazard_index": 9.0,
+               "nws_alerts": [{"event": "Excessive Heat Warning", "until": "Thu 8 PM"},
+                              {"event": "Flood Watch", "until": "Fri 8 AM"}],
+               "wildfire": {"detections_within_25_mi": 3},
+               "crew_reports_last_48_h_within_2_mi": [
+                   {"category": "Downed line", "reported": "2 h ago", "reported_at": "1 PM", "distance_mi": 0.4}]}
+    w = _check_consistent(crowded)
+    assert w.risks[0].startswith("Crew reported a downed line") and "energized" in w.actions[0]
+    assert len(w.risks) == 3 and len(w.actions) <= 3
+
+
+def test_template_soil_cause_names_expected_saturation_and_todays_reading():
+    wet = {**copy.deepcopy(CALM), "go_status": "caution", "hazard_index": 6.0, "rain_total_in": 1.96,
+           "soil": {"level": "moist", "moisture_pct": 22, "crew_note": "Moist ground: soft spots possible off pavement"},
+           "top_factors": [{"hazard": "soil_saturation", "label": "Saturated soil expected"},
+                           {"hazard": "flood", "label": "2.0 in of rain forecast tomorrow"}]}
+    wet["periods"][0]["rain_in"] = 1.96
+    w = _check_consistent(wet)
+    assert w.risks[0].startswith("Saturated soil expected; moist ground") and "mats" in w.actions[0]
+    # The check accepts "saturated" here only because the index's own factor says so.
+    assert writer.unsupported_claims("Saturated soil", {**wet, "top_factors": []})
