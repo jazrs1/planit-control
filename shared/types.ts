@@ -8,9 +8,15 @@ export type HazardIndex = number;
 
 export type RiskLevel = "green" | "amber" | "red";
 
+/**
+ * "lightning" means satellite-detected strikes only (GOES-19: stop-work alerts, the lightning card).
+ * "storm" is forecast storm potential: wind gusts, unstable air (CAPE), thunder hours, NWS
+ * thunderstorm/tornado/tropical alerts, and areas with frequent past severe-weather reports.
+ */
 export type HazardType =
   | "heat"
   | "lightning"
+  | "storm"
   | "flood"
   | "soil_saturation"
   | "wildfire"

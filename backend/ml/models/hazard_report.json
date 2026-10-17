@@ -70,17 +70,23 @@
   },
   "index": {
    "reference_year": 2024,
+   "method": "lift",
+   "base_rate": 0.027570789865871834,
+   "lifts": {
+    "4.0": 2.0,
+    "7.0": 5.0
+   },
    "percentiles": [
     0.0,
-    0.65,
-    0.9,
-    0.99,
-    0.999
+    0.9053154495777447,
+    0.9598609041231992,
+    0.9899652260307998,
+    0.9989567809239941
    ],
    "probability_anchors": [
     0.0,
-    0.010127067666338278,
-    0.05179231331126548,
+    0.05514158073174367,
+    0.13785395132935918,
     0.5150556461618019,
     0.9041587028099359
    ],
@@ -113,6 +119,18 @@
     "fires": 0.13479623824451412,
     "quiet": 0.01853115362571982
    }
+  },
+  "factor_min": {
+   "heat_index_max_f": 86.90335173480005,
+   "tmax_f": 83.8,
+   "rain_in": 0.05,
+   "rain_rate_max_in": 0.05,
+   "rain_prior3_in": 0.05,
+   "rain_prior7_in": 0.3109999999999991,
+   "soil_moisture_pct": 15.608333333333333,
+   "gust_max_mph": 19.7,
+   "cape_max": 1360.0,
+   "thunder_hours": 0.5
   }
  },
  "tuning": {
@@ -406,9 +424,9 @@
    "recall": 0.6954954954954955
   },
   "model_at_red": {
-   "flagged_share": 0.10158966716343766,
-   "precision": 0.19755501222493888,
-   "recall": 0.7279279279279279
+   "flagged_share": 0.04068554396423249,
+   "precision": 0.35653235653235654,
+   "recall": 0.5261261261261261
   },
   "bootstrap_vs_baselines": {
    "climatology": {
@@ -441,21 +459,21 @@
   "bands": [
    {
     "band": "green",
-    "share_of_days": 0.6469448584202683,
-    "event_rate": 0.0029179144590340167,
-    "share_of_events": 0.06846846846846846
+    "share_of_days": 0.9044709388971685,
+    "event_rate": 0.008732904926676553,
+    "share_of_events": 0.2864864864864865
    },
    {
     "band": "amber",
-    "share_of_days": 0.2514654744162941,
-    "event_rate": 0.022323192414065586,
-    "share_of_events": 0.2036036036036036
+    "share_of_days": 0.054843517138599106,
+    "event_rate": 0.09420289855072464,
+    "share_of_events": 0.1873873873873874
    },
    {
     "band": "red",
-    "share_of_days": 0.10158966716343766,
-    "event_rate": 0.19755501222493888,
-    "share_of_events": 0.7279279279279279
+    "share_of_days": 0.04068554396423249,
+    "event_rate": 0.35653235653235654,
+    "share_of_events": 0.5261261261261261
    }
   ],
   "per_hazard": {
@@ -463,13 +481,13 @@
     "positives": 415,
     "pr_auc": 0.5091464172727335,
     "roc_auc": 0.9414151661171697,
-    "recall_at_red": 0.7831325301204819
+    "recall_at_red": 0.6048192771084338
    },
    "flood": {
     "positives": 183,
     "pr_auc": 0.10056138020180261,
     "roc_auc": 0.8789845001823138,
-    "recall_at_red": 0.6721311475409836
+    "recall_at_red": 0.4426229508196721
    },
    "heat": {
     "positives": 0,
@@ -481,7 +499,7 @@
     "positives": 8,
     "pr_auc": 0.0012259691566787099,
     "roc_auc": 0.7942550442301958,
-    "recall_at_red": 0.375
+    "recall_at_red": 0.0
    }
   },
   "reliability": {
@@ -786,9 +804,9 @@
    "recall": 0.4474789915966387
   },
   "model_at_red": {
-   "flagged_share": 0.07701120797011209,
-   "precision": 0.13583441138421734,
-   "recall": 0.4411764705882353
+   "flagged_share": 0.021967621419676214,
+   "precision": 0.21315192743764172,
+   "recall": 0.19747899159663865
   },
   "bootstrap_vs_baselines": {
    "climatology": {
@@ -821,21 +839,21 @@
   "bands": [
    {
     "band": "green",
-    "share_of_days": 0.6670983810709838,
-    "event_rate": 0.005899044205495818,
-    "share_of_events": 0.16596638655462184
+    "share_of_days": 0.9282689912826899,
+    "event_rate": 0.014703514891333513,
+    "share_of_events": 0.5756302521008403
    },
    {
     "band": "amber",
-    "share_of_days": 0.25589041095890414,
-    "event_rate": 0.03640256959314775,
-    "share_of_events": 0.39285714285714285
+    "share_of_days": 0.049763387297633875,
+    "event_rate": 0.10810810810810811,
+    "share_of_events": 0.226890756302521
    },
    {
     "band": "red",
-    "share_of_days": 0.07701120797011209,
-    "event_rate": 0.13583441138421734,
-    "share_of_events": 0.4411764705882353
+    "share_of_days": 0.021967621419676214,
+    "event_rate": 0.21315192743764172,
+    "share_of_events": 0.19747899159663865
    }
   ],
   "per_hazard": {
@@ -843,13 +861,13 @@
     "positives": 207,
     "pr_auc": 0.08196236657168338,
     "roc_auc": 0.8934336184032002,
-    "recall_at_red": 0.5555555555555556
+    "recall_at_red": 0.27053140096618356
    },
    "flood": {
     "positives": 173,
     "pr_auc": 0.07389921020094267,
     "roc_auc": 0.8986653097286531,
-    "recall_at_red": 0.5953757225433526
+    "recall_at_red": 0.27167630057803466
    },
    "heat": {
     "positives": 0,
@@ -861,7 +879,7 @@
     "positives": 118,
     "pr_auc": 0.00891323644216448,
     "roc_auc": 0.665818798552481,
-    "recall_at_red": 0.07627118644067797
+    "recall_at_red": 0.00847457627118644
    }
   },
   "reliability": {
@@ -1117,11 +1135,11 @@
   "date": "2025-08-04",
   "sites": 55,
   "hazardous_sites": 5,
-  "mean_index": 5.169090909090911,
-  "red_sites": 12,
-  "amber_sites": 31,
-  "hazardous_sites_red": 1,
-  "rank_of_day_by_mean_index": 30,
+  "mean_index": 2.661818181818182,
+  "red_sites": 8,
+  "amber_sites": 4,
+  "hazardous_sites_red": 0,
+  "rank_of_day_by_mean_index": 22,
   "days_in_year": 365,
   "per_site": [
    {
@@ -1129,7 +1147,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.3317,
-    "hazard_index": 8.2,
+    "hazard_index": 8.0,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,960 J/kg)",
@@ -1141,7 +1159,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.2502,
-    "hazard_index": 7.9,
+    "hazard_index": 7.6,
     "factors": [
      "2.0 in of rain forecast",
      "Area with frequent past severe-weather reports",
@@ -1153,7 +1171,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.2067,
-    "hazard_index": 7.7,
+    "hazard_index": 7.4,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 5,140 J/kg)",
@@ -1165,7 +1183,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.2166,
-    "hazard_index": 7.7,
+    "hazard_index": 7.4,
     "factors": [
      "2.3 in of rain forecast",
      "Unstable air for storms (CAPE 4,650 J/kg)",
@@ -1177,7 +1195,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.171,
-    "hazard_index": 7.5,
+    "hazard_index": 7.2,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,400 J/kg)",
@@ -1189,7 +1207,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.1605,
-    "hazard_index": 7.5,
+    "hazard_index": 7.1,
     "factors": [
      "Area with frequent past severe-weather reports",
      "0.8 in of rain forecast",
@@ -1197,26 +1215,26 @@
     ]
    },
    {
-    "site_id": "fpl-chipola-river-solar-energy-center",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.1394,
-    "hazard_index": 7.4,
-    "factors": [
-     "0.8 in of rain forecast",
-     "Area with frequent past severe-weather reports",
-     "Wet ground (22% soil moisture)"
-    ]
-   },
-   {
     "site_id": "fpl-shirer-branch-solar-energy-center",
     "hazard": 0,
     "event_types": "",
     "probability": 0.1529,
-    "hazard_index": 7.4,
+    "hazard_index": 7.1,
     "factors": [
      "Area with frequent past severe-weather reports",
      "0.5 in of rain forecast",
+     "Wet ground (22% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "fpl-chipola-river-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.1394,
+    "hazard_index": 7.0,
+    "factors": [
+     "0.8 in of rain forecast",
+     "Area with frequent past severe-weather reports",
      "Wet ground (22% soil moisture)"
     ]
    },
@@ -1225,7 +1243,7 @@
     "hazard": 1,
     "event_types": "Tornado",
     "probability": 0.1075,
-    "hazard_index": 7.2,
+    "hazard_index": 5.9,
     "factors": [
      "Unstable air for storms (CAPE 4,640 J/kg)",
      "2.2 in of rain forecast",
@@ -1237,7 +1255,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0778,
-    "hazard_index": 7.1,
+    "hazard_index": 4.8,
     "factors": [
      "7.3 in of rain forecast",
      "Unstable air for storms (CAPE 3,490 J/kg)",
@@ -1249,7 +1267,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0636,
-    "hazard_index": 7.1,
+    "hazard_index": 4.3,
     "factors": [
      "Unstable air for storms (CAPE 4,200 J/kg)",
      "Area with frequent past severe-weather reports",
@@ -1261,7 +1279,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0553,
-    "hazard_index": 7.0,
+    "hazard_index": 4.0,
     "factors": [
      "Unstable air for storms (CAPE 3,890 J/kg)",
      "Wet ground (21% soil moisture)",
@@ -1273,7 +1291,7 @@
     "hazard": 1,
     "event_types": "Tornado",
     "probability": 0.0505,
-    "hazard_index": 6.9,
+    "hazard_index": 3.7,
     "factors": [
      "6.6 in of rain forecast",
      "Unstable air for storms (CAPE 4,300 J/kg)",
@@ -1281,23 +1299,11 @@
     ]
    },
    {
-    "site_id": "oleander-power-project-lp",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0489,
-    "hazard_index": 6.8,
-    "factors": [
-     "Unstable air for storms (CAPE 4,860 J/kg)",
-     "0.5 in of rain forecast",
-     "Heat index 108\u00b0F"
-    ]
-   },
-   {
     "site_id": "intercession-city",
     "hazard": 0,
     "event_types": "",
     "probability": 0.048,
-    "hazard_index": 6.7,
+    "hazard_index": 3.5,
     "factors": [
      "0.7 in of rain forecast",
      "Unstable air for storms (CAPE 3,500 J/kg)",
@@ -1305,11 +1311,23 @@
     ]
    },
    {
+    "site_id": "oleander-power-project-lp",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0489,
+    "hazard_index": 3.5,
+    "factors": [
+     "Unstable air for storms (CAPE 4,860 J/kg)",
+     "0.5 in of rain forecast",
+     "Heat index 108\u00b0F"
+    ]
+   },
+   {
     "site_id": "h-l-culbreath-bayside-power-station",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0451,
-    "hazard_index": 6.5,
+    "hazard_index": 3.3,
     "factors": [
      "Unstable air for storms (CAPE 5,320 J/kg)",
      "0.3 in of rain forecast",
@@ -1321,7 +1339,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0441,
-    "hazard_index": 6.4,
+    "hazard_index": 3.2,
     "factors": [
      "Unstable air for storms (CAPE 5,100 J/kg)",
      "0.2 in of rain forecast",
@@ -1333,7 +1351,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0408,
-    "hazard_index": 6.2,
+    "hazard_index": 3.0,
     "factors": [
      "1.2 in of rain forecast",
      "Unstable air for storms (CAPE 3,210 J/kg)",
@@ -1345,7 +1363,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0405,
-    "hazard_index": 6.2,
+    "hazard_index": 2.9,
     "factors": [
      "Unstable air for storms (CAPE 4,950 J/kg)",
      "Wet ground (26% soil moisture)",
@@ -1357,7 +1375,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0389,
-    "hazard_index": 6.1,
+    "hazard_index": 2.8,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,520 J/kg)",
@@ -1369,7 +1387,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0377,
-    "hazard_index": 6.0,
+    "hazard_index": 2.7,
     "factors": [
      "Unstable air for storms (CAPE 3,180 J/kg)",
      "Area with frequent past severe-weather reports",
@@ -1381,7 +1399,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0338,
-    "hazard_index": 5.7,
+    "hazard_index": 2.5,
     "factors": [
      "2.2 in of rain forecast",
      "Wet ground (18% soil moisture)",
@@ -1389,23 +1407,11 @@
     ]
    },
    {
-    "site_id": "fort-myers",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.029,
-    "hazard_index": 5.4,
-    "factors": [
-     "Unstable air for storms (CAPE 4,930 J/kg)",
-     "Heat index 108\u00b0F",
-     "High of 93\u00b0F"
-    ]
-   },
-   {
     "site_id": "debary",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0299,
-    "hazard_index": 5.4,
+    "hazard_index": 2.2,
     "factors": [
      "Unstable air for storms (CAPE 4,030 J/kg)",
      "1.5 in of rain forecast",
@@ -1417,7 +1423,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0298,
-    "hazard_index": 5.4,
+    "hazard_index": 2.2,
     "factors": [
      "Unstable air for storms (CAPE 4,410 J/kg)",
      "0.2 in of rain forecast",
@@ -1429,7 +1435,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0302,
-    "hazard_index": 5.4,
+    "hazard_index": 2.2,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,120 J/kg)",
@@ -1437,23 +1443,11 @@
     ]
    },
    {
-    "site_id": "santa-rosa-energy-center",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.029,
-    "hazard_index": 5.4,
-    "factors": [
-     "0.3 in of rain forecast",
-     "Wet ground (18% soil moisture)",
-     "Area with frequent past severe-weather reports"
-    ]
-   },
-   {
     "site_id": "turkey-point",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0289,
-    "hazard_index": 5.3,
+    "hazard_index": 2.1,
     "factors": [
      "Unstable air for storms (CAPE 4,680 J/kg)",
      "Wet ground (28% soil moisture)",
@@ -1461,11 +1455,35 @@
     ]
    },
    {
+    "site_id": "fort-myers",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.029,
+    "hazard_index": 2.1,
+    "factors": [
+     "Unstable air for storms (CAPE 4,930 J/kg)",
+     "Heat index 108\u00b0F",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "santa-rosa-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.029,
+    "hazard_index": 2.1,
+    "factors": [
+     "0.3 in of rain forecast",
+     "Wet ground (18% soil moisture)",
+     "Area with frequent past severe-weather reports"
+    ]
+   },
+   {
     "site_id": "cape-canaveral",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0281,
-    "hazard_index": 5.3,
+    "hazard_index": 2.0,
     "factors": [
      "Unstable air for storms (CAPE 4,410 J/kg)",
      "0.2 in of rain forecast",
@@ -1477,7 +1495,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0244,
-    "hazard_index": 5.0,
+    "hazard_index": 1.8,
     "factors": [
      "7.2 in of rain forecast",
      "Unstable air for storms (CAPE 4,370 J/kg)",
@@ -1489,7 +1507,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0217,
-    "hazard_index": 4.8,
+    "hazard_index": 1.6,
     "factors": [
      "Unstable air for storms (CAPE 4,340 J/kg)",
      "1.3 in of rain forecast",
@@ -1501,7 +1519,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0211,
-    "hazard_index": 4.8,
+    "hazard_index": 1.5,
     "factors": [
      "Unstable air for storms (CAPE 4,560 J/kg)",
      "High of 93\u00b0F",
@@ -1509,23 +1527,11 @@
     ]
    },
    {
-    "site_id": "hammock-solar",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0193,
-    "hazard_index": 4.7,
-    "factors": [
-     "Unstable air for storms (CAPE 4,260 J/kg)",
-     "0.4 in of rain forecast",
-     "Heat index 110\u00b0F"
-    ]
-   },
-   {
     "site_id": "suwannee-river",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0188,
-    "hazard_index": 4.6,
+    "hazard_index": 1.4,
     "factors": [
      "Unstable air for storms (CAPE 3,490 J/kg)",
      "Area with frequent past severe-weather reports",
@@ -1533,11 +1539,23 @@
     ]
    },
    {
+    "site_id": "hammock-solar",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0193,
+    "hazard_index": 1.4,
+    "factors": [
+     "Unstable air for storms (CAPE 4,260 J/kg)",
+     "0.4 in of rain forecast",
+     "Heat index 110\u00b0F"
+    ]
+   },
+   {
     "site_id": "blackwater-river-solar-energy-center",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0165,
-    "hazard_index": 4.5,
+    "hazard_index": 1.2,
     "factors": [
      "0.1 in of rain forecast",
      "Unstable air for storms (CAPE 2,140 J/kg)",
@@ -1549,7 +1567,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0167,
-    "hazard_index": 4.5,
+    "hazard_index": 1.2,
     "factors": [
      "Unstable air for storms (CAPE 5,250 J/kg)",
      "0.6 in of rain forecast",
@@ -1561,7 +1579,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0153,
-    "hazard_index": 4.4,
+    "hazard_index": 1.1,
     "factors": [
      "Unstable air for storms (CAPE 4,290 J/kg)",
      "Area with frequent past severe-weather reports",
@@ -1569,11 +1587,23 @@
     ]
    },
    {
+    "site_id": "okeelanta-cogeneration",
+    "hazard": 1,
+    "event_types": "Wildfire",
+    "probability": 0.0147,
+    "hazard_index": 1.1,
+    "factors": [
+     "Unstable air for storms (CAPE 5,070 J/kg)",
+     "0.4 in of rain forecast",
+     "Heat index 108\u00b0F"
+    ]
+   },
+   {
     "site_id": "west-county-energy-center",
     "hazard": 1,
     "event_types": "Wildfire",
     "probability": 0.0137,
-    "hazard_index": 4.3,
+    "hazard_index": 1.0,
     "factors": [
      "Unstable air for storms (CAPE 4,120 J/kg)",
      "High of 101\u00b0F",
@@ -1585,7 +1615,7 @@
     "hazard": 1,
     "event_types": "Wildfire",
     "probability": 0.0144,
-    "hazard_index": 4.3,
+    "hazard_index": 1.0,
     "factors": [
      "Unstable air for storms (CAPE 4,670 J/kg)",
      "Heat index 112\u00b0F",
@@ -1593,23 +1623,11 @@
     ]
    },
    {
-    "site_id": "okeelanta-cogeneration",
-    "hazard": 1,
-    "event_types": "Wildfire",
-    "probability": 0.0147,
-    "hazard_index": 4.3,
-    "factors": [
-     "Unstable air for storms (CAPE 5,070 J/kg)",
-     "0.4 in of rain forecast",
-     "Heat index 108\u00b0F"
-    ]
-   },
-   {
     "site_id": "bayboro",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0124,
-    "hazard_index": 4.2,
+    "hazard_index": 0.9,
     "factors": [
      "Unstable air for storms (CAPE 4,270 J/kg)",
      "High of 92\u00b0F",
@@ -1621,7 +1639,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0115,
-    "hazard_index": 4.1,
+    "hazard_index": 0.8,
     "factors": [
      "Unstable air for storms (CAPE 4,350 J/kg)",
      "High of 94\u00b0F",
@@ -1633,7 +1651,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0107,
-    "hazard_index": 4.0,
+    "hazard_index": 0.8,
     "factors": [
      "Unstable air for storms (CAPE 4,660 J/kg)",
      "High of 91\u00b0F",
@@ -1645,7 +1663,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0091,
-    "hazard_index": 3.6,
+    "hazard_index": 0.7,
     "factors": [
      "Unstable air for storms (CAPE 4,840 J/kg)",
      "Heat index 110\u00b0F",
@@ -1657,7 +1675,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0077,
-    "hazard_index": 3.0,
+    "hazard_index": 0.6,
     "factors": [
      "Unstable air for storms (CAPE 4,570 J/kg)",
      "Heat index 108\u00b0F",
@@ -1665,11 +1683,47 @@
     ]
    },
    {
+    "site_id": "crystal-river",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0069,
+    "hazard_index": 0.5,
+    "factors": [
+     "Unstable air for storms (CAPE 4,520 J/kg)",
+     "Area with frequent past severe-weather reports",
+     "Heat index 105\u00b0F"
+    ]
+   },
+   {
+    "site_id": "polk",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0071,
+    "hazard_index": 0.5,
+    "factors": [
+     "Unstable air for storms (CAPE 3,250 J/kg)",
+     "Heat index 109\u00b0F",
+     "High of 98\u00b0F"
+    ]
+   },
+   {
+    "site_id": "vandolah-power-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0064,
+    "hazard_index": 0.5,
+    "factors": [
+     "Unstable air for storms (CAPE 3,870 J/kg)",
+     "Heat index 107\u00b0F",
+     "High of 95\u00b0F"
+    ]
+   },
+   {
     "site_id": "osprey-energy-center-power-plant",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0073,
-    "hazard_index": 2.9,
+    "hazard_index": 0.5,
     "factors": [
      "Unstable air for storms (CAPE 3,380 J/kg)",
      "High of 97\u00b0F",
@@ -1681,7 +1735,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0073,
-    "hazard_index": 2.9,
+    "hazard_index": 0.5,
     "factors": [
      "Unstable air for storms (CAPE 4,050 J/kg)",
      "High of 96\u00b0F",
@@ -1689,35 +1743,11 @@
     ]
    },
    {
-    "site_id": "polk",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0071,
-    "hazard_index": 2.8,
-    "factors": [
-     "Unstable air for storms (CAPE 3,250 J/kg)",
-     "Heat index 109\u00b0F",
-     "High of 98\u00b0F"
-    ]
-   },
-   {
-    "site_id": "crystal-river",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0069,
-    "hazard_index": 2.7,
-    "factors": [
-     "Unstable air for storms (CAPE 4,520 J/kg)",
-     "Area with frequent past severe-weather reports",
-     "Heat index 105\u00b0F"
-    ]
-   },
-   {
     "site_id": "orange-cogeneration-facility",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0067,
-    "hazard_index": 2.6,
+    "hazard_index": 0.5,
     "factors": [
      "Unstable air for storms (CAPE 3,120 J/kg)",
      "High of 96\u00b0F",
@@ -1725,15 +1755,15 @@
     ]
    },
    {
-    "site_id": "vandolah-power-station",
+    "site_id": "martin",
     "hazard": 0,
     "event_types": "",
-    "probability": 0.0064,
-    "hazard_index": 2.5,
+    "probability": 0.0051,
+    "hazard_index": 0.4,
     "factors": [
-     "Unstable air for storms (CAPE 3,870 J/kg)",
-     "Heat index 107\u00b0F",
-     "High of 95\u00b0F"
+     "Unstable air for storms (CAPE 4,480 J/kg)",
+     "Heat index 109\u00b0F",
+     "High of 96\u00b0F"
     ]
    },
    {
@@ -1741,7 +1771,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0054,
-    "hazard_index": 2.1,
+    "hazard_index": 0.4,
     "factors": [
      "Unstable air for storms (CAPE 3,780 J/kg)",
      "Heat index 108\u00b0F",
@@ -1753,7 +1783,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0052,
-    "hazard_index": 2.1,
+    "hazard_index": 0.4,
     "factors": [
      "Unstable air for storms (CAPE 4,280 J/kg)",
      "High of 94\u00b0F",
@@ -1761,23 +1791,11 @@
     ]
    },
    {
-    "site_id": "martin",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0051,
-    "hazard_index": 2.0,
-    "factors": [
-     "Unstable air for storms (CAPE 4,480 J/kg)",
-     "Heat index 109\u00b0F",
-     "High of 96\u00b0F"
-    ]
-   },
-   {
     "site_id": "c-d-mcintosh-jr",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0046,
-    "hazard_index": 1.8,
+    "hazard_index": 0.3,
     "factors": [
      "Unstable air for storms (CAPE 3,100 J/kg)",
      "High of 96\u00b0F",
@@ -1839,9 +1857,9 @@
    "recall": 0.29831932773109243
   },
   "model_at_red": {
-   "flagged_share": 0.07342465753424658,
-   "precision": 0.12618724559023067,
-   "recall": 0.3907563025210084
+   "flagged_share": 0.02062266500622665,
+   "precision": 0.14251207729468598,
+   "recall": 0.12394957983193278
   },
   "bootstrap_vs_baselines": {
    "climatology": {
@@ -1874,21 +1892,21 @@
   "bands": [
    {
     "band": "green",
-    "share_of_days": 0.6920049813200498,
-    "event_rate": 0.007630290814857472,
-    "share_of_events": 0.22268907563025211
+    "share_of_days": 0.9317061021170611,
+    "event_rate": 0.01614627887082977,
+    "share_of_events": 0.634453781512605
    },
    {
     "band": "amber",
-    "share_of_days": 0.23457036114570362,
-    "event_rate": 0.03907411339987259,
-    "share_of_events": 0.3865546218487395
+    "share_of_days": 0.04767123287671233,
+    "event_rate": 0.12016718913270637,
+    "share_of_events": 0.2415966386554622
    },
    {
     "band": "red",
-    "share_of_days": 0.07342465753424658,
-    "event_rate": 0.12618724559023067,
-    "share_of_events": 0.3907563025210084
+    "share_of_days": 0.02062266500622665,
+    "event_rate": 0.14251207729468598,
+    "share_of_events": 0.12394957983193278
    }
   ],
   "per_hazard": {
@@ -1896,13 +1914,13 @@
     "positives": 207,
     "pr_auc": 0.0674802638134648,
     "roc_auc": 0.8725328715415462,
-    "recall_at_red": 0.5072463768115942
+    "recall_at_red": 0.18357487922705315
    },
    "flood": {
     "positives": 173,
     "pr_auc": 0.04654213855658331,
     "roc_auc": 0.8768645553965878,
-    "recall_at_red": 0.4624277456647399
+    "recall_at_red": 0.1329479768786127
    },
    "heat": {
     "positives": 0,
@@ -1914,7 +1932,7 @@
     "positives": 118,
     "pr_auc": 0.00850633441704383,
     "roc_auc": 0.6448130429576131,
-    "recall_at_red": 0.1016949152542373
+    "recall_at_red": 0.00847457627118644
    }
   },
   "reliability": {
@@ -2170,11 +2188,11 @@
   "date": "2025-08-04",
   "sites": 55,
   "hazardous_sites": 5,
-  "mean_index": 4.865454545454545,
-  "red_sites": 13,
-  "amber_sites": 27,
+  "mean_index": 2.314545454545454,
+  "red_sites": 5,
+  "amber_sites": 8,
   "hazardous_sites_red": 0,
-  "rank_of_day_by_mean_index": 42,
+  "rank_of_day_by_mean_index": 36,
   "days_in_year": 365,
   "per_site": [
    {
@@ -2182,7 +2200,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.3089,
-    "hazard_index": 8.1,
+    "hazard_index": 7.9,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,600 J/kg)",
@@ -2194,7 +2212,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.2138,
-    "hazard_index": 7.7,
+    "hazard_index": 7.4,
     "factors": [
      "Area with frequent past severe-weather reports",
      "3.1 in of rain forecast",
@@ -2206,7 +2224,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.139,
-    "hazard_index": 7.4,
+    "hazard_index": 7.0,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,180 J/kg)",
@@ -2218,7 +2236,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.1403,
-    "hazard_index": 7.4,
+    "hazard_index": 7.0,
     "factors": [
      "2.5 in of rain forecast",
      "Area with frequent past severe-weather reports",
@@ -2230,7 +2248,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.1437,
-    "hazard_index": 7.4,
+    "hazard_index": 7.0,
     "factors": [
      "Area with frequent past severe-weather reports",
      "0.7 in of rain forecast",
@@ -2238,23 +2256,11 @@
     ]
    },
    {
-    "site_id": "gulf-clean-energy-center",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0988,
-    "hazard_index": 7.2,
-    "factors": [
-     "1.9 in of rain forecast",
-     "Unstable air for storms (CAPE 2,610 J/kg)",
-     "Wet ground (19% soil moisture)"
-    ]
-   },
-   {
     "site_id": "fpl-shirer-branch-solar-energy-center",
     "hazard": 0,
     "event_types": "",
     "probability": 0.1084,
-    "hazard_index": 7.2,
+    "hazard_index": 5.9,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 3,210 J/kg)",
@@ -2262,15 +2268,15 @@
     ]
    },
    {
-    "site_id": "intercession-city",
+    "site_id": "gulf-clean-energy-center",
     "hazard": 0,
     "event_types": "",
-    "probability": 0.0652,
-    "hazard_index": 7.1,
+    "probability": 0.0988,
+    "hazard_index": 5.6,
     "factors": [
-     "Wind gusts to 34 mph",
-     "Unstable air for storms (CAPE 2,330 J/kg)",
-     "0.1 in of rain forecast"
+     "1.9 in of rain forecast",
+     "Unstable air for storms (CAPE 2,610 J/kg)",
+     "Wet ground (19% soil moisture)"
     ]
    },
    {
@@ -2278,7 +2284,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0753,
-    "hazard_index": 7.1,
+    "hazard_index": 4.7,
     "factors": [
      "0.9 in of rain forecast",
      "Wind gusts to 32 mph",
@@ -2290,7 +2296,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0732,
-    "hazard_index": 7.1,
+    "hazard_index": 4.7,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 4,030 J/kg)",
@@ -2298,11 +2304,23 @@
     ]
    },
    {
+    "site_id": "blue-heron-solar",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0729,
+    "hazard_index": 4.6,
+    "factors": [
+     "7.9 in of rain forecast",
+     "Wind gusts to 34 mph",
+     "Unstable air for storms (CAPE 3,390 J/kg)"
+    ]
+   },
+   {
     "site_id": "santa-rosa-energy-center",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0688,
-    "hazard_index": 7.1,
+    "hazard_index": 4.5,
     "factors": [
      "Unstable air for storms (CAPE 2,810 J/kg)",
      "0.2 in of rain forecast",
@@ -2314,7 +2332,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0681,
-    "hazard_index": 7.1,
+    "hazard_index": 4.5,
     "factors": [
      "4.6 in of rain forecast",
      "Wind gusts to 33 mph",
@@ -2322,15 +2340,15 @@
     ]
    },
    {
-    "site_id": "blue-heron-solar",
+    "site_id": "intercession-city",
     "hazard": 0,
     "event_types": "",
-    "probability": 0.0729,
-    "hazard_index": 7.1,
+    "probability": 0.0652,
+    "hazard_index": 4.4,
     "factors": [
-     "7.9 in of rain forecast",
      "Wind gusts to 34 mph",
-     "Unstable air for storms (CAPE 3,390 J/kg)"
+     "Unstable air for storms (CAPE 2,330 J/kg)",
+     "0.1 in of rain forecast"
     ]
    },
    {
@@ -2338,7 +2356,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0498,
-    "hazard_index": 6.9,
+    "hazard_index": 3.6,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,940 J/kg)",
@@ -2350,7 +2368,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0416,
-    "hazard_index": 6.3,
+    "hazard_index": 3.0,
     "factors": [
      "0.4 in of rain forecast",
      "Unstable air for storms (CAPE 2,640 J/kg)",
@@ -2362,7 +2380,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0363,
-    "hazard_index": 5.9,
+    "hazard_index": 2.6,
     "factors": [
      "Unstable air for storms (CAPE 3,590 J/kg)",
      "1.1 in of rain forecast",
@@ -2374,7 +2392,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0355,
-    "hazard_index": 5.8,
+    "hazard_index": 2.6,
     "factors": [
      "0.4 in of rain forecast",
      "Unstable air for storms (CAPE 2,920 J/kg)",
@@ -2386,7 +2404,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0318,
-    "hazard_index": 5.6,
+    "hazard_index": 2.3,
     "factors": [
      "Unstable air for storms (CAPE 3,350 J/kg)",
      "Wet ground (19% soil moisture)",
@@ -2398,10 +2416,22 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0307,
-    "hazard_index": 5.5,
+    "hazard_index": 2.2,
     "factors": [
      "0.5 in of rain forecast",
      "Unstable air for storms (CAPE 3,210 J/kg)",
+     "Wet ground (18% soil moisture)"
+    ]
+   },
+   {
+    "site_id": "brandy-branch",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0298,
+    "hazard_index": 2.2,
+    "factors": [
+     "Unstable air for storms (CAPE 2,930 J/kg)",
+     "Area with frequent past severe-weather reports",
      "Wet ground (18% soil moisture)"
     ]
    },
@@ -2410,7 +2440,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0293,
-    "hazard_index": 5.4,
+    "hazard_index": 2.1,
     "factors": [
      "0.7 in of rain forecast",
      "Unstable air for storms (CAPE 3,320 J/kg)",
@@ -2418,23 +2448,11 @@
     ]
    },
    {
-    "site_id": "brandy-branch",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0298,
-    "hazard_index": 5.4,
-    "factors": [
-     "Unstable air for storms (CAPE 2,930 J/kg)",
-     "Area with frequent past severe-weather reports",
-     "Wet ground (18% soil moisture)"
-    ]
-   },
-   {
     "site_id": "suwannee-river",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0286,
-    "hazard_index": 5.3,
+    "hazard_index": 2.1,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,380 J/kg)",
@@ -2442,23 +2460,11 @@
     ]
    },
    {
-    "site_id": "shady-hills-generating-station",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0261,
-    "hazard_index": 5.2,
-    "factors": [
-     "Unstable air for storms (CAPE 3,760 J/kg)",
-     "0.4 in of rain forecast",
-     "High of 90\u00b0F"
-    ]
-   },
-   {
     "site_id": "sanford",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0258,
-    "hazard_index": 5.1,
+    "hazard_index": 1.9,
     "factors": [
      "Unstable air for storms (CAPE 2,570 J/kg)",
      "Wind gusts to 30 mph",
@@ -2466,11 +2472,23 @@
     ]
    },
    {
+    "site_id": "shady-hills-generating-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0261,
+    "hazard_index": 1.9,
+    "factors": [
+     "Unstable air for storms (CAPE 3,760 J/kg)",
+     "0.4 in of rain forecast",
+     "High of 90\u00b0F"
+    ]
+   },
+   {
     "site_id": "turkey-point",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0233,
-    "hazard_index": 5.0,
+    "hazard_index": 1.7,
     "factors": [
      "Unstable air for storms (CAPE 3,640 J/kg)",
      "0.3 in of rain forecast",
@@ -2482,7 +2500,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0222,
-    "hazard_index": 4.9,
+    "hazard_index": 1.6,
     "factors": [
      "0.5 in of rain forecast",
      "Unstable air for storms (CAPE 3,130 J/kg)",
@@ -2494,34 +2512,10 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0211,
-    "hazard_index": 4.8,
+    "hazard_index": 1.5,
     "factors": [
      "Unstable air for storms (CAPE 2,950 J/kg)",
      "High of 92\u00b0F",
-     "Area with frequent past severe-weather reports"
-    ]
-   },
-   {
-    "site_id": "orange-cogeneration-facility",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0181,
-    "hazard_index": 4.6,
-    "factors": [
-     "Unstable air for storms (CAPE 2,190 J/kg)",
-     "Wind gusts to 30 mph",
-     "0.0 in of rain forecast"
-    ]
-   },
-   {
-    "site_id": "port-everglades",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0165,
-    "hazard_index": 4.5,
-    "factors": [
-     "Unstable air for storms (CAPE 3,120 J/kg)",
-     "Wet ground (20% soil moisture)",
      "Area with frequent past severe-weather reports"
     ]
    },
@@ -2530,7 +2524,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0175,
-    "hazard_index": 4.5,
+    "hazard_index": 1.3,
     "factors": [
      "Area with frequent past severe-weather reports",
      "Unstable air for storms (CAPE 2,090 J/kg)",
@@ -2538,15 +2532,15 @@
     ]
    },
    {
-    "site_id": "seminole-fl",
+    "site_id": "orange-cogeneration-facility",
     "hazard": 0,
     "event_types": "",
-    "probability": 0.0158,
-    "hazard_index": 4.4,
+    "probability": 0.0181,
+    "hazard_index": 1.3,
     "factors": [
-     "Area with frequent past severe-weather reports",
-     "Unstable air for storms (CAPE 2,890 J/kg)",
-     "High of 96\u00b0F"
+     "Unstable air for storms (CAPE 2,190 J/kg)",
+     "Wind gusts to 30 mph",
+     "High of 95\u00b0F"
     ]
    },
    {
@@ -2554,7 +2548,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0162,
-    "hazard_index": 4.4,
+    "hazard_index": 1.2,
     "factors": [
      "Unstable air for storms (CAPE 3,090 J/kg)",
      "Area with frequent past severe-weather reports",
@@ -2562,11 +2556,35 @@
     ]
    },
    {
+    "site_id": "port-everglades",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0165,
+    "hazard_index": 1.2,
+    "factors": [
+     "Unstable air for storms (CAPE 3,120 J/kg)",
+     "Wet ground (20% soil moisture)",
+     "Area with frequent past severe-weather reports"
+    ]
+   },
+   {
+    "site_id": "seminole-fl",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0158,
+    "hazard_index": 1.1,
+    "factors": [
+     "Area with frequent past severe-weather reports",
+     "Unstable air for storms (CAPE 2,890 J/kg)",
+     "High of 96\u00b0F"
+    ]
+   },
+   {
     "site_id": "c-d-mcintosh-jr",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0145,
-    "hazard_index": 4.3,
+    "hazard_index": 1.1,
     "factors": [
      "Wind gusts to 33 mph",
      "Unstable air for storms (CAPE 2,390 J/kg)",
@@ -2574,35 +2592,11 @@
     ]
    },
    {
-    "site_id": "st-lucie",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0125,
-    "hazard_index": 4.2,
-    "factors": [
-     "Unstable air for storms (CAPE 3,460 J/kg)",
-     "High of 90\u00b0F",
-     "Downpours up to 0.0 in/hr forecast"
-    ]
-   },
-   {
-    "site_id": "cape-canaveral",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0128,
-    "hazard_index": 4.2,
-    "factors": [
-     "Unstable air for storms (CAPE 3,270 J/kg)",
-     "Wet ground (18% soil moisture)",
-     "High of 93\u00b0F"
-    ]
-   },
-   {
     "site_id": "anclote",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0134,
-    "hazard_index": 4.2,
+    "hazard_index": 1.0,
     "factors": [
      "Unstable air for storms (CAPE 3,340 J/kg)",
      "Peak storm season (August)",
@@ -2614,7 +2608,31 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0134,
-    "hazard_index": 4.2,
+    "hazard_index": 1.0,
+    "factors": [
+     "Unstable air for storms (CAPE 3,270 J/kg)",
+     "Wet ground (18% soil moisture)",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "st-lucie",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0125,
+    "hazard_index": 0.9,
+    "factors": [
+     "Unstable air for storms (CAPE 3,460 J/kg)",
+     "High of 90\u00b0F",
+     "Heat index 101\u00b0F"
+    ]
+   },
+   {
+    "site_id": "cape-canaveral",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0128,
+    "hazard_index": 0.9,
     "factors": [
      "Unstable air for storms (CAPE 3,270 J/kg)",
      "Wet ground (18% soil moisture)",
@@ -2626,7 +2644,7 @@
     "hazard": 1,
     "event_types": "Tornado",
     "probability": 0.0114,
-    "hazard_index": 4.1,
+    "hazard_index": 0.8,
     "factors": [
      "Unstable air for storms (CAPE 2,660 J/kg)",
      "High of 95\u00b0F",
@@ -2638,7 +2656,7 @@
     "hazard": 1,
     "event_types": "Wildfire",
     "probability": 0.0111,
-    "hazard_index": 4.1,
+    "hazard_index": 0.8,
     "factors": [
      "0.9 in of rain forecast",
      "Unstable air for storms (CAPE 2,500 J/kg)",
@@ -2650,7 +2668,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0104,
-    "hazard_index": 4.0,
+    "hazard_index": 0.8,
     "factors": [
      "Unstable air for storms (CAPE 3,400 J/kg)",
      "Wet ground (25% soil moisture)",
@@ -2658,26 +2676,26 @@
     ]
    },
    {
-    "site_id": "debary",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0095,
-    "hazard_index": 3.8,
-    "factors": [
-     "Unstable air for storms (CAPE 2,400 J/kg)",
-     "Area with frequent past severe-weather reports",
-     "High of 93\u00b0F"
-    ]
-   },
-   {
     "site_id": "okeechobee-clean-energy-center",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0093,
-    "hazard_index": 3.7,
+    "hazard_index": 0.7,
     "factors": [
      "Unstable air for storms (CAPE 3,420 J/kg)",
      "0.2 in of rain forecast",
+     "High of 93\u00b0F"
+    ]
+   },
+   {
+    "site_id": "debary",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0095,
+    "hazard_index": 0.7,
+    "factors": [
+     "Unstable air for storms (CAPE 2,400 J/kg)",
+     "Area with frequent past severe-weather reports",
      "High of 93\u00b0F"
     ]
    },
@@ -2686,7 +2704,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.009,
-    "hazard_index": 3.5,
+    "hazard_index": 0.7,
     "factors": [
      "Unstable air for storms (CAPE 3,770 J/kg)",
      "High of 91\u00b0F",
@@ -2698,7 +2716,7 @@
     "hazard": 1,
     "event_types": "Wildfire",
     "probability": 0.0086,
-    "hazard_index": 3.4,
+    "hazard_index": 0.6,
     "factors": [
      "Unstable air for storms (CAPE 3,270 J/kg)",
      "Wet ground (18% soil moisture)",
@@ -2710,7 +2728,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0081,
-    "hazard_index": 3.2,
+    "hazard_index": 0.6,
     "factors": [
      "Unstable air for storms (CAPE 3,200 J/kg)",
      "High of 94\u00b0F",
@@ -2722,23 +2740,11 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.008,
-    "hazard_index": 3.2,
+    "hazard_index": 0.6,
     "factors": [
      "Unstable air for storms (CAPE 2,760 J/kg)",
-     "0.0 in of rain forecast",
-     "High of 93\u00b0F"
-    ]
-   },
-   {
-    "site_id": "sawgrass-solar-energy-center",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0082,
-    "hazard_index": 3.2,
-    "factors": [
-     "Unstable air for storms (CAPE 2,940 J/kg)",
-     "0.0 in of rain forecast",
-     "High of 94\u00b0F"
+     "High of 93\u00b0F",
+     "5.9 in of rain in the past 7 days"
     ]
    },
    {
@@ -2746,7 +2752,7 @@
     "hazard": 1,
     "event_types": "Tornado",
     "probability": 0.0079,
-    "hazard_index": 3.1,
+    "hazard_index": 0.6,
     "factors": [
      "Unstable air for storms (CAPE 2,700 J/kg)",
      "0.1 in of rain forecast",
@@ -2754,11 +2760,23 @@
     ]
    },
    {
+    "site_id": "sawgrass-solar-energy-center",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0082,
+    "hazard_index": 0.6,
+    "factors": [
+     "Unstable air for storms (CAPE 2,940 J/kg)",
+     "High of 94\u00b0F",
+     "Wet ground (17% soil moisture)"
+    ]
+   },
+   {
     "site_id": "riviera",
     "hazard": 1,
     "event_types": "Wildfire",
     "probability": 0.0068,
-    "hazard_index": 2.7,
+    "hazard_index": 0.5,
     "factors": [
      "Unstable air for storms (CAPE 3,480 J/kg)",
      "Wet ground (18% soil moisture)",
@@ -2770,7 +2788,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0063,
-    "hazard_index": 2.5,
+    "hazard_index": 0.5,
     "factors": [
      "Unstable air for storms (CAPE 2,220 J/kg)",
      "High of 94\u00b0F",
@@ -2782,22 +2800,10 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0061,
-    "hazard_index": 2.4,
+    "hazard_index": 0.4,
     "factors": [
      "Unstable air for storms (CAPE 2,960 J/kg)",
      "High of 93\u00b0F",
-     "Downpours up to 0.0 in/hr forecast"
-    ]
-   },
-   {
-    "site_id": "vandolah-power-station",
-    "hazard": 0,
-    "event_types": "",
-    "probability": 0.0039,
-    "hazard_index": 1.6,
-    "factors": [
-     "Unstable air for storms (CAPE 2,820 J/kg)",
-     "High of 95\u00b0F",
      "Wet ground (16% soil moisture)"
     ]
    },
@@ -2806,7 +2812,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0038,
-    "hazard_index": 1.5,
+    "hazard_index": 0.3,
     "factors": [
      "Unstable air for storms (CAPE 2,950 J/kg)",
      "High of 94\u00b0F",
@@ -2814,11 +2820,23 @@
     ]
    },
    {
+    "site_id": "vandolah-power-station",
+    "hazard": 0,
+    "event_types": "",
+    "probability": 0.0039,
+    "hazard_index": 0.3,
+    "factors": [
+     "Unstable air for storms (CAPE 2,820 J/kg)",
+     "High of 95\u00b0F",
+     "Wet ground (16% soil moisture)"
+    ]
+   },
+   {
     "site_id": "midulla-generating-station",
     "hazard": 0,
     "event_types": "",
     "probability": 0.0032,
-    "hazard_index": 1.3,
+    "hazard_index": 0.2,
     "factors": [
      "Unstable air for storms (CAPE 2,550 J/kg)",
      "High of 93\u00b0F",
@@ -2830,7 +2848,7 @@
     "hazard": 0,
     "event_types": "",
     "probability": 0.0018,
-    "hazard_index": 0.7,
+    "hazard_index": 0.1,
     "factors": [
      "Unstable air for storms (CAPE 2,910 J/kg)",
      "High of 94\u00b0F",
@@ -2866,5 +2884,93 @@
    "inner_val_pr_auc": 0.21714275271051459,
    "test_pr_auc_uncalibrated": 0.087589739753118
   }
- }
+ },
+ "index_history": [
+  {
+   "index": {
+    "reference_year": 2024,
+    "percentiles": [
+     0.0,
+     0.65,
+     0.9,
+     0.99,
+     0.999
+    ],
+    "probability_anchors": [
+     0.0,
+     0.010127067666338278,
+     0.05179231331126548,
+     0.5150556461618019,
+     0.9041587028099359
+    ],
+    "index_values": [
+     0.0,
+     4.0,
+     7.0,
+     9.0,
+     10.0
+    ]
+   },
+   "validation": [
+    {
+     "band": "green",
+     "share_of_days": 0.6469448584202683,
+     "event_rate": 0.0029179144590340167,
+     "share_of_events": 0.06846846846846846
+    },
+    {
+     "band": "amber",
+     "share_of_days": 0.2514654744162941,
+     "event_rate": 0.022323192414065586,
+     "share_of_events": 0.2036036036036036
+    },
+    {
+     "band": "red",
+     "share_of_days": 0.10158966716343766,
+     "event_rate": 0.19755501222493888,
+     "share_of_events": 0.7279279279279279
+    }
+   ],
+   "test_today": [
+    {
+     "band": "green",
+     "share_of_days": 0.6670983810709838,
+     "event_rate": 0.005899044205495818,
+     "share_of_events": 0.16596638655462184
+    },
+    {
+     "band": "amber",
+     "share_of_days": 0.25589041095890414,
+     "event_rate": 0.03640256959314775,
+     "share_of_events": 0.39285714285714285
+    },
+    {
+     "band": "red",
+     "share_of_days": 0.07701120797011209,
+     "event_rate": 0.13583441138421734,
+     "share_of_events": 0.4411764705882353
+    }
+   ],
+   "test_tomorrow": [
+    {
+     "band": "green",
+     "share_of_days": 0.6920049813200498,
+     "event_rate": 0.007630290814857472,
+     "share_of_events": 0.22268907563025211
+    },
+    {
+     "band": "amber",
+     "share_of_days": 0.23457036114570362,
+     "event_rate": 0.03907411339987259,
+     "share_of_events": 0.3865546218487395
+    },
+    {
+     "band": "red",
+     "share_of_days": 0.07342465753424658,
+     "event_rate": 0.12618724559023067,
+     "share_of_events": 0.3907563025210084
+    }
+   ]
+  }
+ ]
 }

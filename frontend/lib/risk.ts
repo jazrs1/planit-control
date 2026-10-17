@@ -10,6 +10,7 @@ export function riskLevel(index: HazardIndex): RiskLevel {
 export const HAZARD_LABEL: Record<HazardType, string> = {
   heat: "Heat",
   lightning: "Lightning",
+  storm: "Storms & wind",
   flood: "Flooding",
   soil_saturation: "Soil saturation",
   wildfire: "Wildfire",

@@ -384,6 +384,11 @@ def score_site(inp: Inputs, species_counts: dict[str, int]) -> dict:
     rules = {h: {"today": parts[h].today, "tomorrow": parts[h].tomorrow,
                  "label_today": parts[h].label_today, "label_tomorrow": parts[h].label_tomorrow}
              for h in ("wildfire", "wildlife")}
+    # Chronic conditions: listed as factors, but they can't color a site on their own (risk.CHRONIC_MAX).
+    # Wildlife is 30 days of sightings; a fire 10-25 mi away is background, not today's hazard.
+    nearest = parts["wildfire"].card.get("nearest_detection_mi")
+    rules["wildlife"]["chronic"] = True
+    rules["wildfire"]["chronic"] = nearest is not None and 10 < nearest <= 25
     rules["heat"] = heat_rule(inp)
     apply_crew_reports(parts, inp)
     cards = {h: p.card for h, p in parts.items()}

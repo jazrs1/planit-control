@@ -7,7 +7,7 @@ Code: `backend/ml/` (model), `backend/hazards/risk.py` + `backend/hazards/model_
 For each site and day, a LightGBM model estimates **the chance that NOAA logs a crew-relevant hazardous-weather event at the site that day**: a thunderstorm-wind, hail, tornado, lightning, flood, heavy-rain, coastal-flood, heat, wildfire, or tropical event within 15 miles or in the site's NWS zone. It reads the same kind of weather forecast it will see live (Open-Meteo, HRRR model), turns the probability into a **0–10 hazard index**, and lists the **top 3 reasons** in plain language ("2.2 in of rain forecast", "Heat index 111°F"). On 2025, a year it never saw:
 
 - It ranks risky days **3–4× better than both baselines** (PR-AUC 0.128 vs 0.032 for monthly climatology and 0.040 for a rain/heat-index rule). The 95% confidence intervals for the improvement exclude zero.
-- **Red days (index ≥ 7)** were 8% of site-days, and **1 in 7 of them** had a logged hazardous event, against **1 in 170 green days**. Red days held 44% of all events.
+- **The index is anchored by lift** over the average day: amber starts at **2×** and red at **5×** the 2024 rate of logged events (2.76% of site-days). On 2025, **amber days (5% of site-days) had a logged event 1 in 9 times** and **red days (2%) 1 in 5 times**, against **1 in 68 green days**.
 - It works a day ahead too, with somewhat less skill (PR-AUC 0.102 tomorrow vs 0.128 today).
 
 It's a decent first model, not a finished one: it can't learn heat or wildfire well from these labels, and it leans partly on *where* NOAA tends to receive reports. Details are in [Limitations](#honest-limitations). That's why the index in the app is a **hybrid**: the model's weather score or a safety rule (OSHA heat band, wildfire, wildlife, crew reports), whichever is higher, plus the lightning stop-work override. See [section 8](#8-live-the-hybrid-hazard-index).
@@ -153,9 +153,9 @@ The model predicts one combined probability. This table shows how well that prob
 
 | 2025, same-day | Events | PR-AUC (base rate) | ROC-AUC | Share that scored red |
 |---|---|---|---|---|
-| Storm | 207 | 0.082 (0.010) | 0.893 | 56% |
-| Flood | 173 | 0.074 (0.009) | 0.899 | 60% |
-| Fire | 118 | 0.009 (0.006) | 0.666 | 8% |
+| Storm | 207 | 0.082 (0.010) | 0.893 | 27% (56% with the first version's anchors) |
+| Flood | 173 | 0.074 (0.009) | 0.899 | 27% (60%) |
+| Fire | 118 | 0.009 (0.006) | 0.666 | 1% (8%) |
 | Heat | 0 | — | — | — |
 
 Storms and floods are where the skill is, about 8× better than chance at the top of the ranking. Fire is barely above chance; the features have no drought or fuel-dryness signal. Heat **can't be evaluated**: there are no heat labels in 2024 or 2025.
@@ -168,47 +168,48 @@ Validation (2024) PR-AUC is 0.47, but test is 0.13. 2024 had Debby, Helene, and 
 
 Five sites had a logged event that day: tornadoes near the **Osceola** (11 mi) and **Stanton** (13 mi) plants, and a Palm Beach County wildfire covering the **West County**, **Riviera**, and **Okeelanta** zones.
 
-- **Same-day forecast.** The model ranked Aug 4 as the **30th riskiest day of 2025** (top 8%) by mean index across sites. It had 12 sites red and 31 amber.
-  - **Stanton was red at 7.2**: "Unstable air for storms (CAPE 4,640 J/kg)"; "2.2 in of rain forecast"; "Heat index 111°F".
-  - **Osceola was 6.9**, just under red: "6.6 in of rain forecast"; "Unstable air for storms (CAPE 4,300 J/kg)"; "Extreme downpours forecast (3+ in/hr)".
-  - The three wildfire sites were amber at 4.3, mostly on heat and CAPE. The model had no fire signal.
-  - The highest scores were in the panhandle and Jacksonville area (J.D. Kennedy 8.2, Lansing Smith 7.9), where nothing was logged that day.
-- **Day-ahead forecast.** The day still looked stormy (13 sites red), but the forecast issued on Aug 3 put the storms elsewhere. Stanton scored 4.1 and Osceola 3.1. That's typical: day-ahead models get the *day* right more often than the *exact place* for summer thunderstorms.
+- **Same-day forecast.** The model ranked Aug 4 as the **22nd riskiest day of 2025** (top 6%) by mean index across sites. It had 8 sites red and 4 amber.
+  - **Stanton was amber at 5.9** (10.8% chance, about 4× an average day): "Unstable air for storms (CAPE 4,640 J/kg)"; "2.2 in of rain forecast"; "Heat index 111°F".
+  - **Osceola was 3.7** (5.1%), just under amber: "6.6 in of rain forecast"; "Unstable air for storms (CAPE 4,300 J/kg)"; "Extreme downpours forecast (3+ in/hr)".
+  - The three wildfire sites were green at about 1.0. The model had no fire signal.
+  - The highest scores were in the panhandle and Jacksonville area (J.D. Kennedy 8.0, Lansing Smith 7.6), where nothing was logged that day.
+- **Day-ahead forecast.** The day still looked stormy (5 sites red, 8 amber), but the forecast issued on Aug 3 put the storms elsewhere. Stanton and Osceola scored under 1. That's typical: day-ahead models get the *day* right more often than the *exact place* for summer thunderstorms.
+- **In the app's replay** none of this changes what you see: the replay is driven by lightning (stop-work alerts hold a site at 9 or more, and the yellow "lightning approaching" advisories come from the storm-cell forecast), not by the model.
 
 Storm Events only logs lightning when it causes damage or injury. So on a day picked for its *lightning*, the five labels understate how hazardous it was for crews. The live lightning stop-work alerts cover exactly that gap.
 
 ## 6. The 0–10 index
 
-**Mapping.** The index is piecewise-linear in calibrated probability. The anchors are percentiles of the validation year's (2024) calibrated probabilities across all sites and days:
+**Mapping.** The index is piecewise-linear in calibrated probability. Amber and red are anchored by **lift over the average day** of the calibration year (2024: 555 of 20,130 site-days had a logged event, a base rate of 2.76%); 9 and 10 stay at that year's top percentiles:
 
-| Index | Anchored at | Probability | Meaning |
+| Index | Anchored at | Probability | Where that fell in 2024 |
 |---|---|---|---|
 | 0 | — | 0% | |
-| **4** (amber starts) | 65th percentile | 1.0% | the calmest 65% of days are green |
-| **7** (red starts) | 90th percentile | 5.2% | the riskiest 10% of days are red |
+| **4** (amber starts) | **2× the base rate** | 5.5% | 90.5th percentile |
+| **7** (red starts) | **5× the base rate** | 13.8% | 96th percentile |
 | 9 | 99th percentile | 51.5% | top 1%; in 2024 these were hurricane days |
 | 10 | 99.9th percentile | 90.4% | capped at 10 |
 
-Between anchors the index rises linearly. For example, a 3.1% chance is halfway between 1.0% and 5.2%, so it scores 5.5. The bands match the app's fixed cutoffs (green < 4, amber 4 to < 7, red ≥ 7).
+Between anchors the index rises linearly. For example, a 9.7% chance is halfway between 5.5% and 13.8%, so it scores 5.5. An average day (2.76%) scores 2.0. The bands match the app's fixed cutoffs (green < 4, amber 4 to < 7, red ≥ 7). `python -m ml.reanchor` recomputes the anchors from the committed model and 2024 data (`ml/model.py`, `index_anchors`).
 
-**Why percentiles.** A raw probability is hard to read: "5% chance of a NOAA-logged event" sounds low even though it's twice the average day. Anchoring to percentiles gives each band a fixed meaning ("red = the riskiest ~10% of days in a normal year"). Because the anchors are fixed probabilities, the index still means the same thing in a quiet year or a hurricane year; only how often each band shows up changes.
+**Why lift.** A raw probability is hard to read: "5% chance of a NOAA-logged event" sounds low even though it's twice the average day. The first version anchored amber at the 65th percentile of 2024 days, which was a 1.0% chance: *below* the average day, so an ordinary October afternoon (October's rate is 1.2%) showed most sites as "elevated". Anchoring to multiples of the base rate gives each band a meaning a crew can check: amber = at least twice as likely as an average day, red = at least five times. The anchors are fixed probabilities, so the index means the same thing in a quiet year or a hurricane year; only how often each band shows up changes.
 
-**How it behaved in 2025:**
+**How it behaved in 2025** (same-day; the first version's percentile anchors in brackets):
 
 | Band | Share of site-days | Had a logged event | Share of all events |
 |---|---|---|---|
-| Green (< 4) | 67% | 0.6% (1 in 170) | 17% |
-| Amber (4–7) | 26% | 3.6% (1 in 27) | 39% |
-| Red (≥ 7) | 8% | 13.6% (1 in 7) | 44% |
+| Green (< 4) | 92.8% [66.7%] | 1.5%, 1 in 68 [0.6%, 1 in 170] | 58% [17%] |
+| Amber (4–7) | 5.0% [25.6%] | 10.8%, 1 in 9 [3.6%, 1 in 27] | 23% [39%] |
+| Red (≥ 7) | 2.2% [7.7%] | 21.3%, 1 in 5 [13.6%, 1 in 7] | 20% [44%] |
 
-Day-ahead was similar: 7% red at a 12.6% hit rate, and 69% green at 0.8%. Red ran slightly under 10% because 2025 was a quieter, hurricane-free year. Scores of 9–10 should be rare outside tropical systems.
+Day-ahead: green 93.2% of days (1.6% event rate), amber 4.8% (12.0%), red 2.1% (14.2%) [was 69.2% / 23.5% / 7.3% at 0.8% / 3.9% / 12.6%]. The trade-off is deliberate: far fewer amber and red days, each much more likely to be a real hazard day, while more events now fall on green days, where the live rules (heat, fire, crew reports, NWS floors, lightning) still raise the index. Scores of 9–10 should be rare outside tropical systems.
 
 ## 7. Explanations: the top 3 factors
 
 LightGBM computes exact **SHAP values** for tree models (`pred_contrib=True`). For each prediction, they split the model's output into how much each feature pushed the risk above or below an average day. We:
 
 1. merge the two coordinates of one idea (`doy_sin` + `doy_cos` → *season*, `lat` + `lon` → *location*);
-2. keep the factors that pushed risk **up** and take the top 3;
+2. keep the factors that pushed risk **up**: a positive SHAP value *and*, for weather features, a reading above an ordinary 2024 day (the median, or the smallest amount its label can show, e.g. 0.05 in of rain; `factor_min` in `hazard_model.json`). So "0.0 in of rain forecast" is never shown as a cause, even when the model's interactions give it a small positive push. Then take the top 3;
 3. turn each into a sentence using that day's actual value.
 
 | Factor | Example label | `hazard` field |
@@ -218,11 +219,11 @@ LightGBM computes exact **SHAP values** for tree models (`pred_contrib=True`). F
 | wettest hour | "Downpours up to 1.4 in/hr forecast" (≥ 3 in/hr shown as "Extreme downpours forecast (3+ in/hr)") | flood |
 | prior rain | "3.1 in of rain in the past 3 days" | flood |
 | soil | "Wet ground (22% soil moisture)" | soil_saturation |
-| gusts / CAPE / thunder code | "Wind gusts to 35 mph" / "Unstable air for storms (CAPE 4,640 J/kg)" | lightning |
+| gusts / CAPE / thunder code | "Wind gusts to 35 mph" / "Unstable air for storms (CAPE 4,640 J/kg)" | storm |
 | season | "Peak storm season (August)" | the top weather factor's hazard |
-| location | "Area with frequent past severe-weather reports" | the top weather factor's hazard |
+| location | "Area with frequent past severe-weather reports" | storm |
 
-Each factor also gets a `weight`: its share of the upward push, so the weights sum to ≤ 1. The API's `ContributingFactor` needs a `HazardType`, and it has no `storm` type, so storm factors (CAPE, gusts, thunder) use `lightning`. *Season* and *location* aren't hazards: they borrow the hazard of the strongest weather factor in the same prediction (or `lightning` if there is none), since they mostly reflect storm and flood reports.
+Each factor also gets a `weight`: its share of the upward push, so the weights sum to ≤ 1. The API's `ContributingFactor` needs a `HazardType`. **`lightning` means satellite-detected strikes only** (stop-work alerts, the lightning card), so forecast storm potential (CAPE, gusts, thunder hours) and NWS thunderstorm, tornado and tropical alerts use **`storm`** ("Storms & wind" in the app). *Location* ("Area with frequent past severe-weather reports") is storm context, so it's `storm` too. *Season* isn't a hazard: it borrows the hazard of the strongest weather factor in the same prediction (or `storm` if there is none). Stored scores are re-labelled on read (`model_scores.current_hazards`), so rows from before this mapping read the same way.
 
 **What drives the model overall** (mean |SHAP| on 2025, log-odds): CAPE 0.98 · location 0.77 · season 0.57 · soil moisture 0.48 · rain 0.41 · gusts 0.27 · high temp 0.18 · heat index 0.16 · wettest hour 0.12 · prior 3-day rain 0.09 · prior 7-day rain 0.04 · thunder hours 0.00.
 
@@ -244,14 +245,16 @@ The app never shows the raw model alone. `hazards/risk.predict()` is the one fun
 |---|---|---|---|
 | ML weather score | model | ✔ | ✔ |
 | OSHA heat-index band (lower 0–2, moderate 5, high 7.5, very high 9.5) | rule | ✔ (rest of today's peak) | ✔ (tomorrow's peak) |
-| Wildfire (FIRMS distance) | rule | ✔ | ✔ |
-| Wildlife (sightings, crew wildlife reports) | rule | ✔ | ✔ |
+| Wildfire (FIRMS distance): within 5 mi 8 (6 if seen on one satellite pass), within 10 mi 6, **10–25 mi at most 3** | rule | ✔ | ✔ |
+| Wildlife (sightings and crew wildlife reports, 30 days): **at most 3** | rule | ✔ | ✔ |
 | Crew report that raises a card to watch | rule (4.0) | ✔ | — |
 | **Floor: NWS warning** (see below) | rule (at least 7) | ✔ in effect today | ✔ in effect tomorrow |
 | **Floor: NWS watch** | rule (at least 4) | ✔ in effect today | ✔ in effect tomorrow |
 | **Floor: NWS advisory, or our own flood-risk alert** | rule (at least 4) | ✔ | — |
 | **Floor: downed-line crew report** within 2 mi, last 48 h | rule (at least 7) | ✔ | — |
 | **Lightning stop-work** | rule (at least 9.0) | ✔ | — |
+
+**Chronic conditions can't color a site on their own.** Wildlife sightings over 30 days and fires 10–25 mi away are background: they count at most 3 (`CHRONIC_MAX`), but they're always listed as factors, and their cards keep their own watch color. A crew report from the last 48 hours still counts 4.
 
 **Why a maximum and not a blend:** each part answers a different question, and a crew needs to know about the worst one. The rules cover exactly what the model can't learn from its labels: heat, fire, wildlife, and what crews see on the ground.
 
@@ -323,6 +326,7 @@ python -m ml.openmeteo --budget          # show pending downloads and the rollin
 python -m ml.openmeteo                   # archived forecasts 2022-2025 + 2025 day-ahead (cached, resumable)
 python -m ml.dataset                     # join -> data/ml/dataset.csv.gz, dataset_day1.csv.gz
 python -m ml.train                       # tune, train, calibrate, evaluate, write models/ and the plot
+python -m ml.reanchor                    # recompute the index anchors and factor floors (no retraining)
 python -m ml.predict --site big-bend     # score today/tomorrow from the live forecast
 python -m ml.predict --date 2025-08-04   # score a past day from archived forecasts
 python -m pytest tests/test_ml.py tests/test_hybrid.py
