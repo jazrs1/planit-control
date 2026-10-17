@@ -189,7 +189,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   const realOthers = realAlerts.filter((a) => a.type !== "lightning");
   const approach = detail.lightning_approach;
   // An advisory is hidden only by a stop-work of its own kind (real by real, replay by replay).
-  const approachStopWork = siteAlerts.some((a) => a.type === "lightning" && a.replay === !!approach?.replay);
+  const approachStopWork = siteAlerts.some((a) => a.type === "lightning" && !!a.replay === !!approach?.replay);
   const alertsLastKnown = alertsStatus === "stale";
   // No card has a status: everything is placeholder, so the index is too.
   const noLiveData = [c.lightning, c.heat, c.flood, c.soil, c.wildfire, c.wildlife_summary].every((card) => !card?.hazard_status);

@@ -123,6 +123,11 @@ test("site detail shows the advisory, respects stop-work priority, and labels co
   }
   const Detail = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [lightning] })).default;
   assert.doesNotMatch(render(Detail, { siteId: site.id, initialDetail: detail }), /LIGHTNING POSSIBLE/);
+  // A replay stop-work is only a secondary tag: it never hides a real advisory.
+  const Replay = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [{ ...lightning, replay: true }] })).default;
+  const replayHtml = render(Replay, { siteId: site.id, initialDetail: detail });
+  advisory(replayHtml);
+  assert.ok(replayHtml.indexOf("LIGHTNING POSSIBLE") < replayHtml.indexOf("Replay"), "the real advisory comes before the replay tag");
   const Offline = load("components/SiteDetailView.tsx", modules({ ...baseState, status: "stale", connection: { level: "offline", lastSuccessAt: nowMs } })).default;
   const html = render(Offline, { siteId: site.id, initialDetail: detail });
   advisory(html);
