@@ -20,9 +20,6 @@ function timeOfDay(date: Date) {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-/** Demo flashes are fixed samples: fade them relative to the newest one, not the real clock. */
-const DEMO_NOW_MS = Math.max(...DEMO_DATA.lightning.map((f) => Date.parse(f.ts)));
-
 export default function SupervisorDashboard({ initialSites }: { initialSites: Site[] | null }) {
   // Live sites only; null until they load. Mocks are shown only in demo mode, and labeled.
   const [liveSites, setLiveSites] = useState(initialSites);
@@ -40,9 +37,11 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const replaying = replay?.running ?? false;
   const sites = demo ? DEMO_DATA.sites : liveSites;
   const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
-  // Fade by age on the backend clock (simulated during replay). Recomputed on every refresh render.
-  const nowMs = demo ? DEMO_NOW_MS : serverNow();
+  // Fade by age on the backend clock (simulated during replay, the demo clock in demo mode).
+  const nowMs = serverNow();
   const alertsKnown = knownAlerts !== null;
+  // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
+  const alertsStale = alertsStatus === "stale";
   const alerts = useMemo(() => knownAlerts ?? [], [knownAlerts]);
 
   const pollSites = useCallback(async () => {
@@ -85,7 +84,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     </p>
     : staleSince && sites
       ? <p role="status" className="text-sm font-semibold text-risk-red">Connection lost · showing data from {timeOfDay(staleSince)}</p>
-      : <p className="text-sm text-muted">Florida field operations · {replaying ? "Storm replay: refreshing every 3 seconds" : "Refreshes every 30 seconds, lightning every 10"}</p>;
+      : sites === null
+        ? <p role="status" className="text-sm text-muted">{sitesFailed ? "Not connected to the server" : "Connecting…"}</p>
+        : <p className="text-sm text-muted">Florida field operations · {replaying ? "Storm replay: refreshing every 3 seconds" : "Refreshes every 30 seconds, lightning every 10"}</p>;
 
   return (
     <main className="flex min-h-[calc(100dvh-var(--pc-nav-height))] flex-col lg:h-[calc(100dvh-var(--pc-nav-height))] lg:overflow-hidden">
@@ -128,11 +129,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                   Stop-work status unknown · can&apos;t load alerts · retrying…
                 </p>
               )}
-              <dl className="grid grid-cols-3 gap-2 text-center">
+              {/* "Alerts" is every active alert (same number as the nav badge); "Stop work" is lightning stop-work sites. */}
+              <dl className="grid grid-cols-4 gap-2 text-center">
                 <div><dt className="text-xs text-muted">Sites</dt><dd className="text-2xl font-bold">{sites.length}</dd></div>
                 <div><dt className="text-xs text-muted">High risk</dt><dd className="text-2xl font-bold text-risk-red">{sites.filter((s) => riskLevel(s.hazard_index) === "red").length}</dd></div>
-                <div><dt className="text-xs text-muted">Stop work</dt><dd className={`text-2xl font-bold ${alertsKnown ? "text-risk-red" : "text-muted"}`}>{alertsKnown ? sites.filter((s) => lightning.has(s.id)).length : "—"}</dd></div>
+                <div><dt className="text-xs text-muted">Alerts</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-red" : "text-muted"}`}>{alertsKnown ? `${alerts.length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
+                <div><dt className="text-xs text-muted">Stop work</dt><dd className={`text-2xl font-bold ${alertsKnown && !alertsStale ? "text-risk-red" : "text-muted"}`}>{alertsKnown ? `${sites.filter((s) => lightning.has(s.id)).length}${alertsStale ? "?" : ""}` : "—"}</dd></div>
               </dl>
+              {alertsStale && <p role="status" className="mt-2 text-center text-xs font-medium text-muted">? = last known before the connection was lost</p>}
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>
             </div>
             <ul className="space-y-3 p-4 lg:overflow-y-auto">

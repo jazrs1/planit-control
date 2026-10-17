@@ -49,6 +49,10 @@ function clockFrom(status: ReplayStatus | null): ServerClock {
 
 const UNKNOWN: AlertsState = { alerts: null, status: "connecting", staleSince: null, clock: null, replay: null };
 
+/** Demo data is a fixed sample: run its clock from the newest sample flash so mock countdowns and
+ *  flash fading look as they would have live, instead of "All clear" against today's real time. */
+const DEMO_START_MS = Math.max(...DEMO_DATA.lightning.map((f) => Date.parse(f.ts)));
+
 export function AlertsProvider({ initialAlerts, children }: { initialAlerts: Alert[] | null; children: ReactNode }) {
   const [state, setState] = useState<AlertsState>(() =>
     initialAlerts === null ? UNKNOWN : { ...UNKNOWN, alerts: newestFirst(initialAlerts), status: "live" },
@@ -78,7 +82,10 @@ export function AlertsProvider({ initialAlerts, children }: { initialAlerts: Ale
   const setDemo = useCallback((on: boolean) => {
     demo.current = on;
     lastGood.current = null;
-    setState(on ? { ...UNKNOWN, alerts: newestFirst(DEMO_DATA.alerts), status: "demo" } : UNKNOWN);
+    setState(on
+      ? { ...UNKNOWN, alerts: newestFirst(DEMO_DATA.alerts), status: "demo",
+          clock: { simulatedMs: DEMO_START_MS, fetchedAtMs: Date.now(), speed: 1 } }
+      : UNKNOWN);
   }, []);
 
   const loaded = state.alerts !== null && state.status !== "demo";

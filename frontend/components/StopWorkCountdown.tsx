@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Alert } from "@shared/types";
-import { useServerNow } from "@/components/AlertsProvider";
+import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 
 export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_clear_at">) {
   // Start with a placeholder so the server and hydration render agree.
@@ -10,6 +10,8 @@ export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_cle
   const [resetting, setResetting] = useState(false);
   // Backend clock, so replayed alerts count down in simulated time (and at replay speed).
   const serverNow = useServerNow();
+  // Offline (last known alerts): reaching zero can't confirm the all-clear; a new strike may have reset it.
+  const offline = useAlertsState().status === "stale";
   const previousTarget = useRef(all_clear_at === null ? null : Date.parse(all_clear_at));
   const target = all_clear_at === null ? null : Date.parse(all_clear_at);
 
@@ -36,12 +38,15 @@ export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_cle
   const seconds = target !== null && Number.isFinite(target) && now !== null
     ? Math.max(0, Math.ceil((target - now) / 1000))
     : null;
-  const cleared = seconds === 0;
+  const unconfirmed = seconds === 0 && offline;
+  const cleared = seconds === 0 && !offline;
   const label = target === null
     ? "Awaiting all-clear"
     : !Number.isFinite(target)
       ? "All-clear time unavailable"
-      : cleared
+      : unconfirmed
+        ? "Not confirmed"
+        : cleared
         ? "All clear"
         : seconds === null
           ? "--:--"
@@ -55,8 +60,8 @@ export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_cle
       <span role="timer" aria-live="off" className="block font-mono text-2xl font-bold tabular-nums">
         {label}
       </span>
-      <span role="status" className={resetting ? "block text-sm font-semibold" : "sr-only"}>
-        {resetting ? "New strike — timer reset" : cleared ? "All clear" : ""}
+      <span role="status" className={resetting || unconfirmed ? "block text-sm font-semibold" : "sr-only"}>
+        {resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : cleared ? "All clear" : ""}
       </span>
     </div>
   );

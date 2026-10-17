@@ -8,6 +8,8 @@ export default function TopNavigation() {
   // Unknown is not zero: never show a green "0" before real alerts have loaded.
   const badge = alerts === null
     ? { text: "—", label: "Alerts, connecting to server", style: "bg-bg text-muted" }
+    : status === "stale"
+    ? { text: `${alerts.length}?`, label: `Alerts, ${alerts.length} last known, connection lost`, style: "bg-bg text-muted" }
     : {
       text: String(alerts.length),
       label: `Alerts, ${alerts.length} active${status === "demo" ? ", demo data" : ""}`,
@@ -29,7 +31,11 @@ export default function TopNavigation() {
           <span aria-hidden="true" className={`min-w-6 rounded-pill px-2 py-0.5 text-center tabular-nums ${badge.style}`}>
             {badge.text}
           </span>
-          {alerts === null && <span aria-hidden="true" className="text-xs font-normal text-muted">Connecting…</span>}
+          {(alerts === null || status === "stale") && (
+            <span aria-hidden="true" className="text-xs font-normal text-muted">
+              {status === "unreachable" || status === "stale" ? "Offline" : "Connecting…"}
+            </span>
+          )}
           {status === "demo" && <span aria-hidden="true" className="rounded-pill border border-border px-2 py-0.5 text-xs font-medium text-muted">Demo data</span>}
         </Link>
       </div>
