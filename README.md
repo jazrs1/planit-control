@@ -32,7 +32,7 @@ uvicorn app.main:app --reload --port 8000
 - Interactive docs: http://localhost:8000/docs
 - Health check (includes the database): `curl localhost:8000/health`
 
-`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json`; their hazard values are still placeholders (see the `TODO(...)` markers in `app/site_data.py`). Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts and briefings still come from `shared/mocks/`. Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
+`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json` with live hazard data (see **Hazard data sources** below); `hazard_index` is a temporary rule-based score until the ML model exists. Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts and briefings still come from `shared/mocks/`. Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
 
 ### Hazard data sources
 
@@ -92,7 +92,7 @@ cp .env.example .env.local      # NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Open http://localhost:3000. The home page lists every site, highest risk first, using `components/SiteCard.tsx`. If the backend isn't running, the frontend falls back to `shared/mocks` and logs a warning in the terminal.
+Open http://localhost:3000 for the supervisor dashboard: a live map of every site with recent lightning, sites ranked by risk with stop-work countdowns, and a **⚡ Replay storm** button that plays the Aug 4, 2025 storm (after `python -m scripts.find_replay_window`). `/alerts` lists active alerts. The frontend never shows mock data when the backend is down: it says the server can't be reached and stop-work status is unknown. Sample data from `shared/mocks` is shown only if you click **Show demo data**, and is labeled "Demo data" everywhere.
 
 Other commands: `npm run typecheck`, `npm run build`.
 

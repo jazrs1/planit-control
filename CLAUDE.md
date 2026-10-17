@@ -19,7 +19,7 @@ Real-time job-site safety platform for utility field crews. Built for the Sperry
 |---|---|---|
 | `frontend/` | Frontend teammates | Next.js (App Router), TypeScript, Tailwind v4, MapLibre GL |
 | `backend/` | John Azer | Python 3.11, FastAPI, uvicorn. Config from `backend/.env`. `data/sites.json` + `scripts/load_sites.py` |
-| `shared/` | John Azer | `types.ts` (the API contract) and `mocks/` (sample JSON for every endpoint) |
+| `shared/` | John Azer | `types.ts` (the API contract) and `mocks/` (sample JSON for every endpoint: contract examples, backend placeholders without a database, and the frontend's labeled demo mode) |
 
 Only change files in folders you own. If you need something in another folder (a new field, a new endpoint, a bug fix), ask the owner or open an issue.
 
@@ -59,7 +59,8 @@ Changing the contract: update `shared/types.ts`, `backend/app/schemas.py`, and t
 - **Lightning:** a strike within 10 mi of a site starts a stop-work alert. `all_clear_at` = latest strike + 30 min and moves later with every new strike.
 - **Nullable fields** use `null`, never a missing key.
 - **Frontend styling:** use the tokens in `frontend/styles/tokens.css` through their Tailwind names (`bg-surface`, `text-muted`, `bg-risk-red-bg`, `rounded-card`, ...). No raw hex colors in components. `frontend/components/SiteCard.tsx` is the reference component: copy its structure.
-- **Frontend data:** fetch through `frontend/lib/api.ts`. If the backend can't be reached, it falls back to `shared/mocks`, so UI work never waits on the API.
+- **Frontend data:** fetch through `frontend/lib/api.ts`; its requests throw when the backend is unreachable or returns an error. The frontend **never falls back to mocks** when the backend is down. Unknown safety data must look unknown: the nav badge shows "—" / "Offline", the dashboard says "Can't reach the server", and after a connection drop the last real data stays visible but greyed with "?" and countdowns say "Not confirmed", never "All clear". `shared/mocks` appear only in the explicit **Demo data** mode (`DEMO_DATA` in `lib/api.ts`, turned on with "Show demo data"), and anything showing them must carry the "Demo data" label.
+- **Frontend state and time:** read alerts and replay state from `AlertsProvider` via `useAlertsState()` so the nav badge, dashboard and `/alerts` always agree (the dashboard's "Alerts" count equals the badge; "Stop work" is lightning only). Any countdown or age-based display uses `useServerNow()`: the backend clock, simulated during replay and a demo clock in demo mode. Poll with `lib/usePolling.ts`; refresh speeds up to every 3 seconds while a replay runs.
 - **Next.js 16:** APIs have changed from older versions. Check `frontend/node_modules/next/dist/docs/` before using a Next API you're unsure of.
 - **Backend:** one router per resource in `backend/app/routers/`. Read config only through `get_settings()` in `backend/app/config.py`. Keep each route's response model the same when you swap in real data.
 - **Real vs placeholder data:** every hazard card is real when the backend has a database: lightning (GOES-19), heat, rain and soil (Open-Meteo), NWS alerts, FEMA flood zones, nearby rivers (USGS NHD), fires (NASA FIRMS, needs `FIRMS_MAP_KEY`), wildlife (iNaturalist + crew reports). `hazard_index` / `top_factors` are a **temporary rule-based score** (`backend/hazards/scoring.py`) until the ML model exists; while a site has an active lightning stop-work, today's index is at least 9.0. Report photos are saved to `backend/uploads/` (gitignored) and served at `/uploads/<file>`. Briefings are still mocked and only cover the 6 mock sites.
