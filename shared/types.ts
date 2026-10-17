@@ -271,6 +271,11 @@ export interface Briefing {
   unavailable?: (keyof BriefingKeyNumbers)[] | null;
 }
 
+// ---------- GET /briefings ----------
+
+/** The latest briefing for every site that has one, largest plant first. */
+export type BriefingsResponse = Briefing[];
+
 // ---------- POST /briefing/send-now ----------
 
 export interface SendBriefingRequest {

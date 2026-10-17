@@ -76,8 +76,23 @@ def generate(pool: ConnectionPool, site_ids: list[str] | None = None, now: datet
                  "numbers": Jsonb(numbers), "unavailable": unavailable, "inputs": Jsonb(inputs),
                  "generator": written.generator, "model": written.model})
         done.append(site_id)
+    if done:
+        from app.cache import api_cache
+
+        api_cache.invalidate()   # GET /briefings shows new briefings on the next request
     log.info("Briefings generated for %d sites", len(done))
     return done
+
+
+def latest_all(pool: ConnectionPool) -> list[dict]:
+    """The latest briefing for every site that has one, largest plant first (like /sites)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            f"""SELECT * FROM (
+                    SELECT DISTINCT ON (b.site_id) {COLUMNS}, s.capacity_mw
+                    FROM briefings b JOIN sites s ON s.id = b.site_id
+                    ORDER BY b.site_id, b.for_date DESC, b.created_at DESC) latest
+                ORDER BY capacity_mw DESC, site_id""").fetchall()
 
 
 def latest(pool: ConnectionPool, site_id: str) -> dict | None:
@@ -128,6 +143,7 @@ async def run_loop(pool: ConnectionPool) -> None:
 
 def to_response(row: dict) -> dict:
     """DB row -> Briefing (shared/types.ts)."""
+    row = {k: v for k, v in row.items() if k != "capacity_mw"}
     return {**row, "for_date": row["for_date"].isoformat(), "unavailable": row["unavailable"] or []}
 
 
