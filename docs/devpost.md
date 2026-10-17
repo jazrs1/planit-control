@@ -45,7 +45,7 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
   - Amber and red days held 42% of logged events (83% with our first, looser anchors, which colored most sites on an ordinary day); 58% fell on green days, because many Florida storms form with little warning. The index plans the day; the lightning engine and NWS warnings protect the crew.
 - **On that storm, the forecast warned 8 of 13 stop-works** (after a 15-minute warm-up) a median of 10.8 minutes ahead. It's one storm, and we tuned on it. Arrival estimates ran late in 7 of 8, so the app never shows an arrival countdown, and 11 of 19 advisories weren't followed by a stop-work.
 - **Reaction time.** On our production server, real stop-work alerts were saved a median of 35 seconds after the strike (worst 49 s, five stop-works), nearly all of it the GOES-19 satellite's own delivery time; our engine adds about one second. A small sample: one afternoon of storms over southeast Florida.
-- 332 backend tests and 83 frontend tests.
+- 332 backend tests and 84 frontend tests.
 
 ## What we learned
 
