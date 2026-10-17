@@ -24,9 +24,9 @@ CALIBRATION_SVG = MODELS_DIR / "calibration.svg"
 
 HYBRID = ("The hazard index is the highest of: the ML weather score (the model's calibrated probability "
           "mapped to 0-10), the OSHA heat-index band, and the wildfire, wildlife and crew-report rules. "
-          "An NWS warning (flood, flash flood, severe thunderstorm, tornado, extreme heat, red flag) or a "
-          "downed-line crew report raises it to at least 7, and an NWS watch or advisory, or our flood-risk "
-          "alert, to at least 4. While a site has an active lightning stop-work, today's index is at least 9. "
+          "An NWS Hurricane Warning raises it to at least 9; another NWS warning (flood, flash flood, severe "
+          "thunderstorm, tornado, tropical storm, extreme heat, red flag) or a downed-line crew report to at "
+          "least 7; an NWS watch or advisory, or our flood-risk alert, to at least 4. While a site has an active lightning stop-work, today's index is at least 9. "
           "Every factor says whether it came from the model or a rule.")
 FEATURE_LABELS = {
     "cape_max": "Storm energy (CAPE)", "location": "Site location (past report frequency)",

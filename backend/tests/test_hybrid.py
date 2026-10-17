@@ -124,6 +124,32 @@ def test_nws_watch_or_advisory_floors_today_at_4(event):
     assert scored["top_factors"][0]["label"] == f"NWS {event} until 4:30 PM"
 
 
+@pytest.mark.parametrize("event, floor", [
+    ("Hurricane Warning", 9.0), ("Tropical Storm Warning", 7.0), ("Hurricane Watch", 4.0), ("Tropical Storm Watch", 4.0),
+])
+def test_tropical_floors(event, floor):
+    scored = predict(inputs(nws=[nws(event, ends_in_h=30)]), {})        # through 8 PM tomorrow
+    assert scored["hazard_index_today"] == floor
+    assert scored["hazard_index_tomorrow"] == floor                       # watches and warnings carry into tomorrow
+    assert scored["top_factors"][0] == {"hazard": "lightning", "label": f"NWS {event} until Thu 8 PM",
+                                        "weight": 1.0, "source": "rule"}
+
+
+def test_hurricane_warning_does_not_hide_a_tornado_warning():
+    scored = predict(inputs(nws=[nws("Hurricane Warning", ends_in_h=30), nws("Tornado Warning", ends_in_h=0.5),
+                                 nws("Tropical Storm Warning", ends_in_h=30)]), {})
+    assert scored["hazard_index_today"] == 9.0
+    assert [f["label"] for f in scored["top_factors"]] == ["NWS Hurricane Warning until Thu 8 PM",
+                                                         "NWS Tornado Warning until 2:30 PM"]
+
+
+def test_hurricane_floor_and_stop_work_both_listed():
+    alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW, "all_clear_at": NOW + timedelta(minutes=30)}
+    scored = predict(inputs(nws=[nws("Hurricane Warning", ends_in_h=30)], lightning_alert=alert), {})
+    assert scored["hazard_index_today"] == 9.0
+    assert [f["label"] for f in scored["top_factors"]] == [STOP_WORK_FACTOR, "NWS Hurricane Warning until Thu 8 PM"]
+
+
 def test_unrelated_nws_alerts_add_no_floor():
     assert predict(inputs(nws=[nws("Rip Current Statement"), nws("Small Craft Advisory")]), {})["hazard_index_today"] == 0
 
@@ -141,12 +167,23 @@ def test_our_flood_risk_alert_floors_today_at_4():
 def test_downed_line_floors_today_at_7_with_its_age():
     downed = {"id": "r2", "category": "downed_line", "species": None, "created_at": NOW - timedelta(hours=2),
               "distance_mi": 0.2}
-    scored = predict(inputs(crew_reports=[downed]), {})
+    scored = predict(inputs({("heat", "heat_index_f"): 95.0}, crew_reports=[downed]), {})
     assert scored["hazard_index_today"] == 7.0
-    assert scored["top_factors"][0] == {"hazard": "lightning", "label": "Crew report: downed line, 2 h ago",
-                                        "weight": 1.0, "source": "rule"}
+    # No HazardType fits an electrical hazard and the API can't point at the crew-hazards card: null.
+    assert scored["top_factors"][0] == {"hazard": None, "label": "Crew report: downed line, 2 h ago",
+                                        "weight": 0.58, "source": "rule"}
+    assert scored["top_hazard"] == "heat"                 # top_hazard stays a HazardType: the next factor's
     assert scored["cards"]["crew_hazards"]["hazard_status"] == "danger"
-    assert scored["hazard_index_tomorrow"] == 0.0
+    assert scored["hazard_index_tomorrow"] == 0.0         # the downed line is today's only
+
+
+def test_downed_line_alone_still_gives_a_valid_top_hazard_and_response():
+    from app.schemas import ContributingFactor, Site
+    downed = {"id": "r2", "category": "downed_line", "species": None, "created_at": NOW, "distance_mi": 0.2}
+    scored = predict(inputs(crew_reports=[downed]), {})
+    assert scored["hazard_index_today"] == 7.0 and scored["top_hazard"] == "heat"   # contract default
+    ContributingFactor.model_validate(scored["top_factors"][0])
+    Site.model_validate({**SITE, "county": "Test", "hazard_index": 7.0, "top_hazard": scored["top_hazard"]})
 
 
 def test_floors_only_raise_the_index():

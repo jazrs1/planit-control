@@ -10,9 +10,11 @@ Hybrid index, for today and tomorrow (site-local dates):
     - the wildfire rule (FIRMS distance), the wildlife rule, and crew reports
       (a crew report that raises a card to watch counts 4.0; today only)
     - floors that only ever raise the index:
+        an NWS Hurricane Warning for the site                                      at least 9
         an NWS warning for the site (flood, flash flood, coastal flood, severe thunderstorm,
-          tornado, excessive/extreme heat, red flag)                              at least 7
-        an NWS watch or advisory in the same families, or our own flood-risk alert  at least 4
+          tornado, tropical storm, excessive/extreme heat, red flag)              at least 7
+        an NWS watch or advisory in the same families (incl. hurricane and tropical
+          storm watches), or our own flood-risk alert                             at least 4
         a downed-line crew report within 2 mi in the last 48 h (today only)        at least 7
       Today counts alerts in effect at any point in the rest of today; tomorrow counts only
       watches and warnings in effect during tomorrow.
@@ -41,34 +43,52 @@ from zoneinfo import ZoneInfo
 from hazards.scoring import STOP_WORK_FACTOR, Inputs, ago, score_site
 
 STOP_WORK_MIN = 9.0
+HURRICANE_FLOOR = 9.0
 WARNING_FLOOR = 7.0
 WATCH_FLOOR = 4.0
 SHOW_RULES_FROM = 4.0  # rule factors at watch or above are listed even when another source wins
 MAX_FACTORS = 4
 
-# NWS event -> hazard. Warnings floor the index at 7, watches and advisories at 4.
-WARNINGS = {
-    "Flood Warning": "flood", "Flash Flood Warning": "flood", "Coastal Flood Warning": "flood",
-    "Severe Thunderstorm Warning": "lightning", "Tornado Warning": "lightning",
-    "Excessive Heat Warning": "heat", "Extreme Heat Warning": "heat",  # NWS renamed it Extreme in 2025
-    "Red Flag Warning": "wildfire",
+# NWS event -> (family, hazard, floor). Each family gives one floor, from its most severe alert, so a
+# Hurricane Warning doesn't hide a Tornado Warning. Storm and tropical alerts use the `lightning`
+# hazard, like the model's storm factors (the contract has no wind or storm type).
+NWS_FLOORS = {
+    "Flood Warning": ("flood", "flood", WARNING_FLOOR),
+    "Flash Flood Warning": ("flood", "flood", WARNING_FLOOR),
+    "Coastal Flood Warning": ("flood", "flood", WARNING_FLOOR),
+    "Flood Watch": ("flood", "flood", WATCH_FLOOR),
+    "Flash Flood Watch": ("flood", "flood", WATCH_FLOOR),
+    "Coastal Flood Watch": ("flood", "flood", WATCH_FLOOR),
+    "Flood Advisory": ("flood", "flood", WATCH_FLOOR),
+    "Coastal Flood Advisory": ("flood", "flood", WATCH_FLOOR),
+    "Severe Thunderstorm Warning": ("storm", "lightning", WARNING_FLOOR),
+    "Tornado Warning": ("storm", "lightning", WARNING_FLOOR),
+    "Severe Thunderstorm Watch": ("storm", "lightning", WATCH_FLOOR),
+    "Tornado Watch": ("storm", "lightning", WATCH_FLOOR),
+    "Hurricane Warning": ("tropical", "lightning", HURRICANE_FLOOR),
+    "Tropical Storm Warning": ("tropical", "lightning", WARNING_FLOOR),
+    "Hurricane Watch": ("tropical", "lightning", WATCH_FLOOR),
+    "Tropical Storm Watch": ("tropical", "lightning", WATCH_FLOOR),
+    "Excessive Heat Warning": ("heat", "heat", WARNING_FLOOR),
+    "Extreme Heat Warning": ("heat", "heat", WARNING_FLOOR),  # NWS renamed Excessive to Extreme in 2025
+    "Excessive Heat Watch": ("heat", "heat", WATCH_FLOOR),
+    "Extreme Heat Watch": ("heat", "heat", WATCH_FLOOR),
+    "Heat Advisory": ("heat", "heat", WATCH_FLOOR),
+    "Red Flag Warning": ("fire", "wildfire", WARNING_FLOOR),
+    "Fire Weather Watch": ("fire", "wildfire", WATCH_FLOOR),
 }
-WATCHES = {
-    "Flood Watch": "flood", "Flash Flood Watch": "flood", "Coastal Flood Watch": "flood",
-    "Severe Thunderstorm Watch": "lightning", "Tornado Watch": "lightning",
-    "Excessive Heat Watch": "heat", "Extreme Heat Watch": "heat", "Fire Weather Watch": "wildfire",
-}
-ADVISORIES = {"Flood Advisory": "flood", "Coastal Flood Advisory": "flood", "Heat Advisory": "heat"}  # today only
-NWS_EVENTS = WARNINGS.keys() | WATCHES.keys() | ADVISORIES.keys()
+ADVISORIES = {"Flood Advisory", "Coastal Flood Advisory", "Heat Advisory"}  # today only
+NWS_EVENTS = NWS_FLOORS.keys()
 FLOOD_ALERT_FACTOR = "Flood-risk alert: heavy rain in flood-prone area"
-# The contract's HazardType has no electrical or crew category; a downed line is storm damage.
-DOWNED_LINE_HAZARD = "lightning"
+# The API can't attach a factor to the crew-hazards card, and no HazardType fits an electrical
+# hazard, so the downed-line factor has no hazard (null); conditions.crew_hazards shows the report.
+DOWNED_LINE_HAZARD = None
 
 
 @dataclass
 class Component:
     source: str            # "model" | "rule"
-    hazard: str            # the component's leading HazardType
+    hazard: str | None     # the component's leading HazardType (None: a downed line)
     score: float           # 0-10
     factors: list[tuple[str, str, float]] = field(default_factory=list)  # (hazard, label, share of this component)
     urgent: bool = False   # an official warning or downed line: listed right after the stop-work
@@ -81,7 +101,7 @@ def _model_component(model: dict | None) -> Component | None:
     return Component("model", factors[0][0] if factors else "lightning", float(model["score"]), factors)
 
 
-def _rule(hazard: str, score: float, label: str, urgent: bool = False) -> Component | None:
+def _rule(hazard: str | None, score: float, label: str, urgent: bool = False) -> Component | None:
     return Component("rule", hazard, float(score), [(hazard, label, 1.0)], urgent) if score > 0 and label else None
 
 
@@ -103,7 +123,9 @@ def combine(components: list[Component | None], stop_work: bool) -> tuple[float,
     factors = factors[:MAX_FACTORS]
     for f in factors:  # floor, so the weights never sum past 1
         f["weight"] = math.floor(f["weight"] * 100) / 100
-    top = factors[0]["hazard"] if factors else "heat"
+    # top_hazard must be a HazardType: the first factor that has one (a downed line has none).
+    top = next((f["hazard"] for f in factors if f["hazard"]), None) or next(
+        (c.hazard for c in comps if c.hazard and c.score > 0), "heat")
     return round(min(index, 10.0), 1), top, factors
 
 
@@ -123,30 +145,25 @@ def _in_effect(alert: dict, start: datetime, end: datetime) -> bool:
 
 
 def nws_floors(inp: Inputs, day: date, start: datetime, end: datetime, advisories: bool) -> list[Component]:
-    """One floor per hazard family: the most severe NWS alert in effect between start and end."""
+    """One floor per alert family: the most severe NWS alert in effect between start and end."""
     tz = ZoneInfo(inp.site["timezone"])
-    best: dict[str, tuple[float, str]] = {}
+    best: dict[str, tuple[float, str, str]] = {}   # family -> (floor, hazard, label)
     for a in inp.nws:
         event = a["event"]
-        if event in WARNINGS:
-            hazard, floor = WARNINGS[event], WARNING_FLOOR
-        elif event in WATCHES or (advisories and event in ADVISORIES):
-            hazard, floor = WATCHES.get(event) or ADVISORIES[event], WATCH_FLOOR
-        else:
+        if event not in NWS_FLOORS or (event in ADVISORIES and not advisories) or not _in_effect(a, start, end):
             continue
-        if not _in_effect(a, start, end):
-            continue
+        family, hazard, floor = NWS_FLOORS[event]
         until = f" until {_clock(a['ends_at'], tz, day)}" if a.get("ends_at") else ""
-        if floor > best.get(hazard, (0.0, ""))[0]:
-            best[hazard] = (floor, f"NWS {event}{until}")
-    return [_rule(h, floor, label, urgent=floor >= WARNING_FLOOR) for h, (floor, label) in best.items()]
+        if floor > best.get(family, (0.0, "", ""))[0]:
+            best[family] = (floor, hazard, f"NWS {event}{until}")
+    return [_rule(h, floor, label, urgent=floor >= WARNING_FLOOR) for floor, h, label in best.values()]
 
 
 def today_floors(inp: Inputs, now: datetime, today: date) -> list[Component | None]:
     tz = ZoneInfo(inp.site["timezone"])
     midnight = datetime.combine(today + timedelta(days=1), time(0), tz)
     floors: list[Component | None] = nws_floors(inp, today, now, midnight, advisories=True)
-    if inp.flood_alert and not any(c.hazard == "flood" and c.score >= WATCH_FLOOR for c in floors):
+    if inp.flood_alert and not any(c.hazard == "flood" and c.score >= WATCH_FLOOR for c in floors if c):
         floors.append(_rule("flood", WATCH_FLOOR, FLOOD_ALERT_FACTOR))
     downed = next((r for r in inp.crew_reports if r["category"] == "downed_line"), None)  # newest first
     if downed:

@@ -119,7 +119,7 @@ FactorSource = Literal["model", "rule"]
 
 
 class ContributingFactor(BaseModel):
-    hazard: HazardType
+    hazard: HazardType | None   # None: a factor that isn't one hazard (a downed-line crew report)
     label: str
     weight: float = Field(ge=0, le=1)
     source: FactorSource | None = None

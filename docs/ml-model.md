@@ -265,10 +265,13 @@ A floor only ever *raises* the index; it never lowers a higher model or rule sco
 | Storms | Severe Thunderstorm Warning, Tornado Warning | Severe Thunderstorm Watch, Tornado Watch |
 | Heat | Excessive Heat Warning (renamed Extreme Heat Warning in 2025) | Excessive/Extreme Heat Watch, Heat Advisory |
 | Fire | Red Flag Warning | Fire Weather Watch |
+| Tropical | Tropical Storm Warning; **Hurricane Warning (at least 9)** | Tropical Storm Watch, Hurricane Watch |
 
 Our own flood-risk alert (heavy rain in a FEMA flood zone or near a river, `alerts/flood.py`) floors today at 4. A downed-line crew report within 2 miles in the last 48 hours floors today at 7, with the factor "Crew report: downed line, 2 h ago".
 
-Today counts any alert in effect during the rest of today, so a Flood Watch starting this afternoon counts and one starting tomorrow doesn't. Tomorrow counts only watches and warnings in effect at some point tomorrow; advisories, our flood alert and crew reports describe now, not tomorrow. Each hazard family contributes one floor, from its most severe alert. The factor names the alert and when it ends ("NWS Severe Thunderstorm Warning until 4:30 PM", or "until Fri 10 AM" when it ends on a later day).
+A Hurricane Warning floors the index at 9, the same level as a lightning stop-work: outdoor line work shouldn't be planned in hurricane-force wind.
+
+Today counts any alert in effect during the rest of today, so a Flood Watch starting this afternoon counts and one starting tomorrow doesn't. Tomorrow counts only watches and warnings in effect at some point tomorrow; advisories, our flood alert and crew reports describe now, not tomorrow. Each alert family (flood, storms, tropical, heat, fire) contributes one floor, from its most severe alert. Tropical is its own family, so a Hurricane Warning doesn't hide a Tornado Warning. The factor names the alert and when it ends ("NWS Severe Thunderstorm Warning until 4:30 PM", or "until Fri 10 AM" when it ends on a later day).
 
 **Why floors exist:**
 
@@ -279,7 +282,7 @@ Today counts any alert in effect during the rest of today, so a Flood Watch star
 
 **What feeds the index only through floors or the model:** the card rules for rain, flood zones and soil don't feed the index directly; rain, storms and soil are the model's job, and NWS alerts and our flood alert come in through the floors. The cards, alerts and the briefing's go/caution logic still use all of them.
 
-**Factor order:** every factor carries `source: "model" | "rule"`. The stop-work comes first, then warning-level floors (official warnings, downed lines), then the winning part's reasons, then any other part at watch or above. `top_hazard` is the first factor's hazard. A downed line is listed under `lightning` (storm damage) because the API's hazard types have no electrical or crew category.
+**Factor order:** every factor carries `source: "model" | "rule"`. The stop-work comes first, then warning-level floors (official warnings, downed lines), then the winning part's reasons, then any other part at watch or above. `top_hazard` is the first factor's hazard. The downed-line factor has `hazard: null`: the API's hazard types have no electrical or crew category, and a factor can't point at the crew-hazards card (`conditions.crew_hazards`), which shows the report itself. `top_hazard` stays a hazard type: the first factor that has one. Storm and tropical alerts use `lightning`, like the model's storm factors.
 
 **How it runs.** The hourly weather poll (`hazards/sources/open_meteo.py`) now requests exactly what the model was trained on: `gfs_seamless`, the same 7 variables and units, 8 past days + 4 forecast days. That's still one Open-Meteo call per site (≤ 10 variables, ≤ 14 days), so 1,320 calls/day, the same as before. The model is scored from that same response with no extra calls (`hazards/model_scores.py`). Every run stores one `hazard_scores` row per site for today and tomorrow: the hybrid `score` and `factors`, plus the model's own part (`model_probability`, `model_score`, `model_factors`, `model_version`; migration `007`). Between runs, `/sites` reads the latest model part back and recombines it with the live rules, so a new stop-work or crew report shows up immediately.
 

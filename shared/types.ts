@@ -162,7 +162,8 @@ export interface NwsAlert {
 export type FactorSource = "model" | "rule";
 
 export interface ContributingFactor {
-  hazard: HazardType;
+  /** null for a factor that isn't one hazard: a downed-line crew report (see conditions.crew_hazards). */
+  hazard: HazardType | null;
   label: string;
   /** Share of the hazard index, 0–1. Factors for a site sum to <= 1. */
   weight: number;
