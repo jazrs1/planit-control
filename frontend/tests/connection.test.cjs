@@ -99,3 +99,20 @@ test("storm-cell requests use the API contract path and reject errors without mo
   await assert.rejects(api.getLightningCells(), /Forecast unavailable/);
   assert.ok(api.DEMO_DATA.lightningCells.length > 0);
 });
+
+test("push API methods use the contract bodies and do not send the demo code or fall back to mocks", async () => {
+  const calls = [];
+  let status = 200;
+  const { api } = load(async (url, init) => { calls.push({ url, init }); return json(status, status === 200 ? { public_key: "AQID", removed: false, sent: true } : { detail: "Push unavailable" }); });
+  const subscription = { endpoint: "https://fcm.googleapis.com/test-device", keys: { p256dh: "key", auth: "auth" }, expirationTime: null };
+  await api.getPushPublicKey();
+  await api.subscribePush({ subscription, role: "crew", site_ids: ["big-bend"] });
+  await api.unsubscribePush({ endpoint: subscription.endpoint });
+  await api.testPush({ endpoint: subscription.endpoint });
+  assert.deepEqual(calls.map(call => call.url), ["http://api.test/push/public-key", "http://api.test/push/subscribe", "http://api.test/push/unsubscribe", "http://api.test/push/test"]);
+  assert.deepEqual(JSON.parse(calls[1].init.body), { subscription, role: "crew", site_ids: ["big-bend"] });
+  for (const call of calls.slice(1)) { assert.equal(call.init.method, "POST"); assert.equal(call.init.headers["X-Admin-Token"], undefined); }
+  status = 503;
+  await assert.rejects(api.getPushPublicKey(), /Push unavailable/);
+  await assert.rejects(api.subscribePush({ subscription, role: "crew", site_ids: null }), /Push unavailable/);
+});

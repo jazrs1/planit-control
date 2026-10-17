@@ -104,6 +104,7 @@ function modules(state, extra = {}) {
     "@/components/SiteScoreHistory": nullComponent,
     "@/components/CrewReadings": nullComponent,
     "@/components/CrewBriefing": nullComponent,
+    "@/components/PushSettings": nullComponent,
     "@/lib/api": { DEMO_DATA: { sites: [site], lightning: [], lightningCells: [cell], siteDetails: { [site.id]: detail }, briefings: {} } },
     "@/lib/useCrewSiteData": { useCrewSiteData: () => ({ detail, detailFailed: false, briefingFailed: false, loading: false }) },
     "@/lib/usePolling": { usePolling() {} },
