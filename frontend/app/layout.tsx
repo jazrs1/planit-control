@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { APP_COLORS } from "@/lib/branding";
 import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, pageMetadata } from "@/lib/metadata";
 import { AlertsProvider } from "@/components/AlertsProvider";
+import { ViewModeProvider } from "@/components/ViewModeProvider";
 import { PushProvider } from "@/components/PushProvider";
 import OutageShell from "@/components/OutageShell";
 import TopNavigation from "@/components/TopNavigation";
@@ -48,12 +49,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" className={`${overpass.variable} ${overpassMono.variable}`}>
-      <body className="min-h-svh pbs-[env(safe-area-inset-top,0px)] pe-[env(safe-area-inset-right,0px)] pbe-[calc(env(safe-area-inset-bottom,0px)+7rem)] ps-[env(safe-area-inset-left,0px)] antialiased sm:pbe-0">
+      <body className="min-h-svh pbs-[env(safe-area-inset-top,0px)] pe-[env(safe-area-inset-right,0px)] pbe-[env(safe-area-inset-bottom,0px)] ps-[env(safe-area-inset-left,0px)] antialiased">
         <AlertsProvider initialAlerts={alerts}>
-          <PushProvider>
-            <TopNavigation />
-            <OutageShell>{children}</OutageShell>
-          </PushProvider>
+          <ViewModeProvider>
+            <PushProvider>
+              <TopNavigation />
+              <OutageShell>{children}</OutageShell>
+            </PushProvider>
+          </ViewModeProvider>
         </AlertsProvider>
       </body>
     </html>

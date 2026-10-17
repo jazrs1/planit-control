@@ -21,6 +21,9 @@ const QUIET_TAIL_MIN = 31;
  *  README "Storm replay"). Status reports the real window once a replay has run. */
 const DEFAULT_WINDOW = "2025-08-04_2200-2300";
 const ZONE = { timeZone: "America/New_York" } as const;
+/** A recording of the replay for people who can't start one. Set the video URL to show the link in the
+ *  idle panel; null keeps it hidden. */
+const RECORDING_URL: string | null = null;
 
 function clock(ms: number, zone = false, timeZone: string = ZONE.timeZone) {
   return new Date(ms).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit", ...(zone ? { timeZoneName: "short" } : {}) });
@@ -85,12 +88,17 @@ type ReplayTimelineProps = {
   nowMs: number;
   /** The connection dropped: the replay may have ended; everything here is last known. */
   stale: boolean;
+  /** This device's view. In Live view a running replay is one slim banner with "Watch replay". */
+  view?: "live" | "replay";
+  /** Replay view after the replay finished: the panel stays on its final state. */
+  ended?: boolean;
+  onWatch?: () => void;
 };
 
 /** The storm replay instrument: the one dark panel on the light page, so a replay can never be mistaken
  *  for a real stop-work. Controls, forward-only progress (no seeking), event markers, flash particles,
  *  two quiet charts and the key events. Replay counts live here, never in the dashboard's real counts. */
-export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs, stale }: ReplayTimelineProps) {
+export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs, stale, view = "replay", ended = false, onWatch }: ReplayTimelineProps) {
   const running = replay?.running ?? false;
   const names = new Map(sites.map((site) => [site.id, site.name]));
   const zones = new Map(sites.map((site) => [site.id, site.timezone]));
@@ -112,11 +120,23 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
   // Key events start open on a wide screen and collapsed on a phone.
   useEffect(() => { if (details.current && window.matchMedia("(min-width: 64rem)").matches) details.current.open = true; }, [running]);
 
-  if (!running) {
+  // Live view while a replay runs: one slim line, so today's map stays today's.
+  if (running && view === "live") {
+    return (
+      <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-instrument px-4 py-2 text-text shadow-float">
+        <span className="pc-chip pc-chip--replay">REPLAY</span>
+        <h2 id="replay-heading" className="min-w-0 flex-1 text-sm">A storm replay is running</h2>
+        {onWatch && <button type="button" onClick={onWatch} className="pc-btn rounded-pill border-text/40 bg-transparent px-5 text-text">Watch replay</button>}
+      </section>
+    );
+  }
+
+  if (!running && !ended) {
     return (
       <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-instrument px-4 py-2 text-text shadow-float">
         <h2 id="replay-heading" className="text-sm font-semibold">Storm replay</h2>
         <p className="min-w-0 flex-1 basis-56 text-xs text-muted sm:truncate">{replayWindowLabel(replay)} · plays a recorded storm through the live pipeline</p>
+        {RECORDING_URL && <a href={RECORDING_URL} target="_blank" rel="noopener noreferrer" className="pc-link text-text">Watch the 90-second recording</a>}
         <ReplayControl />
       </section>
     );
@@ -147,7 +167,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
           </span>
         </header>
 
-        <div className="grid items-center gap-x-6 gap-y-3 xl:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="grid items-center gap-x-6 gap-y-3">
           <ReplayControl />
           <div className="grid min-w-0 gap-1">
             <div className="relative h-4 mbe-1" aria-hidden="true">

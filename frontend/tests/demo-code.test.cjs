@@ -41,11 +41,23 @@ test("the code is remembered in localStorage and cleared", () => {
   assert.equal(code.getDemoCode(), null);
   assert.deepEqual({ ...code.demoCodeHeaders() }, {});
   code.setDemoCode("swamp");
-  assert.equal(window.localStorage.getItem("planit-demo-code"), "swamp");
+  assert.equal(JSON.parse(window.localStorage.getItem("planit-demo-code")).code, "swamp");
   assert.equal(load("lib/demoCode.ts", { window }).getDemoCode(), "swamp");      // survives a reload
   assert.deepEqual({ ...code.demoCodeHeaders() }, { "X-Admin-Token": "swamp" });
   code.clearDemoCode();
   assert.equal(code.getDemoCode(), null);
+});
+
+test("an entered code is remembered for 24 hours, then forgotten", () => {
+  const window = { localStorage: storage() };
+  const code = load("lib/demoCode.ts", { window });
+  const t0 = Date.parse("2026-10-17T19:00:00Z");
+  code.setDemoCode("swamp", t0);
+  assert.equal(code.getDemoCode(t0 + 23 * 3600_000), "swamp");
+  assert.equal(code.getDemoCode(t0 + 24 * 3600_000), null, "expired after 24 h");
+  assert.equal(window.localStorage.getItem("planit-demo-code"), null, "and removed from the device");
+  window.localStorage.setItem("planit-demo-code", "old-plain-text");
+  assert.equal(code.getDemoCode(), null, "an older entry without a time is treated as expired");
 });
 
 test("blocked storage doesn't throw: the code is kept for this page load", () => {
@@ -60,7 +72,7 @@ test("blocked storage doesn't throw: the code is kept for this page load", () =>
 
 test("replay start/stop and send-now carry the code; reads never do", async () => {
   const window = { localStorage: storage() };
-  window.localStorage.setItem("planit-demo-code", "swamp");
+  window.localStorage.setItem("planit-demo-code", JSON.stringify({ code: "swamp", savedAt: Date.now() }));
   const sent = [];
   const fetch = async (url, init = {}) => {
     sent.push({ url, headers: { ...(init.headers ?? {}) } });
