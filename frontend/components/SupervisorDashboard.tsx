@@ -219,7 +219,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const replayFlashCount = flashes.filter(isReplayFlash).length;
   const realFlashCount = flashes.length - replayFlashCount;
   const stale = lightningStale ? " · last known" : "";
-  const flashText = replaying
+  const flashText = replaying || replayFlashCount > 0
     ? `${realFlashCount ? `${realFlashCount.toLocaleString()} real` : "real not shown during a replay"} · ${replayFlashCount.toLocaleString()} replay${stale}`
     : `${realFlashCount.toLocaleString()} real${stale}`;
   const fullHeight = "lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))]";
