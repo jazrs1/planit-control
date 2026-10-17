@@ -40,22 +40,22 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
   const edge = realStop ? "border-s-risk-red-solid bg-risk-red-bg" : replayStop ? "border-s-notice [border-inline-start-style:dashed] bg-surface" : "border-s-transparent bg-surface";
 
   return (
-    <article className={`flex flex-col gap-3 border-s-[6px] p-3 ${edge} ${selected ? "outline-3 -outline-offset-3 outline-notice" : ""}`}>
+    <article className={`flex flex-col gap-3 border-s-4 px-4 py-3.5 ${edge} ${selected ? "outline-3 -outline-offset-3 outline-notice" : ""}`}>
       <header className="flex items-start gap-3">
         <div
           className={`flex w-16 shrink-0 items-center gap-1.5 pbs-0.5 ${risk.text}`}
           aria-label={`Hazard index ${site.hazard_index} of 10, ${risk.label} risk`}
         >
           <span aria-hidden="true" className={`pc-shape pc-shape--${realStop || replayStop ? "stop" : level} text-[0.95rem]`} />
-          <span className="font-mono text-xl font-bold leading-none tabular-nums text-text">{site.hazard_index.toFixed(1)}</span>
+          <span className="text-xl font-bold leading-none tracking-[-0.02em] text-text">{site.hazard_index.toFixed(1)}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-extrabold leading-tight text-text">{site.name}</h2>
+          <h2 className="text-base font-bold leading-tight text-text">{site.name}</h2>
           <p className="text-[0.8125rem] text-muted">
             {site.county} County · {timeZoneAbbr(site.timezone)} · <span className="text-text">{HAZARD_LABEL[site.top_hazard]}</span>
           </p>
         </div>
-        <span className={`pc-label shrink-0 pbs-1 ${risk.text}`}>{risk.label}</span>
+        <span className={`shrink-0 pbs-0.5 text-xs font-semibold ${risk.text}`}>{risk.label}</span>
       </header>
 
       {alerts.map((alert) => <AlertBanner key={alert.id} alert={alert} site={site} flood={flood} compact unconfirmed={alertsUnconfirmed} />)}
@@ -64,10 +64,10 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
       {history}
 
       <div className="flex flex-wrap gap-2">
-        <Link href={`/sites/${site.id}`} className="pc-btn min-h-10 flex-1 text-sm">
+        <Link href={`/sites/${site.id}`} className="pc-btn pc-btn--quiet min-h-10 flex-1 text-sm">
           Site details →
         </Link>
-        {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className={`pc-btn min-h-10 flex-1 text-sm ${selected ? "border-notice text-notice" : ""}`}>{selected ? "Selected on map" : "Show on map"}</button>}
+        {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className={`pc-btn pc-btn--quiet min-h-10 flex-1 text-sm ${selected ? "border-notice text-notice" : ""}`}>{selected ? "Selected on map" : "Show on map"}</button>}
       </div>
     </article>
   );

@@ -20,9 +20,9 @@
   --color-muted: var(--pc-text-muted);
   --color-brand: var(--pc-ink);
   --color-on-brand: var(--pc-on-ink);
-  --color-bar: var(--pc-bar);
-  --color-on-bar: var(--pc-on-bar);
-  --color-bar-muted: var(--pc-bar-muted);
+  --color-border-strong: var(--pc-border-strong);
+  --color-instrument: var(--pc-instrument);
+  --color-instrument-line: var(--pc-instrument-line);
   --color-notice: var(--pc-notice);
   --color-on-notice: var(--pc-on-notice);
 
@@ -67,12 +67,21 @@
     background: var(--pc-page);
     color: var(--pc-text);
     font-family: var(--pc-font-sans);
+    /* Numbers line up everywhere: counts, countdowns, readings, times. */
+    font-variant-numeric: tabular-nums;
   }
   h1, h2, h3, h4 { text-wrap: balance; }
   time, [role="timer"] { font-variant-numeric: tabular-nums; }
   input, textarea, select { font-size: max(16px, 1rem); }
   button, a, [role="button"] { touch-action: manipulation; }
   :focus-visible { outline-color: var(--pc-notice); }
+}
+
+/* Laid over the map: hairline, soft shadow. A utility, so it takes variants (lg:pc-float). */
+@utility pc-float {
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
+  box-shadow: var(--pc-shadow-float);
 }
 
 @layer components {
@@ -85,21 +94,34 @@
     text-transform: uppercase;
   }
 
-  /* Page title: a sign header. */
+  /* Page title: calm and large. The sign variant (uppercase, black weight) is for the crew view. */
   .pc-title {
     font-size: var(--pc-text-title);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+  .pc-title--sign {
     font-weight: 900;
     letter-spacing: 0.01em;
-    line-height: 1.1;
     text-transform: uppercase;
   }
 
-  /* A panel: white with a black rule. The heavy variant is for the crew view. */
+  /* A small grey label over a big number (stat strips, readouts). Sentence case. */
+  .pc-caption {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--pc-text-muted);
+    line-height: 1.2;
+  }
+
+  /* A panel: white with a light grey hairline. The heavy variant (black rule) is for safety states. */
   .pc-panel {
     background: var(--pc-surface);
-    border: var(--pc-rule-width) solid var(--pc-rule);
+    border: 1px solid var(--pc-border);
   }
-  .pc-panel--heavy { border-width: var(--pc-rule-heavy); }
+  .pc-panel--heavy { border: var(--pc-rule-heavy) solid var(--pc-rule); }
+
   /* Unknown, last known or no data: dashed and grey, never a safety color. */
   .pc-panel--unknown {
     border-style: dashed;
@@ -162,6 +184,8 @@
   }
   .pc-btn > svg { flex: none; inline-size: 1.1em; block-size: 1.1em; }
   .pc-btn--primary { background: var(--pc-ink); border-color: var(--pc-ink); color: var(--pc-on-ink); }
+  /* Calm secondary button for the dashboard and other non-safety pages. */
+  .pc-btn--quiet { border-width: 1px; border-color: var(--pc-border-strong); font-weight: 700; letter-spacing: 0; }
   .pc-btn--danger { color: var(--pc-risk-red); border-color: var(--pc-risk-red); }
   .pc-btn--large { min-block-size: 4rem; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
   .pc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -287,7 +311,7 @@
   max-inline-size: 15rem;
   background: var(--pc-surface);
   color: var(--pc-text);
-  border: var(--pc-rule-width) solid var(--pc-rule);
+  border: 1px solid var(--pc-border);
   font-size: 0.75rem;
   line-height: 1.25;
   pointer-events: none;
@@ -296,7 +320,7 @@
 .site-callout::before {
   content: "";
   position: absolute;
-  background: var(--pc-rule);
+  background: var(--pc-text-muted);
 }
 .site-callout[data-side="east"]::before { inset-inline-end: 100%; inset-block-start: 50%; inline-size: 18px; block-size: 2px; }
 .site-callout[data-side="west"]::before { inset-inline-start: 100%; inset-block-start: 50%; inline-size: 18px; block-size: 2px; }
@@ -311,10 +335,15 @@
 .site-callout__row--flood > span { color: var(--pc-risk-amber); }
 .site-callout__more { font-weight: 700; color: var(--pc-text-muted); }
 
-/* MapLibre controls in the Signal style */
+/* MapLibre controls: floating, hairline */
 .maplibregl-ctrl-group:not(:empty) {
   border-radius: 0;
-  box-shadow: none;
-  border: var(--pc-rule-width) solid var(--pc-rule);
+  border: 1px solid var(--pc-border);
+  box-shadow: var(--pc-shadow-float);
+}
+/* On the wide dashboard the site list floats over the map's right side; keep the controls clear of it. */
+@media (width >= 64rem) {
+  .pc-dash-map .maplibregl-ctrl-top-right { inset-inline-end: calc(var(--pc-rail-width) + 1.5rem); }
+  .pc-dash-map .maplibregl-ctrl-bottom-right { inset-block: 0.75rem auto; inset-inline-end: calc(var(--pc-rail-width) + 4.5rem); }
 }
 .maplibregl-ctrl-attrib { font-family: var(--pc-font-sans); }

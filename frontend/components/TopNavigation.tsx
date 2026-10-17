@@ -50,16 +50,16 @@ export default function TopNavigation() {
     : {
       text: String(alerts.length),
       label: `Alerts, ${alerts.length} active${status === "demo" ? ", demo data" : ""}`,
-      style: counts.lightning > 0 ? "bg-risk-red-solid text-on-risk-red" : alerts.length > 0 ? "bg-risk-amber-solid text-on-risk-amber" : "bg-on-bar text-bar",
+      style: counts.lightning > 0 ? "bg-risk-red-solid text-on-risk-red" : alerts.length > 0 ? "bg-risk-amber-solid text-on-risk-amber" : "pc-chip--quiet",
     };
-  const linkStyle = (href: string) => `flex min-h-10 items-center px-2.5 text-[0.8125rem] font-bold tracking-[0.02em] focus-visible:outline-2 focus-visible:outline-offset-2 ${pathname === href ? "bg-on-bar text-bar" : "text-bar-muted hover:text-on-bar"}`;
+  const linkStyle = (href: string) => `flex min-h-10 items-center px-2.5 text-[0.8125rem] font-bold tracking-[0.02em] focus-visible:outline-2 focus-visible:outline-offset-2 ${pathname === href ? "text-text shadow-[inset_0_-2px_0_currentColor]" : "text-muted hover:text-text"}`;
 
   return (
-    <nav ref={nav} aria-label="Main navigation" className="relative z-50 h-(--pc-nav-height) border-be-2 border-bar bg-bar text-on-bar">
+    <nav ref={nav} aria-label="Main navigation" className="relative z-50 h-(--pc-nav-height) border-be border-border bg-surface text-text">
       <div className="flex h-full items-center gap-3 px-3 sm:px-4">
         <Link href="/" className="flex min-h-12 shrink-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="PlanIT Control dashboard">
           <img src="/icon.svg" width={30} height={30} alt="" className="shrink-0" />
-          <span className="text-[0.95rem] font-black uppercase tracking-[0.05em]">PlanIT<span className="hidden text-risk-amber-solid sm:inline"> Control</span></span>
+          <span className="text-base font-extrabold tracking-[-0.01em]">PlanIT<span className="hidden font-medium text-muted sm:inline"> Control</span></span>
         </Link>
         <div className="ms-auto hidden items-center gap-0.5 xl:flex">
           {LINKS.filter((link) => link.href !== "/alerts").map((link) => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} className={linkStyle(link.href)}>{link.label}</Link>)}
@@ -69,29 +69,29 @@ export default function TopNavigation() {
           href="/alerts"
           onClick={() => setOpen(false)}
           aria-current={pathname === "/alerts" ? "page" : undefined}
-          className={`flex min-h-12 min-w-0 max-w-48 flex-col justify-center px-2 focus-visible:outline-2 focus-visible:outline-offset-2 ${pathname === "/alerts" ? "bg-on-bar text-bar" : ""}`}
+          className={`flex min-h-12 min-w-0 max-w-48 flex-col justify-center px-2 focus-visible:outline-2 focus-visible:outline-offset-2 ${pathname === "/alerts" ? "shadow-[inset_0_-2px_0_currentColor]" : ""}`}
           aria-label={`${badge.label}, ${breakdown}`}
         >
           <span className="flex flex-wrap items-center gap-x-1.5">
-          <span className="pc-label">Alerts</span>
+          <span className="text-[0.8125rem] font-bold">Alerts</span>
           <span aria-hidden="true" className={`pc-chip min-w-7 justify-center text-[0.8125rem] tabular-nums ${badge.style}`}>
             {badge.text}
           </span>
           {(alerts === null || status === "stale") && (
-            <span aria-hidden="true" className="text-xs font-semibold opacity-80">
+            <span aria-hidden="true" className="text-xs font-semibold text-muted">
               {status === "unreachable" || status === "stale" ? "Offline" : "Connecting…"}
             </span>
           )}
           {status === "demo" && <span aria-hidden="true" className="pc-chip pc-chip--unknown">Demo data</span>}
           </span>
-          <span aria-hidden="true" className="text-[0.6875rem] opacity-80 tabular-nums">{breakdown}</span>
+          <span aria-hidden="true" className="text-[0.6875rem] text-muted">{breakdown}</span>
         </Link>
-        <button ref={toggle} type="button" aria-expanded={open} aria-controls="main-menu" onClick={() => setOpen((value) => !value)} className="pc-label flex min-h-11 shrink-0 items-center justify-center border-2 border-on-bar px-3 active:scale-97 focus-visible:outline-2 focus-visible:outline-offset-2 xl:hidden">{open ? "Close" : "Menu"}</button>
+        <button ref={toggle} type="button" aria-expanded={open} aria-controls="main-menu" onClick={() => setOpen((value) => !value)} className="pc-btn pc-btn--quiet min-h-11 shrink-0 px-3 text-sm xl:hidden">{open ? "Close" : "Menu"}</button>
         </div>
       </div>
-      {open && <div id="main-menu" className="absolute inset-x-0 inset-bs-full max-h-[calc(100dvh-var(--pc-nav-height))] overflow-y-auto overscroll-contain border-be-2 border-rule bg-surface p-4 pbe-[max(1rem,env(safe-area-inset-bottom,0px))] text-text xl:hidden">
+      {open && <div id="main-menu" className="absolute inset-x-0 inset-bs-full max-h-[calc(100dvh-var(--pc-nav-height))] overflow-y-auto overscroll-contain border-be border-border bg-surface p-4 shadow-float pbe-[max(1rem,env(safe-area-inset-bottom,0px))] text-text xl:hidden">
         <ul className="mx-auto max-w-5xl space-y-1">
-          {LINKS.map((link) => <li key={link.href}><Link href={link.href} onClick={() => setOpen(false)} aria-current={pathname === link.href ? "page" : undefined} className={`flex min-h-14 items-center px-4 text-base font-extrabold uppercase tracking-[0.04em] focus-visible:outline-2 ${link.href === "/report" ? "bg-brand text-on-brand" : pathname === link.href ? "border-s-4 border-rule bg-surface-2" : ""}`}>{link.label}</Link></li>)}
+          {LINKS.map((link) => <li key={link.href}><Link href={link.href} onClick={() => setOpen(false)} aria-current={pathname === link.href ? "page" : undefined} className={`flex min-h-14 items-center px-4 text-base font-bold focus-visible:outline-2 ${link.href === "/report" ? "bg-brand text-on-brand" : pathname === link.href ? "border-s-4 border-text bg-surface-2" : ""}`}>{link.label}</Link></li>)}
         </ul>
       </div>}
       {!open && pathname !== "/report" && pathname !== "/crew" && <Link href="/report" className="pc-btn pc-btn--primary pc-btn--large fixed inset-x-4 inset-be-[calc(env(safe-area-inset-bottom,0px)+1rem)] z-50 shadow-float sm:hidden">Report hazard</Link>}

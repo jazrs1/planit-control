@@ -41,7 +41,7 @@ function CrewSite({ site }: { site: Site }) {
       <LightningApproachChip approach={detail?.lightning_approach} stopWork={!!lightning} unconfirmed={detailFailed || alertsUnknown || connection.level !== "online"} nowMs={serverNow()} demo={status === "demo"} />
       {flood && <AlertBanner alert={flood} site={site} compact prominent flood={detailFailed ? undefined : detail?.conditions.flood} unconfirmed={alertsUnknown} />}
       {!lightning && !flood && (alertsUnknown ? <div role="status" className="pc-panel pc-panel--heavy pc-panel--unknown p-5">
-        <h2 className="pc-title">Safety status unknown</h2>
+        <h2 className="pc-title pc-title--sign">Safety status unknown</h2>
         <p className="mbs-2 font-semibold">Stop-work status is not confirmed. {status === "stale" ? "Connection lost." : "Waiting for the server."}</p>
       </div> : <div className={`pc-panel pc-panel--heavy ${detailFailed || !risk ? "pc-panel--unknown grayscale" : ""}`}>
         <h2 className={`flex h-10 items-center justify-between gap-3 px-4 ${detailFailed || !risk ? "border-be-2 border-dashed border-muted" : risk.band}`}>
@@ -82,7 +82,7 @@ function CrewModeView({ initialSites, demo }: { initialSites: Site[] | null; dem
   useEffect(() => { if (selected) rememberSite(selected.id); }, [selected?.id]);
 
   return <main className="mx-auto max-w-2xl space-y-5 px-4 py-5">
-    <header><h1 className="pc-title">Crew view</h1><p className="mbs-1 font-semibold text-muted">Your site, at a glance.</p></header>
+    <header><h1 className="pc-title pc-title--sign">Crew view</h1><p className="mbs-1 font-semibold text-muted">Your site, at a glance.</p></header>
     {demo && <div role="status" className="rounded-card border-2 border-rule bg-surface p-4 font-semibold text-muted">Demo data · sample conditions, not live safety data. <button type="button" onClick={() => setDemo(false)} className="min-h-12 px-2 text-brand underline">Exit demo</button></div>}
     <div className="pc-panel pc-panel--heavy p-4">
       <label htmlFor="crew-site" className="pc-label block text-sm">Your site</label>

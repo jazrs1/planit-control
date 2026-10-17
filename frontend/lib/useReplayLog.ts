@@ -17,6 +17,8 @@ export type ReplayLog = {
   events: ReplayLogEvent[];
   /** Flashes ingested per 5 simulated minutes, from the change in flashes_ingested between polls. */
   flashBins: { start: number; flashes: number }[];
+  /** Flashes ingested between polls, at the replay's progress then: drawn as particles along the track. */
+  trail: { progress: number; flashes: number }[];
   /** Replay stop-work sites at each poll. */
   stopSeries: { at: number; count: number }[];
   /** The replay this log belongs to (its window), or null before one is seen. */
@@ -25,7 +27,7 @@ export type ReplayLog = {
 
 const BIN_MS = 5 * 60_000;
 const REPLAY_CLOCK_MS = 3 * 60 * 60_000;
-const EMPTY: ReplayLog = { events: [], flashBins: [], stopSeries: [], window: null };
+const EMPTY: ReplayLog = { events: [], flashBins: [], trail: [], stopSeries: [], window: null };
 
 /**
  * The API has no replay event list or time series yet (docs/design-data-needs.md). Until it does, the
@@ -86,7 +88,8 @@ export function useReplayLog(replay: ReplayStatus | null, alerts: Alert[] | null
         else flashBins.push({ start, flashes: delta });
       }
       const stopSeries = alerts === null ? base.stopSeries : [...base.stopSeries, { at: now, count: stops.size }];
-      return { window: run, flashBins, stopSeries, events: [...base.events, ...events].sort((a, b) => a.at - b.at) };
+      const trail = delta === null || delta === 0 ? base.trail : [...base.trail, { progress, flashes: delta }];
+      return { window: run, flashBins, trail, stopSeries, events: [...base.events, ...events].sort((a, b) => a.at - b.at) };
     });
   }, [replay, alerts, sites]);
 

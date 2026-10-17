@@ -160,14 +160,14 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     if (!styleLoaded || !instance) return;
     const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo);
     // Paint needs real colors, so resolve them from tokens.css (light or dark).
-    const ink = resolveColor("--pc-rule");
+    const ink = resolveColor("--pc-risk-amber");
     const muted = resolveColor("--pc-text-muted");
     const fill = resolveColor("--pc-risk-amber-solid");
     const source = instance.getSource<GeoJSONSource>(CELLS_SOURCE);
     if (source) {
       void source.setData(data);
       instance.setPaintProperty(`${CELLS_SOURCE}-fill`, "fill-color", ["case", ["get", "uncertain"], muted, fill]);
-      instance.setPaintProperty(`${CELLS_SOURCE}-outline`, "line-color", ["case", ["get", "uncertain"], muted, ink]);
+      instance.setPaintProperty(`${CELLS_SOURCE}-outline`, "line-color", ["case", ["get", "uncertain"], muted, fill]);
       instance.setPaintProperty(`${CELLS_SOURCE}-arrows`, "line-color", ["case", ["get", "uncertain"], muted, ink]);
       return;
     }
@@ -178,19 +178,19 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       filter: ["==", ["geometry-type"], "Polygon"],
       paint: {
         "fill-color": ["case", ["get", "uncertain"], muted, fill],
-        "fill-opacity": ["case", ["get", "uncertain"], 0.12, 0.22],
+        "fill-opacity": ["case", ["get", "uncertain"], 0.1, 0.18],
       },
     }, before);
     instance.addLayer({
       id: `${CELLS_SOURCE}-outline`, type: "line", source: CELLS_SOURCE,
       filter: ["==", ["geometry-type"], "Polygon"],
-      paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 1.5, "line-dasharray": [3, 2] },
+      paint: { "line-color": ["case", ["get", "uncertain"], muted, fill], "line-width": 1.5, "line-opacity": 0.8 },
     }, before);
     instance.addLayer({
       id: `${CELLS_SOURCE}-arrows`, type: "line", source: CELLS_SOURCE,
       filter: ["==", ["geometry-type"], "LineString"],
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 2.5 },
+      paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 2 },
     }, before);
   }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs, theme]);
 
@@ -203,11 +203,24 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     const source = instance.getSource<GeoJSONSource>(LIGHTNING_SOURCE);
     if (source) {
       void source.setData(data);
+      instance.setPaintProperty(`${LIGHTNING_SOURCE}-glow`, "circle-color", flash);
       instance.setPaintProperty(LIGHTNING_SOURCE, "circle-color", flash);
       instance.setPaintProperty(LIGHTNING_SOURCE, "circle-stroke-color", ring);
       return;
     }
     instance.addSource(LIGHTNING_SOURCE, { type: "geojson", data });
+    // A soft glow under each flash that fades with age, like the dot itself.
+    instance.addLayer({
+      id: `${LIGHTNING_SOURCE}-glow`,
+      type: "circle",
+      source: LIGHTNING_SOURCE,
+      paint: {
+        "circle-color": flash,
+        "circle-radius": ["*", 3.2, ["get", "radius"]],
+        "circle-blur": 1,
+        "circle-opacity": ["*", 0.55, ["get", "opacity"]],
+      },
+    });
     instance.addLayer({
       id: LIGHTNING_SOURCE,
       type: "circle",
@@ -230,6 +243,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     if (!styleLoaded || !instance) return;
     const show = (id: string, visible: boolean) => { if (instance.getLayer(id)) instance.setLayoutProperty(id, "visibility", visible ? "visible" : "none"); };
     show(LIGHTNING_SOURCE, layers.lightning);
+    show(`${LIGHTNING_SOURCE}-glow`, layers.lightning);
     for (const part of ["fill", "outline", "arrows"]) show(`${CELLS_SOURCE}-${part}`, layers.cells);
   }, [styleLoaded, layers.lightning, layers.cells, flashes, cells]);
 
@@ -241,7 +255,8 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     const lons = sites.map((site) => site.lon), lats = sites.map((site) => site.lat);
     const wide = container.current.clientWidth > 700;
     instance.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], {
-      padding: wide ? { top: 40, bottom: 110, left: 280, right: 70 } : { top: 64, bottom: 96, left: 24, right: 48 },
+      // Wide: the site list floats over the right side and the replay panel over the bottom.
+      padding: wide ? { top: 40, bottom: 250, left: 270, right: 460 } : { top: 64, bottom: 24, left: 24, right: 48 },
       animate: false,
     });
   }, [ready, sites]);
@@ -259,7 +274,8 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       clear();
       if (!layers.sites) return;
       const box = container.current.getBoundingClientRect();
-      const avoid = [...(container.current.parentElement?.querySelectorAll("[data-map-avoid], .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right") ?? [])].map((el) => el.getBoundingClientRect());
+      const avoid = [...document.querySelectorAll("[data-map-avoid]"), ...(container.current.querySelectorAll(".maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right"))]
+        .map((el) => el.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
       const placed: DOMRect[] = [];
       const byId = new Map(sites.map((site) => [site.id, site]));
       const rows = new Map<string, { site: Site; text: string; tone: "stop" | "replay" | "flood" }>();
@@ -304,7 +320,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     instance.on("resize", layout);
     // The layers panel opens and closes: its size changes what a label may cover.
     const observer = new ResizeObserver(() => layout());
-    container.current?.parentElement?.querySelectorAll("[data-map-avoid]").forEach((el) => observer.observe(el));
+    document.querySelectorAll("[data-map-avoid]").forEach((el) => observer.observe(el));
     return () => { disposed = true; instance.off("moveend", layout); instance.off("resize", layout); observer.disconnect(); clear(); };
   }, [ready, callouts, sites, alerts, layers.sites]);
 

@@ -124,7 +124,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const stat = (label: string, value: number, solid?: string) => {
     const shown = alertsKnown ? `${value}${alertsStale ? "?" : ""}` : "—";
     const style = countUnknown ? "text-muted" : solid && value > 0 ? solid : "";
-    return <div className={`grid gap-1 px-2.5 py-2 ${style}`}><dt className="pc-label">{label}</dt><dd className="font-mono text-2xl font-bold leading-none tabular-nums">{shown}</dd></div>;
+    return <div className={`grid content-between gap-1 px-2 py-1.5 ${style}`}><dt className={`text-xs font-medium ${style ? "" : "text-muted"}`}>{label}</dt><dd className="text-3xl font-bold leading-none tracking-[-0.02em]">{shown}</dd></div>;
   };
   const layerRow = (key: keyof MapLayers | null, label: string, detail: string, swatch: string) => (
     <li key={label}>
@@ -132,23 +132,26 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
         <input type="checkbox" className="size-4 shrink-0 accent-(--pc-ink)" disabled={!key} checked={key ? layers[key] : false}
           onChange={key ? (event) => setLayers((value) => ({ ...value, [key]: event.target.checked })) : undefined} />
         <span aria-hidden="true" className={`size-3 shrink-0 ${swatch}`} />
-        <span className="grid leading-tight"><span className="text-[0.8125rem] font-bold">{label}</span><span className="text-[0.6875rem] text-muted">{detail}</span></span>
+        <span className="grid leading-tight"><span className="text-[0.8125rem] font-semibold">{label}</span><span className="text-[0.6875rem] text-muted">{detail}</span></span>
       </label>
     </li>
   );
+  const fullHeight = "lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))]";
 
+  // Wide screens: the map fills the page and the panels float over it (layers top-left, legend and the
+  // replay instrument bottom-left, the site list docked right). Phones: map, legend, replay, then sites.
   return (
-    <main className="flex flex-col lg:grid lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] lg:grid-cols-[minmax(0,1fr)_26rem] lg:grid-rows-[minmax(0,1fr)_auto] lg:overflow-clip">
+    <main className={`relative flex flex-col ${fullHeight} lg:block lg:overflow-clip`}>
       {sites === null ? (
-        <section role="status" className="flex min-h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] flex-col items-center justify-center gap-3 p-8 text-center lg:col-span-2 lg:row-span-2 lg:min-h-0">
-          <h1 className="pc-label text-muted">Supervisor dashboard</h1>
+        <section role="status" className="flex min-h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] flex-col items-center justify-center gap-3 p-8 text-center lg:min-h-full">
+          <h1 className="pc-caption">Supervisor dashboard</h1>
           {sitesFailed ? (
             <>
               <h2 className="pc-title text-risk-red">Can&apos;t reach the server</h2>
               <p className="max-w-md text-sm text-muted">Site conditions and stop-work status are unknown. Don&apos;t treat any site as clear. Retrying every 5 seconds.</p>
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" onClick={() => { void pollSites(); void refreshAlerts(); }} className="pc-btn pc-btn--primary">Retry now</button>
-                <button type="button" onClick={() => setDemo(true)} className="pc-btn">Show demo data</button>
+                <button type="button" onClick={() => setDemo(true)} className="pc-btn pc-btn--quiet">Show demo data</button>
               </div>
             </>
           ) : (
@@ -157,46 +160,48 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
         </section>
       ) : (
         <>
-          <section aria-label="Florida site safety map" className="relative h-[min(56svh,30rem)] min-h-80 lg:col-start-1 lg:row-start-1 lg:h-auto lg:min-h-0">
+          <section aria-label="Florida site safety map" className="pc-dash-map relative h-[min(56svh,30rem)] min-h-80 lg:absolute lg:inset-0 lg:h-auto">
             <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} callouts />
-            <details ref={layersPanel} data-map-avoid className="group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)] border-2 border-rule bg-surface shadow-float">
+            <details ref={layersPanel} data-map-avoid className="pc-float group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)]">
               <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3">
-                <span className="flex items-center gap-2 pc-label text-[0.8125rem]">
+                <span className="flex items-center gap-2 text-[0.8125rem] font-bold">
                   <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4"><path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
                   Layers
                 </span>
-                <span aria-hidden="true" className="text-xs motion-safe:transition-[rotate] group-open:rotate-180">▾</span>
+                <span aria-hidden="true" className="text-xs text-muted motion-safe:transition-[rotate] group-open:rotate-180">▾</span>
               </summary>
-              <ul className="border-bs-2 border-rule px-3 py-1.5">
-                {layerRow("lightning", "Lightning", `${flashes.length.toLocaleString()}${lightningStale ? "?" : ""} flashes · last ${LIGHTNING_WINDOW_MIN} min`, "rounded-pill bg-lightning ring-1 ring-lightning-ring")}
-                {layerRow("cells", "Storm cells", cells === null ? "Loading…" : `${cells.length}${cellsUnconfirmed || oldCells ? "?" : ""} cells`, "rounded-pill border-2 border-dashed border-rule bg-risk-amber-bg")}
+              <ul className="border-bs border-border px-3 py-1.5">
+                {layerRow("lightning", "Lightning", `${flashes.length.toLocaleString()}${lightningStale ? "?" : ""} flashes · last ${LIGHTNING_WINDOW_MIN} min`, "rounded-pill bg-lightning shadow-[0_0_6px_var(--pc-lightning)]")}
+                {layerRow("cells", "Storm cells", cells === null ? "Loading…" : `${cells.length}${cellsUnconfirmed || oldCells ? "?" : ""} cells`, "rounded-pill border border-risk-amber-solid bg-risk-amber-solid/25")}
                 {layerRow("sites", "Sites", `${sites.length} sites`, "rounded-pill bg-muted")}
-                {layerRow(null, "Crew reports", "Not loaded on the dashboard", "bg-surface-2")}
-                {layerRow(null, "Flood zones", "Needs data", "bg-surface-2")}
-                {layerRow(null, "Fires", "Needs data", "bg-surface-2")}
-                {layerRow(null, "Wildlife", "Needs data", "bg-surface-2")}
+                {layerRow(null, "Crew reports", "Not loaded on the dashboard", "rounded-pill bg-surface-2")}
+                {layerRow(null, "Flood zones", "Needs data", "rounded-pill bg-surface-2")}
+                {layerRow(null, "Fires", "Needs data", "rounded-pill bg-surface-2")}
+                {layerRow(null, "Wildlife", "Needs data", "rounded-pill bg-surface-2")}
               </ul>
             </details>
-            <div data-map-avoid className="absolute inset-be-8 inset-s-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-3.5 gap-y-1 border-2 border-rule bg-surface px-3 py-2 text-xs shadow-float" aria-label="Map legend">
+          </section>
+
+          <div data-map-avoid className="z-20 flex flex-col gap-2 lg:absolute lg:inset-be-3 lg:inset-s-3 lg:inset-e-[calc(var(--pc-rail-width)+1.5rem)] lg:items-start">
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-be border-border bg-surface px-4 py-2.5 text-xs lg:pc-float lg:max-w-full lg:border lg:px-3 lg:py-2" aria-label="Map legend">
               <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--green" />Low &lt; 4</span>
               <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--amber" />Elevated 4–&lt;7</span>
               <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--red" />High ≥ 7</span>
               <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--stop" />Lightning stop work</span>
-              <span className={`flex items-center gap-1.5 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{lightningStale ? "?" : ""}) · {lightningStale ? "last known, fade paused" : "newest brightest"}</span>
-              <span role="status" className={`max-lg:hidden ${cells === null || cellsUnconfirmed || oldCells ? "text-muted" : ""}`}>
+              <span className={`flex items-center gap-1.5 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning shadow-[0_0_5px_var(--pc-lightning)]" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{lightningStale ? "?" : ""}) · {lightningStale ? "last known, fade paused" : "newest brightest"}</span>
+              <span role="status" className={`text-muted ${cells === null || cellsUnconfirmed || oldCells ? "" : ""}`}>
                 {demo && "Demo data · "}Storm cells: {cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…" : `${cells.length}${cellsUnconfirmed || oldCells ? "? · Last known · Not confirmed" : ""}`} · circle = cell extent, arrow = motion direction; no arrow = stationary or untracked
               </span>
             </div>
-          </section>
-
-          <div className="lg:col-start-1 lg:row-start-2">
-            <ReplayTimeline replay={replay} alerts={alerts} sites={sites} log={replayLog} stale={!demo && (offline || alertsStale)} />
+            <div className="w-full">
+              <ReplayTimeline replay={replay} alerts={alerts} sites={sites} log={replayLog} stale={!demo && (offline || alertsStale)} />
+            </div>
           </div>
 
-          <section aria-labelledby="sites-heading" className="flex min-h-0 flex-col border-bs-2 border-rule bg-bg lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:border-bs-0 lg:border-s-2">
-            <div className="shrink-0 space-y-3 border-be-2 border-rule bg-surface p-4">
-              <div>
-                <h1 id="sites-heading" className="pc-title text-xl">Sites by risk</h1>
+          <section aria-labelledby="sites-heading" data-map-avoid className="z-20 flex min-h-0 flex-col bg-surface lg:pc-float lg:absolute lg:inset-bs-3 lg:inset-be-3 lg:inset-e-3 lg:w-(--pc-rail-width)">
+            <div className="shrink-0 space-y-4 border-be border-border p-5">
+              <div className="space-y-1">
+                <h1 id="sites-heading" className="text-xl font-bold tracking-[-0.01em]">Sites by risk</h1>
                 {statusLine}
               </div>
               {!alertsKnown && (
@@ -206,7 +211,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               )}
               {/* "Alerts" is every real active alert (same number as the nav badge); "Stop work" is real
                   lightning stop-work sites. Replay counts are on the replay timeline. */}
-              <dl className="grid grid-cols-5 divide-x-2 divide-rule border-2 border-rule">
+              <dl className="-mx-2 grid grid-cols-5 gap-1">
                 {stat("Sites", sites.length)}
                 {stat("High risk", highRisk)}
                 {stat("Alerts", real.length)}
@@ -214,16 +219,16 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {stat("Flood risk", counts.flood, "bg-risk-amber-solid text-on-risk-amber")}
               </dl>
               {alertsStale && <p role="status" className="text-xs font-semibold text-muted">? = last known before the connection was lost</p>}
-              <p className="pc-label text-muted">Stop-work sites first, then highest risk</p>
+              <p className="pc-caption">Stop-work sites first, then highest risk</p>
             </div>
             {/* relative: contains the cards' absolutely positioned screen-reader text, which otherwise escapes
                 the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
-            <ul className="relative divide-y-2 divide-border lg:overflow-y-auto lg:overscroll-contain">
+            <ul className="relative divide-y divide-border lg:overflow-y-auto lg:overscroll-contain">
               {sorted.map((site, index) => <li key={site.id} className={!showAll && index >= PHONE_SITES ? "max-lg:hidden" : ""} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }} onClick={() => setSelectedId(site.id)}>
                 <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
               </li>)}
             </ul>
-            {!showAll && sorted.length > PHONE_SITES && <div className="p-4 lg:hidden"><button type="button" onClick={() => setShowAll(true)} className="pc-btn w-full">Show all {sorted.length} sites</button></div>}
+            {!showAll && sorted.length > PHONE_SITES && <div className="p-4 lg:hidden"><button type="button" onClick={() => setShowAll(true)} className="pc-btn pc-btn--quiet w-full">Show all {sorted.length} sites</button></div>}
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}
           </section>
         </>
