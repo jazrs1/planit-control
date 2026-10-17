@@ -15,6 +15,7 @@ import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/li
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
 import { HAZARD_LABEL, factorHazardLabel, riskLevel } from "@/lib/risk";
+import { rainForecast } from "@/lib/rainForecast";
 import { formatPageTime, zoneLabel } from "@/lib/siteTime";
 import { formatAgo } from "@/lib/time";
 import { usePolling } from "@/lib/usePolling";
@@ -197,6 +198,10 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   const factors = [...detail.top_factors].sort((a, b) => b.weight - a.weight);
   const replayNowMs = replay?.running || demo ? serverNow() : nowMs;
   const peakHour = c.heat.peak_at ? new Date(c.heat.peak_at).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric" }) : null;
+  // Our rain forecast, cross-checked against NWS: a range when they disagree, never the higher one as fact.
+  // rain_next_24h_nws_in comes with #47; read it narrowly until that contract change is on main.
+  const nwsRain = (c.flood as { rain_next_24h_nws_in?: number | null }).rain_next_24h_nws_in;
+  const rain = rainForecast(c.flood.rain_next_24h_in, nwsRain);
   // "FEMA zone X" as a source only repeats the zone row.
   const floodSource = c.flood.source && !/^FEMA\b/i.test(c.flood.source) ? c.flood.source : null;
 
@@ -308,8 +313,12 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         />
         <HazardPanel
           title="Flooding" card={c.flood} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
-          value={fmt(c.flood.rain_next_24h_in, " in", 1)} caption="Rain expected, next 24 h"
+          value={rain.value} caption={rain.caption} note={rain.note}
           rows={[
+            ...(rain.disagree ? [
+              { label: "Rain, next 24 h (our forecast)", value: fmt(c.flood.rain_next_24h_in, " in", 1) },
+              { label: "Rain, next 24 h (NWS)", value: fmt(nwsRain, " in", 1) },
+            ] : []),
             { label: "Rain, past 12 h", value: fmt(c.flood.rain_past_12h_in, " in", 1) },
             { label: "Rain, past 24 h", value: fmt(c.flood.rain_past_24h_in, " in", 1) },
             { label: "Rain, past 72 h", value: fmt(c.flood.rain_past_72h_in, " in", 1) },
