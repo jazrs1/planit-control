@@ -1,7 +1,8 @@
 """Background polling of hazard sources (started from app/main.py's lifespan).
 
   weather (Open-Meteo)   every 60 min   heat, rain, soil (WEATHER_POLL_MINUTES; its models update
-                                        at most hourly, so polling faster only repeats data)
+                                        at most hourly, so polling faster only repeats data), then
+                                        the hazard model scores every site from the same forecasts
   NWS alerts             every  5 min
   FIRMS fires            every 30 min   (skipped without FIRMS_MAP_KEY)
   iNaturalist wildlife   every  6 h
@@ -22,6 +23,7 @@ from psycopg_pool import ConnectionPool
 
 from alerts import flood
 from app.config import get_settings
+from hazards import model_scores
 from hazards.sources import firms, flood_maps, inaturalist, nws, open_meteo
 from hazards.store import last_success, mark_source
 
@@ -36,9 +38,12 @@ def _sites(pool: ConnectionPool) -> list[dict]:
 
 
 def _weather(pool, now):
-    result = open_meteo.poll(pool, _sites(pool), now)
+    sites = _sites(pool)
+    forecasts = open_meteo.fetch(sites)
+    result = open_meteo.store(pool, sites, forecasts, now)
     flood.evaluate(pool, now)
-    return result
+    # Same forecasts, no extra API calls: hazard model + hybrid index, stored in hazard_scores.
+    return f"{result}; {model_scores.run(pool, sites, forecasts, now)}"
 
 
 def _nws(pool, now):

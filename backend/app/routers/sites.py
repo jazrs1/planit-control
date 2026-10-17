@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from psycopg_pool import ConnectionPool
 from pydantic import TypeAdapter
@@ -5,7 +7,8 @@ from pydantic import TypeAdapter
 from app import clock, site_data
 from app.cache import api_cache
 from app.db import get_pool_optional
-from app.schemas import Site, SiteDetail
+from app.schemas import ScoreHistory, Site, SiteDetail
+from hazards import model_scores
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 
@@ -36,3 +39,17 @@ def get_site(site_id: str, pool: ConnectionPool | None = Depends(get_pool_option
     if body is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
     return Response(body, media_type="application/json")
+
+
+@router.get("/{site_id}/score-history", response_model=ScoreHistory)
+def score_history(site_id: str, pool: ConnectionPool | None = Depends(get_pool_optional)):
+    """Today's and tomorrow's hazard index at every hourly scoring run in the last 7 days (sparkline)."""
+    site = site_data.known_site(site_id)
+    if site is None:
+        raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
+    if pool is None:
+        return {"site_id": site_id, "points": []}
+    with pool.connection() as conn:
+        # Scores are stored on real time (pollers ignore the replay clock), so history uses it too.
+        points = model_scores.history(conn, site, datetime.now(timezone.utc))
+    return {"site_id": site_id, "points": points}

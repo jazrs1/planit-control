@@ -157,11 +157,18 @@ export interface NwsAlert {
   ends_at: string | null;
 }
 
+/** Where a hazard-index factor came from: the ML weather model, or a safety rule
+ * (OSHA heat band, wildfire, wildlife, crew report, lightning stop-work). */
+export type FactorSource = "model" | "rule";
+
 export interface ContributingFactor {
-  hazard: HazardType;
+  /** null for a factor that isn't one hazard: a downed-line crew report (see conditions.crew_hazards). */
+  hazard: HazardType | null;
   label: string;
   /** Share of the hazard index, 0–1. Factors for a site sum to <= 1. */
   weight: number;
+  /** Always sent by the live backend; absent in older mocks. */
+  source?: FactorSource | null;
 }
 
 export interface SiteDetail extends Site {
@@ -321,6 +328,106 @@ export interface ReplayStatus {
   files_total: number;
   files_done: number;
   flashes_ingested: number;
+}
+
+// ---------- GET /sites/{id}/score-history ----------
+
+export type ScoreHorizon = "today" | "tomorrow";
+
+/** One stored scoring run (hourly, after the weather poll) for one day. */
+export interface ScorePoint {
+  scored_at: string;
+  /** Site-local date the score is for (YYYY-MM-DD). */
+  for_date: string;
+  /** "today" when for_date was the site's own date at scored_at; "tomorrow" the day after. */
+  horizon: ScoreHorizon;
+  hazard_index: HazardIndex;
+  top_hazard: HazardType | null;
+  /** The ML weather score alone, 0–10; null when the model hadn't scored that day yet. */
+  model_score: HazardIndex | null;
+}
+
+export interface ScoreHistory {
+  site_id: string;
+  /** Last 7 days, oldest first. Empty without a database or before the first scoring run. */
+  points: ScorePoint[];
+}
+
+// ---------- GET /model/info ----------
+
+export interface ModelMetrics {
+  /** Precision-recall AUC: how well risky days rank at the top (higher is better). */
+  pr_auc: number;
+  roc_auc: number;
+  /** Mean squared error of the probability (lower is better). */
+  brier: number;
+}
+
+export interface ModelComparison {
+  name: string;
+  description: string;
+  /** Scored from same-day forecasts ("today"). */
+  same_day: ModelMetrics;
+  /** Scored from forecasts issued ~24 h earlier ("tomorrow"); null if not evaluated. */
+  day_ahead: ModelMetrics | null;
+}
+
+export interface ModelBand {
+  band: RiskLevel;
+  share_of_days: number;
+  /** Share of that band's site-days with a logged hazardous event. */
+  event_rate: number;
+  share_of_events: number;
+}
+
+export interface IndexAnchor {
+  index: HazardIndex;
+  /** Percentile of the validation year's site-days, 0–1. */
+  percentile: number;
+  /** Calibrated probability at that index. */
+  probability: number;
+}
+
+export interface CalibrationBin {
+  mean_predicted: number;
+  observed: number;
+  site_days: number;
+}
+
+export interface ModelInfo {
+  /** Training timestamp; stored with every score. */
+  version: string;
+  trained_at: string;
+  /** What the model predicts (the label). */
+  label: string;
+  weather_source: string;
+  /** How the ML score and the safety rules combine into the hazard index. */
+  hybrid: string;
+  training: {
+    train_years: number[];
+    validation_year: number;
+    test_year: number;
+    sites: number;
+    train_site_days: number;
+    train_events: number;
+  };
+  test: { site_days: number; events: number; base_rate: number };
+  /** On the test year: the model first, then the baselines. */
+  results: ModelComparison[];
+  /** Test year, same-day forecasts. */
+  bands: ModelBand[];
+  index_anchors: IndexAnchor[];
+  calibration: {
+    /** Path on the API (e.g. "/model/calibration.svg"); light and dark mode. */
+    plot_url: string;
+    /** Test year, same-day forecasts; the plot's points (bins with >= 50 site-days). */
+    bins: CalibrationBin[];
+  };
+  /** What drives the model most, largest first (mean |SHAP|, log-odds). */
+  top_features: { label: string; importance: number }[];
+  limitations: string[];
+  /** Last successful hourly scoring run; null without a database or before the first run. */
+  last_scored_at: string | null;
 }
 
 // ---------- Errors ----------

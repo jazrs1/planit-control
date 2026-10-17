@@ -15,3 +15,8 @@ export const HAZARD_LABEL: Record<HazardType, string> = {
   wildfire: "Wildfire",
   wildlife: "Wildlife",
 };
+
+/** A contributing factor's hazard label. null is a factor that isn't one hazard: a downed-line crew report. */
+export function factorHazardLabel(hazard: HazardType | null): string {
+  return hazard ? HAZARD_LABEL[hazard] : "Crew hazard";
+}

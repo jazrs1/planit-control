@@ -110,3 +110,9 @@ test("flood reason does not repeat the FLOOD RISK label", () => {
   const reading = "Flood risk: heavy rain in a flood-prone area. 2.3 in of rain in 12 h";
   assert.equal(helpers.floodReason({ ...conditions, reading }), "Heavy rain in a flood-prone area. 2.3 in of rain in 12 h");
 });
+
+test("a factor with no hazard type (a downed-line crew report) is labeled Crew hazard", () => {
+  const risk = load("lib/risk.ts");
+  assert.equal(risk.factorHazardLabel(null), "Crew hazard");
+  assert.equal(risk.factorHazardLabel("lightning"), "Lightning");
+});

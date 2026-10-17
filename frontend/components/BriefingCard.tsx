@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Briefing, BriefingKeyNumbers } from "@shared/types";
 import { GO_LABEL, GO_STYLE, KEY_NUMBER_LABEL, briefingDay, formatForDate } from "@/lib/briefings";
-import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
+import { factorHazardLabel, riskLevel } from "@/lib/risk";
 import { formatAgo, formatSiteDateTime } from "@/lib/time";
 
 // One site's next-day briefing. Used on /briefings and on the site detail page.
@@ -148,7 +148,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
 
           {b.top_factors && b.top_factors.length > 0 && (
             <p className="text-xs text-muted">
-              Why: {b.top_factors.map((f) => `${HAZARD_LABEL[f.hazard]} (${Math.round(f.weight * 100)}%)`).join(" · ")}
+              Why: {b.top_factors.map((f) => `${factorHazardLabel(f.hazard)} (${Math.round(f.weight * 100)}%)`).join(" · ")}
             </p>
           )}
           {structured && (
