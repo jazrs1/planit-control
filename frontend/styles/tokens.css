@@ -7,12 +7,14 @@
  * light grey hairlines, big numbers with small grey labels. Blue is the notice color: REPLAY and focus.
  * Live is light; the replay is the one dark instrument panel, so it can't be mistaken for a real stop-work.
  *
- * Each color holds its light and dark value; the theme switches with color-scheme, never by redefining.
+ * Each color holds its light and dark value; a scope switches with color-scheme, never by redefining.
  * The block is also declared on [data-theme] because browsers resolve light-dark() where a custom
  * property is declared: a dark scope inside a light page (the replay panel) needs its own resolution.
  */
 :root, [data-theme] {
-  color-scheme: light dark;
+  /* Light everywhere, whatever the device setting. The dark values serve [data-theme="dark"] scopes:
+     the replay panel is the one dark element. */
+  color-scheme: light;
 
   /* Read literally by lib/branding.ts for the web manifest and browser chrome, so plain hex. */
   --pc-brand: #141414;

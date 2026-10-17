@@ -84,14 +84,15 @@ test("stale and unknown advisories stay visible, grey with ? and Not confirmed; 
 
 test("dashboard cards suppress advisories for a stop-work, including last-known stop-work", () => {
   const Card = load("components/SiteCard.tsx").default;
-  advisory(render(Card, { site, nowMs }));
-  advisory(render(Card, { site, nowMs, alerts: [{ ...lightning, type: "flood", all_clear_at: null }] }));
+  advisory(render(Card, { site, nowMs, selected: true }));
+  advisory(render(Card, { site, nowMs, alerts: [{ ...lightning, type: "flood", all_clear_at: null }], selected: true }));
   for (const alertsUnconfirmed of [false, true]) {
-    const html = render(Card, { site, nowMs, alerts: [lightning], alertsUnconfirmed });
+    const html = render(Card, { site, nowMs, alerts: [lightning], alertsUnconfirmed, selected: true });
     assert.match(html, /STOP WORK/);
     assert.doesNotMatch(html, /LIGHTNING POSSIBLE|Storm approaching/);
   }
-  assert.match(render(Card, { site, nowMs, approachUnconfirmed: true }), /Not confirmed/);
+  assert.match(render(Card, { site, nowMs, approachUnconfirmed: true, selected: true }), /Not confirmed/);
+  assert.match(render(Card, { site, nowMs }), /Lightning possible/);
 });
 
 const nullComponent = { __esModule: true, default: () => null };
@@ -233,7 +234,7 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   const draw = () => { polls = []; return driver.render(Dashboard, { initialSites: [site] }); };
   const map = tree => elements(tree, el => el.type === Map)[0].props;
   let tree = draw();
-  assert.deepEqual(polls.map(p => p.ms), [30_000, 10_000]);
+  assert.deepEqual(polls.map(p => p.ms), [30_000, 10_000, 60_000]);
   assert.match(renderToStaticMarkup(tree), /Storm cells: loading/);
   failCells = true;
   await polls[1].poll(); tree = draw();
@@ -246,20 +247,21 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   await polls[1].poll(); tree = draw();
   assert.equal(map(tree).cells.length, 1, "last real cells survive a failed refresh");
   assert.equal(map(tree).cellsUnconfirmed, true, "successful flashes cannot confirm failed cells");
-  assert.match(renderToStaticMarkup(tree), /Storm cells: 1\? · Last known · Not confirmed/);
+  assert.match(renderToStaticMarkup(tree), /Storm cells: last known · Not confirmed/);
+  assert.doesNotMatch(renderToStaticMarkup(tree), /Storm cells: \d+\?/, "never a count with a question mark");
   failCells = false; failFlashes = true;
   await polls[1].poll(); tree = draw();
   assert.equal(map(tree).flashes.length, 1);
   assert.equal(map(tree).cellsUnconfirmed, false);
   assert.match(renderToStaticMarkup(tree), /last known, fade paused/);
   state.replay = { running: true }; draw();
-  assert.deepEqual(polls.map(p => p.ms), [3_000, 3_000]);
+  assert.deepEqual(polls.map(p => p.ms), [3_000, 3_000, 60_000]);
   state.alerts = [lightning];
   tree = draw();
   assert.equal(elements(tree, el => el.type === Card)[0].props.alerts[0].type, "lightning");
   const previousReads = cellReads;
   state.status = "demo"; tree = draw();
-  assert.deepEqual(polls.map(p => p.ms), [null, null]);
+  assert.deepEqual(polls.map(p => p.ms), [null, null, null]);
   assert.equal(cellReads, previousReads);
   assert.equal(map(tree).demo, true);
   assert.equal(map(tree).cells, overrides["@/lib/api"].DEMO_DATA.lightningCells);

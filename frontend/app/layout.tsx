@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1, viewportFit: "cover",
-  themeColor: APP_COLORS.theme, colorScheme: "light dark",
+  themeColor: APP_COLORS.theme, colorScheme: "light",
 };
 
 export async function generateMetadata(): Promise<Metadata> {

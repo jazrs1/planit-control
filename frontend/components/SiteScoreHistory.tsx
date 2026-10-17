@@ -41,7 +41,7 @@ function HistoryForMode({ site, compact = false, lazy = false, unconfirmed = fal
   const old = !demo && !replay?.running && latest && now !== null && now - Date.parse(latest.scored_at) > HISTORY_STALE_MS;
   const uncertain = !demo && (unconfirmed || failed || connection.level !== "online" || !!old);
 
-  return <div ref={ref} className={`min-w-0 space-y-2 ${compact ? "min-h-36" : "rounded-card border border-border bg-surface p-4 shadow-card"}`}>
+  return <div ref={ref} className={`min-w-0 space-y-2 ${compact ? "min-h-16" : "rounded-card border border-border bg-surface p-4 shadow-card"}`}>
     {compact ? <p className="text-xs font-semibold text-muted">7-day hazard index</p> : <h2 className="font-semibold text-text">7-day hazard index</h2>}
     {demo && <p className="text-xs font-semibold text-muted">Demo data · sample history, not live</p>}
     {history === null && !demo ? <p role="status" className="text-sm text-muted">{failed ? "History unavailable · Not confirmed" : visible ? "Loading history…" : "History loads when this card is visible"}</p>

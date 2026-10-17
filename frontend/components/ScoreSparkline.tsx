@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import type { PointerEvent } from "react";
 import type { ScoreHistory, ScorePoint, Site } from "@shared/types";
 import { riskLevel } from "@/lib/risk";
-import { HISTORY_WINDOW_MS, historyPoints, historySegments } from "@/lib/scoreHistory";
+import { HISTORY_WINDOW_MS, MIN_HISTORY_POINTS, historyPoints, historySegments } from "@/lib/scoreHistory";
 import { formatSiteDateTime } from "@/lib/time";
 
 const POINT_COLOR = { green: "fill-risk-green", amber: "fill-risk-amber", red: "fill-risk-red" } as const;
@@ -16,7 +16,7 @@ export default function ScoreSparkline({ history, site, compact = false, unconfi
   const latest = points.at(-1);
   const [active, setActive] = useState<number | null>(null);
   const tooltipId = useId();
-  if (points.length < 2 || !latest) return <p className="text-sm text-muted">Not enough history yet{demo && " · Demo data"}.<span className="block text-xs">At least two hourly scoring runs are needed.</span></p>;
+  if (points.length < MIN_HISTORY_POINTS || !latest) return <p className="text-sm text-muted">Not enough history yet{demo && " · Demo data"}.<span className="block text-xs">At least {MIN_HISTORY_POINTS} hourly scoring runs are needed.</span></p>;
 
   const end = Date.parse(latest.scored_at);
   const start = end - HISTORY_WINDOW_MS;

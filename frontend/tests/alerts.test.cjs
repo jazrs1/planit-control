@@ -76,13 +76,20 @@ test("only lightning gets STOP WORK, red styling and a countdown", () => {
 
 test("dashboard cards show simultaneous flood and lightning alerts separately", () => {
   const Card = load("components/SiteCard.tsx").default;
-  const html = render(Card, { site, alerts: [lightning, flood], flood: conditions });
+  // The compact row: the stop-work tag and its countdown.
+  const row = render(Card, { site, alerts: [lightning, flood], flood: conditions });
+  assert.match(row, /Stop work/);
+  assert.equal((row.match(/data-countdown/g) || []).length, 1);
+  assert.doesNotMatch(row, /Heavy rain near the river/);
+  // The selected row expands to both alerts, with one countdown.
+  const html = render(Card, { site, alerts: [lightning, flood], flood: conditions, selected: true });
   assert.match(html, /STOP WORK/);
   assert.match(html, /FLOOD RISK/);
   assert.match(html, /Heavy rain near the river/);
   assert.match(html, /9\.9 mi/);
   assert.equal((html.match(/data-countdown/g) || []).length, 1);
-  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true }), /Not confirmed/);
+  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true, selected: true }), /Not confirmed/);
+  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true }), /pc-chip--unknown/);
 });
 
 function nav(alerts, status = "live") {

@@ -11,6 +11,30 @@ const EVENT = {
   clear: { label: "All clear", mark: "pc-shape--green" },
 } as const;
 
+/** backend/lightning/replay.py QUIET_TAIL: after the storm data the replay runs this long so countdowns can clear. */
+const QUIET_TAIL_MIN = 31;
+
+/** The recorded storm a start plays when the server hasn't reported a window yet (its newest folder,
+ *  README "Storm replay"). Status reports the real window once a replay has run. */
+const DEFAULT_WINDOW = "2025-08-04_2200-2300";
+
+/** "2025-08-04_2200-2300" (UTC folder name) → "Aug 4, 2025 storm · 6:00–7:31 PM EDT". */
+export function replayWindowLabel(window: string | null | undefined): string {
+  window ??= DEFAULT_WINDOW;
+  const match = window ? /^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(window) : null;
+  if (!match) return "Recorded storm";
+  const [, y, mo, d, sh, sm, eh, em] = match.map(Number);
+  const start = Date.UTC(y, mo - 1, d, sh, sm);
+  let end = Date.UTC(y, mo - 1, d, eh, em);
+  if (end <= start) end += 24 * 60 * 60_000;
+  end += QUIET_TAIL_MIN * 60_000;
+  const zone = { timeZone: "America/New_York" } as const;
+  const date = new Date(start).toLocaleDateString("en-US", { ...zone, month: "short", day: "numeric", year: "numeric" });
+  const from = new Date(start).toLocaleTimeString("en-US", { ...zone, hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/, "");
+  const to = new Date(end).toLocaleTimeString("en-US", { ...zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  return `${date} storm · ${from}–${to}`;
+}
+
 function simTime(ms: number) {
   return new Date(ms).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
 }
@@ -84,7 +108,8 @@ export default function ReplayTimeline({ replay, alerts, sites, log, stale }: Re
   const progress = replay && replay.files_total > 0 ? Math.min(1, replay.files_done / replay.files_total) : 0;
   const quiet = running && progress >= 1;
   const hasLog = log.events.length > 0 || log.flashBins.length > 0;
-  const active = running || hasLog;
+  // Expanded only while a replay runs; otherwise one slim dark row, so the map keeps the space.
+  const active = running;
   const details = useRef<HTMLDetailsElement>(null);
   // Key events start open on a wide screen and collapsed on a phone.
   useEffect(() => { if (details.current && window.matchMedia("(min-width: 64rem)").matches) details.current.open = true; }, []);
@@ -96,6 +121,16 @@ export default function ReplayTimeline({ replay, alerts, sites, log, stale }: Re
     </li>
   );
 
+  if (!active) {
+    return (
+      <section data-theme="dark" aria-labelledby="replay-heading" className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-instrument px-4 py-2.5 text-text shadow-float">
+        <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
+        <p className="min-w-0 flex-1 basis-56 font-mono text-xs text-muted sm:truncate">{replayWindowLabel(replay?.window)} · plays a recorded storm through the live pipeline</p>
+        <ReplayControl />
+      </section>
+    );
+  }
+
   return (
     <section data-theme="dark" aria-labelledby="replay-heading" className={`grid bg-instrument text-text shadow-float lg:grid-cols-[minmax(0,1fr)_16rem] ${stale ? "grayscale" : ""}`}>
       <div className="grid min-w-0 gap-3 p-4">
@@ -103,7 +138,7 @@ export default function ReplayTimeline({ replay, alerts, sites, log, stale }: Re
           <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
           {active && <span className="pc-chip pc-chip--replay">REPLAY</span>}
           <span className="font-mono text-xs text-muted">
-            {running ? `${replay?.window ?? "Recorded storm"} · forward only` : hasLog ? "Ended · events seen on this page" : "A recorded storm through the live pipeline, on a simulated clock"}
+            {replayWindowLabel(replay?.window)}
           </span>
           {running && <span className="ms-auto font-mono text-xs">
             <span className="text-muted">Replay </span>{replayStops} stop work{replayFlood ? ` · ${replayFlood} flood risk` : ""}{stale ? "?" : ""}

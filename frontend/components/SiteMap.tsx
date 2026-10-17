@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Alert, LightningCell, LightningFlash, Site } from "@shared/types";
+import type { Alert, HazardReport, LightningCell, LightningFlash, Site } from "@shared/types";
 import type { GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { riskLevel } from "@/lib/risk";
 import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
@@ -9,6 +9,7 @@ import { resolveColor } from "@/lib/themeColor";
 
 const LIGHTNING_SOURCE = "recent-lightning";
 const CELLS_SOURCE = "storm-cells";
+const REPORTS_SOURCE = "crew-reports";
 /** Flashes older than this are gone; matches the /lightning/recent window the dashboard asks for. */
 export const LIGHTNING_WINDOW_MIN = 15;
 /** A tile that loads this long after the last error means the tile server has recovered. */
@@ -31,10 +32,10 @@ function lightningGeoJson(flashes: LightningFlash[], nowMs: number): GeoJSON.Fea
 }
 
 /** Map layers the dashboard's layers panel can hide. */
-export type MapLayers = { lightning: boolean; cells: boolean; sites: boolean };
-const ALL_LAYERS: MapLayers = { lightning: true, cells: true, sites: true };
+export type MapLayers = { lightning: boolean; cells: boolean; sites: boolean; reports: boolean };
+const ALL_LAYERS: MapLayers = { lightning: true, cells: true, sites: true, reports: true };
 
-/** Recolor the Carto basemap from the --pc-map-* tokens (light or dark). */
+/** Recolor the Carto basemap from the --pc-map-* tokens. */
 function paintBasemap(instance: LibreMap) {
   const c = (token: string) => resolveColor(token);
   const land = c("--pc-map-land"), landAlt = c("--pc-map-land-alt"), water = c("--pc-map-water"), road = c("--pc-map-road"), roadCase = c("--pc-map-road-case");
@@ -69,6 +70,10 @@ type SiteMapProps = {
   onSelect: (id: string) => void;
   /** Which layers to draw; all of them unless the dashboard's layers panel hides some. */
   layers?: MapLayers;
+  /** Crew hazard reports to pin on the map (newest first). */
+  reports?: HazardReport[];
+  /** Changes when "Show on map" asks to center on the selected site again. */
+  focusKey?: number;
   /** Label stop-work and flood sites on the map. Labels never cover [data-map-avoid] panels or leave the map. */
   callouts?: boolean;
 };
@@ -84,7 +89,7 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], focusKey = 0 }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -93,8 +98,6 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   const [ready, setReady] = useState(false);
   const [styleLoaded, setStyleLoaded] = useState(false);
   const [error, setError] = useState(false);
-  // Bumped when the OS switches light/dark, so canvas-drawn layers repaint from the tokens.
-  const [theme, setTheme] = useState(0);
 
   useEffect(() => {
     let disposed = false;
@@ -118,12 +121,9 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       });
       observer = new ResizeObserver(() => instance.resize());
       observer.observe(container.current);
-      scheme.addEventListener("change", onScheme);
       setReady(true);
     }).catch(() => { if (!disposed) setError(true); });
-    const scheme = window.matchMedia("(prefers-color-scheme: dark)");
-    const onScheme = () => { if (map.current?.isStyleLoaded()) paintBasemap(map.current); setTheme((value) => value + 1); };
-    return () => { disposed = true; observer?.disconnect(); scheme.removeEventListener("change", onScheme); markers.current.forEach((m) => m.remove()); markers.current.clear(); map.current?.remove(); map.current = null; };
+    return () => { disposed = true; observer?.disconnect(); markers.current.forEach((m) => m.remove()); markers.current.clear(); map.current?.remove(); map.current = null; };
   }, []);
 
   useEffect(() => {
@@ -192,7 +192,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 2 },
     }, before);
-  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs, theme]);
+  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs]);
 
   // Recent lightning: a GeoJSON circle layer under the site markers (markers are DOM, always on top).
   useEffect(() => {
@@ -235,7 +235,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         "circle-stroke-opacity": ["*", 0.7, ["get", "opacity"]],
       },
     });
-  }, [styleLoaded, flashes, flashNowMs, theme]);
+  }, [styleLoaded, flashes, flashNowMs]);
 
   // The layers panel hides whole layers; the data keeps updating underneath.
   useEffect(() => {
@@ -244,8 +244,9 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     const show = (id: string, visible: boolean) => { if (instance.getLayer(id)) instance.setLayoutProperty(id, "visibility", visible ? "visible" : "none"); };
     show(LIGHTNING_SOURCE, layers.lightning);
     show(`${LIGHTNING_SOURCE}-glow`, layers.lightning);
+    show(REPORTS_SOURCE, layers.reports);
     for (const part of ["fill", "outline", "arrows"]) show(`${CELLS_SOURCE}-${part}`, layers.cells);
-  }, [styleLoaded, layers.lightning, layers.cells, flashes, cells]);
+  }, [styleLoaded, layers.lightning, layers.cells, layers.reports, flashes, cells, reports]);
 
   // Frame every site once, clear of the panels laid over the map (layers top-left, legend at the bottom).
   useEffect(() => {
@@ -327,8 +328,28 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   useEffect(() => {
     if (!ready || !selectedId) return;
     const site = sites.find((s) => s.id === selectedId);
-    if (site) map.current?.easeTo({ center: [site.lon, site.lat], duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500 });
-  }, [ready, selectedId, sites]);
+    // Center in the part of the map the floating panels leave open.
+    const wide = (container.current?.clientWidth ?? 0) > 700;
+    if (site) map.current?.easeTo({ center: [site.lon, site.lat], padding: wide ? { top: 40, bottom: 120, left: 270, right: 440 } : { top: 0, bottom: 0, left: 0, right: 0 }, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500 });
+  }, [ready, selectedId, sites, focusKey]);
+
+  // Crew reports: small ink pins with a white ring, above the flashes, under the site markers.
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    const data: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+      type: "FeatureCollection",
+      features: reports.filter((report) => Number.isFinite(report.lat) && Number.isFinite(report.lon))
+        .map((report) => ({ type: "Feature", geometry: { type: "Point", coordinates: [report.lon, report.lat] }, properties: { category: report.category } })),
+    };
+    const source = instance.getSource<GeoJSONSource>(REPORTS_SOURCE);
+    if (source) { void source.setData(data); return; }
+    instance.addSource(REPORTS_SOURCE, { type: "geojson", data });
+    instance.addLayer({
+      id: REPORTS_SOURCE, type: "circle", source: REPORTS_SOURCE,
+      paint: { "circle-color": resolveColor("--pc-ink"), "circle-radius": 5, "circle-stroke-color": resolveColor("--pc-surface"), "circle-stroke-width": 2 },
+    });
+  }, [styleLoaded, reports]);
 
   return <><div ref={container} className="h-full w-full" />
     <ul className="sr-only" aria-label="Storm cell motion">
