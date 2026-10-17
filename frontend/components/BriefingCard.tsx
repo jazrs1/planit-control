@@ -166,6 +166,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
             <>
               Generated {formatSiteDateTime(b.generated_at, timeZone)}
               {nowMs !== null && ` · ${formatAgo(Math.max(0, nowMs - Date.parse(b.generated_at)))}`}
+              {b.generator === "claude" && ` · Written by Claude${b.model ? ` (${b.model})` : ""}`}
               {b.generator === "gemini" && ` · Written by Gemini${b.model ? ` (${b.model})` : ""}`}
               {b.generator === "template" && " · Template"}
               {connectionLost && " · last known"}
