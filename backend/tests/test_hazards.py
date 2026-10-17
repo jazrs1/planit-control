@@ -100,3 +100,54 @@ def test_firms_ignores_hot_spots_at_other_florida_thermal_plants():
     two_km_away = {"lat": hardee["lat"] + 0.018, "lon": hardee["lon"]}   # ~1.2 mi
     kept, ignored = plant_hot_spots([at_hardee, two_km_away], list(plants.values()))
     assert kept == [two_km_away] and ignored == 1
+
+
+def _fire(minutes_ago: int, satellite: str = "N", confidence: str = "nominal", miles_north: float = 1.0) -> dict:
+    return {"ts": NOW - timedelta(minutes=minutes_ago), "lat": SITE["lat"] + miles_north / 69.09, "lon": SITE["lon"],
+            "satellite": satellite, "confidence": confidence, "frp_mw": 5.0}
+
+
+def test_satellite_passes_group_each_satellites_detections():
+    from hazards.sources.firms import satellite_passes
+    one_pass = [_fire(30), _fire(29), _fire(28)]                       # one overpass, a few scan lines
+    assert satellite_passes(one_pass) == 1
+    assert satellite_passes(one_pass + [_fire(25, satellite="N20")]) == 2   # a second satellite
+    assert satellite_passes(one_pass + [_fire(12 * 60)]) == 2             # the same satellite, 12 h earlier
+    assert satellite_passes([]) == 0
+
+
+def _wildfire_card(fires: list[dict]):
+    from hazards.sources.firms import site_readings
+    readings = {(h, m): v for h, m, v in site_readings(SITE, fires)}
+    return score_site(inputs(readings), {})
+
+
+def test_a_fire_seen_on_one_pass_is_watch_not_danger():
+    scored = _wildfire_card([_fire(30), _fire(29)])
+    card = scored["cards"]["wildfire"]
+    assert card["hazard_status"] == "watch" and "one satellite pass only" in card["reading"]
+    from hazards.sources.firms import site_readings
+    readings = {(h, m): v for h, m, v in site_readings(SITE, [_fire(30)])}
+    assert predict(inputs(readings, now=NOW), {})["hazard_index_today"] < 7
+
+
+@pytest.mark.parametrize("fires", [
+    [_fire(30), _fire(6 * 60)],                         # two passes within 24 h
+    [_fire(30), _fire(25, satellite="N21")],            # two satellites
+    [_fire(30, confidence="high")],                      # one high-confidence detection
+])
+def test_a_confirmed_fire_within_5_mi_is_danger(fires):
+    card = _wildfire_card(fires)["cards"]["wildfire"]
+    assert card["hazard_status"] == "danger" and "one satellite pass" not in card["reading"]
+
+
+def test_only_detections_within_5_mi_confirm_a_fire():
+    # Two passes, but the second one is 8 mi away: the close fire is still one pass.
+    card = _wildfire_card([_fire(30), _fire(6 * 60, miles_north=8)])["cards"]["wildfire"]
+    assert card["hazard_status"] == "watch"
+
+
+def test_readings_from_before_pass_counts_keep_the_old_rule():
+    readings = {("wildfire", "nearest_detection_mi"): 1.0, ("wildfire", "nearest_detection_epoch"): NOW.timestamp(),
+                ("wildfire", "nearest_confidence"): 1.0, ("wildfire", "detections_25mi"): 1.0}
+    assert score_site(inputs(readings), {})["cards"]["wildfire"]["hazard_status"] == "danger"
