@@ -53,8 +53,6 @@ dig +short api.planit.example.com
 
 ### 1. Set up the server (about 10 minutes)
 
-The server needs a branch that has `deploy/`. Use `main` once this PR is merged; until then pass `deploy-prep`.
-
 ```bash
 # from the repo root on your laptop
 scp deploy/setup.sh root@203.0.113.10:/root/
@@ -73,7 +71,12 @@ ssh -t root@203.0.113.10 bash /root/setup.sh api.planit.example.com main
 3. Creates a `planit` system user and a read-only **GitHub deploy key**. The repo is private, so it prints the public key and waits:
    - Open https://github.com/jazrs1/planit-control/settings/keys/new.
    - Paste the key and leave **Allow write access** off.
-   - Press Enter.
+   - Press Enter. Without a terminal (`ssh` without `-t`), the script instead checks every 10 seconds until the key works, so you can add it from your laptop meanwhile:
+
+     ```bash
+     ssh root@203.0.113.10 cat /opt/planit/.ssh/id_ed25519.pub > /tmp/planit-deploy.pub
+     gh repo deploy-key add /tmp/planit-deploy.pub -R jazrs1/planit-control -t "planit-api server"   # read-only by default
+     ```
 4. Clones the repo to `/opt/planit/app`, creates the venv in `/opt/planit/venv`, and installs `backend/requirements.txt`.
 5. Installs `planit-api.service` and a journald size cap (500 MB, 30 days), and writes `/etc/caddy/Caddyfile` for `api.planit.example.com`.
 
@@ -93,7 +96,8 @@ ssh root@203.0.113.10 'cd /opt/planit/app/backend && sudo -u planit -H /opt/plan
 
 ```bash
 deploy/copy-to-server.sh root@203.0.113.10 \
-  --cors https://planit.example.com,https://www.planit.example.com,https://planit-control.vercel.app
+  --cors https://planit.example.com,https://www.planit.example.com,https://planit-control.vercel.app \
+  --cors-regex '^https://planit-control-[a-z0-9-]+\.vercel\.app$'
 ```
 
 - **What gets copied:**
@@ -103,7 +107,7 @@ deploy/copy-to-server.sh root@203.0.113.10 \
 - **After copying**, it restarts the API and waits for `/health`.
 - **Your local `.env` is never changed.** In the server's copy, the script:
   - forces `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED`, `BRIEFING_ENABLED` and `PUSH_ENABLED` to `true`, since the server is the only machine that polls and sends push notifications;
-  - sets `CORS_ORIGINS` to the `--cors` list.
+  - sets `CORS_ORIGINS` to the `--cors` list, and `CORS_ORIGIN_REGEX` to `--cors-regex` (kept from your file if you don't pass it).
 
   So the same command still works after you turn your laptop's flags off.
 - **Checks before copying:**
@@ -116,13 +120,7 @@ deploy/copy-to-server.sh root@203.0.113.10 \
   ssh root@203.0.113.10 'nano /opt/planit/app/backend/.env && systemctl restart planit-api'
   ```
 
-Put the exact Vercel production domain (`<project>.vercel.app`) in `--cors`. Preview deployments get a new URL each time. To allow them too, add one line to the server's `.env`:
-
-```bash
-CORS_ORIGIN_REGEX=^https://planit-control-[a-z0-9-]+\.vercel\.app$
-```
-
-Match the pattern to one of your real preview URLs (they include the project and team names), and keep it anchored (`^…$`) so other sites can't match.
+Put the exact Vercel production domain (`<project>.vercel.app`) in `--cors`. Preview deployments get a new URL each time; `--cors-regex` allows them. Match the pattern to one of your real preview URLs (they look like `<project>-<hash>-<team>.vercel.app` and `<project>-git-<branch>-<team>.vercel.app`), ideally including your team slug, e.g. `^https://planit-control-[a-z0-9-]+-myteam\.vercel\.app$`. The script refuses a pattern that isn't anchored with `^https://…$`, since an unanchored one would match other sites.
 
 ### 4. Stop your laptop polling (do this right after step 3)
 
@@ -179,10 +177,9 @@ open https://api.planit.example.com/docs          # interactive API docs
 ssh root@203.0.113.10 'systemctl status planit-api --no-pager; journalctl -u planit-api -n 50 --no-pager'
 ```
 
-A healthy server log shows, within a minute:
-- `GLM live ingestion started (every 20 s)`;
-- `Hazard source open-meteo: …` and `Hazard source nws-alerts: …`;
-- the hourly weather poll after that.
+A healthy server log shows:
+- within a minute, `GLM live ingestion started (every 20 s)` and then `GLM live: N files, …` every 20 seconds;
+- `Hazard source nws-alerts: …`, `Hazard source open-meteo: …` and the others once each source is due. On a fresh database that's right away. Right after a laptop handover, each source waits out its interval from the laptop's last successful poll (NWS 5 min, FIRMS 30 min, weather 60 min, iNaturalist 6 h), so a quiet first few minutes is normal.
 
 ### 6. Frontend on Vercel (about 5 minutes)
 
@@ -269,7 +266,8 @@ Running `--rollback` twice goes back to the newer commit, since the rollback its
 | `BRIEFING_CONCURRENCY` | `4` | — | |
 | `FIRMS_MAP_KEY` | **required for fires** | keep | No wildfire data without it. |
 | `CORS_ORIGINS` | **your domain(s) + `<project>.vercel.app`**, comma-separated, `https://`, no path | `http://localhost:3000` | Set by `copy-to-server.sh --cors`. Trailing slashes are ignored. |
-| `CORS_ORIGIN_REGEX` | optional | empty | Vercel preview URLs, anchored regex. |
+| `CORS_ORIGIN_REGEX` | optional (set by `--cors-regex`) | empty | Vercel preview URLs, anchored regex (`^https://…$`). |
+| `ADMIN_TOKEN` | **required for the demo** | same | The demo code: `X-Admin-Token` for replay start/stop and send-now. Empty turns those off (503). |
 | `LIGHTNING_INGEST_ENABLED` | `true` (forced by the copy script) | **`false`** | GOES-19 polling and the stop-work engine. |
 | `LIGHTNING_POLL_SECONDS` | `20` | — | |
 | `HAZARD_POLLING_ENABLED` | `true` (forced) | **`false`** | Weather, NWS, FIRMS, iNaturalist, FEMA/river, flood alerts, hazard scores. |
@@ -287,11 +285,8 @@ Running `--rollback` twice goes back to the newer commit, since the rollback its
 
 ## Known gaps
 
-- **The write endpoints are open to the internet.** `POST /replay/start` and `/replay/stop`, `POST /briefing/send-now`, `POST /reports` and `POST /uploads` have no authentication. The worst cases:
-  - Anyone who finds the API can start a replay, which pauses live lightning ingestion and switches the server to simulated time until it ends.
-  - They can trigger paid Claude briefing calls.
-
-  The frontend's Replay button calls the first endpoint from the browser, so it can't simply be blocked at Caddy without breaking the demo. Fine for judging. Add authentication before real crews depend on it.
+- **Some write endpoints are open to the internet.** `POST /replay/start`, `/replay/stop` and `POST /briefing/send-now` need the demo code (`ADMIN_TOKEN`, `X-Admin-Token` header) and send-now is rate-limited, but `POST /reports` and `POST /uploads` have no authentication: anyone who finds the API can post a crew report or upload a photo. Add real authentication before real crews depend on it.
+- **Without `ADMIN_TOKEN`** in the server's `.env`, Replay storm and Send briefings now are turned off (503).
 - **One server, no failover.** If the box goes down, the API is down until it's back (systemd restarts the process on crashes and on boot).
 - **Report photos and the replay are only on the server's disk.** Vultr's automatic backups (an add-on) would cover `/var/lib/planit/uploads`.
 - **Photo URLs are stored as full URLs.** Reports made against `localhost` keep their `http://localhost:8000/...` photo links.

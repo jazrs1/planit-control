@@ -8,6 +8,9 @@
 #   --env FILE     env file to send (default: backend/.env). Your local file is never changed.
 #   --cors LIST    CORS_ORIGINS for the server: comma-separated frontend origins (https://host, no path).
 #                  Without it, the file's CORS_ORIGINS is kept and must contain an https:// origin.
+#   --cors-regex RE  CORS_ORIGIN_REGEX for the server, e.g. Vercel previews:
+#                  '^https://planit-control-[a-z0-9-]+\.vercel\.app$' (anchored with ^ and $). Without it,
+#                  the file's CORS_ORIGIN_REGEX (if any) is kept.
 #   --no-replay    don't copy backend/data/replay/
 #   --uploads      also copy backend/uploads/ (report photos) into /var/lib/planit/uploads (existing files kept)
 #
@@ -20,6 +23,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 ENV_FILE=$ROOT/backend/.env
 REPLAY_DIR=$ROOT/backend/data/replay
 CORS=""
+CORS_REGEX=""
 REPLAY=1
 UPLOADS=0
 REMOTE=""
@@ -31,6 +35,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --env) ENV_FILE=${2:?--env needs a file}; shift 2 ;;
     --cors) CORS=${2:?--cors needs a list}; shift 2 ;;
+    --cors-regex) CORS_REGEX=${2:?--cors-regex needs a pattern}; shift 2 ;;
     --no-replay) REPLAY=0; shift ;;
     --uploads) UPLOADS=1; shift ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
@@ -63,6 +68,13 @@ for o in "${origins[@]}"; do
 done
 CORS=$clean
 (( https_origins > 0 )) || fail "CORS_ORIGINS has no https:// origin. Pass --cors https://<your-domain>,https://<project>.vercel.app"
+[[ -n $CORS_REGEX ]] || CORS_REGEX=$(value_of CORS_ORIGIN_REGEX)
+if [[ -n $CORS_REGEX ]]; then
+  # Unanchored, "vercel\.app" would also match https://vercel.app.evil.com.
+  [[ $CORS_REGEX == '^https://'* && $CORS_REGEX == *'$' ]] \
+    || fail "--cors-regex must start with ^https:// and end with \$ (got '$CORS_REGEX')"
+  python3 -c 'import re,sys; re.compile(sys.argv[1])' "$CORS_REGEX" 2>/dev/null || fail "--cors-regex isn't a valid regex"
+fi
 [[ -n $(value_of FIRMS_MAP_KEY) ]] || warn "FIRMS_MAP_KEY is empty: no wildfire data"
 [[ -n $(value_of ANTHROPIC_API_KEY)$(value_of GEMINI_API_KEY) ]] || warn "no ANTHROPIC_API_KEY or GEMINI_API_KEY: briefings use the template"
 [[ -n $(value_of VAPID_PRIVATE_KEY) && -n $(value_of VAPID_PUBLIC_KEY) ]] \
@@ -75,7 +87,7 @@ fi
 umask 077
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-{ grep -vE '^[[:space:]]*(export[[:space:]]+)?(LIGHTNING_INGEST_ENABLED|HAZARD_POLLING_ENABLED|BRIEFING_ENABLED|PUSH_ENABLED|UPLOADS_DIR|CORS_ORIGINS)=' "$ENV_FILE" || true; } > "$tmp/env"
+{ grep -vE '^[[:space:]]*(export[[:space:]]+)?(LIGHTNING_INGEST_ENABLED|HAZARD_POLLING_ENABLED|BRIEFING_ENABLED|PUSH_ENABLED|UPLOADS_DIR|CORS_ORIGINS|CORS_ORIGIN_REGEX)=' "$ENV_FILE" || true; } > "$tmp/env"
 cat >> "$tmp/env" <<EOF
 
 # ---- set by deploy/copy-to-server.sh: the server is the only machine that polls ----
@@ -84,10 +96,11 @@ HAZARD_POLLING_ENABLED=true
 BRIEFING_ENABLED=true
 PUSH_ENABLED=true
 CORS_ORIGINS=$CORS
+CORS_ORIGIN_REGEX=$CORS_REGEX
 EOF
 
 echo "Server: $REMOTE"
-echo "Env file: $ENV_FILE (pollers forced on; CORS_ORIGINS=$CORS)"
+echo "Env file: $ENV_FILE (pollers forced on; CORS_ORIGINS=$CORS; CORS_ORIGIN_REGEX=${CORS_REGEX:-none})"
 ssh "$REMOTE" 'test -d /opt/planit/app/backend' || fail "no /opt/planit/app on the server: run deploy/setup.sh there first"
 ssh "$REMOTE" 'rm -rf /root/planit-upload && install -d -m 700 /root/planit-upload'
 
