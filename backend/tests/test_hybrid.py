@@ -183,7 +183,8 @@ def test_downed_line_alone_still_gives_a_valid_top_hazard_and_response():
     scored = predict(inputs(crew_reports=[downed]), {})
     assert scored["hazard_index_today"] == 7.0 and scored["top_hazard"] == "heat"   # contract default
     ContributingFactor.model_validate(scored["top_factors"][0])
-    Site.model_validate({**SITE, "county": "Test", "hazard_index": 7.0, "top_hazard": scored["top_hazard"]})
+    Site.model_validate({**SITE, "county": "Test", "hazard_index": 7.0, "hazard_index_live": 7.0,
+                         "top_hazard": scored["top_hazard"]})
 
 
 def test_floors_only_raise_the_index():

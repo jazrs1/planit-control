@@ -7,6 +7,8 @@
     "county": "Escambia",
     "timezone": "America/Chicago",
     "hazard_index": 2.6,
+    "hazard_index_live": 2.6,
+    "replay_override": false,
     "top_hazard": "soil_saturation",
     "conditions": {
       "heat": {
@@ -94,6 +96,8 @@
     "county": "Alachua",
     "timezone": "America/New_York",
     "hazard_index": 6.1,
+    "hazard_index_live": 6.1,
+    "replay_override": false,
     "top_hazard": "flood",
     "conditions": {
       "heat": {
@@ -200,6 +204,8 @@
     "county": "Citrus",
     "timezone": "America/New_York",
     "hazard_index": 3.2,
+    "hazard_index_live": 3.2,
+    "replay_override": false,
     "top_hazard": "wildlife",
     "conditions": {
       "heat": {
@@ -300,6 +306,8 @@
     "county": "Hillsborough",
     "timezone": "America/New_York",
     "hazard_index": 9.2,
+    "hazard_index_live": 9.2,
+    "replay_override": false,
     "top_hazard": "lightning",
     "conditions": {
       "heat": {
@@ -399,6 +407,8 @@
     "county": "Martin",
     "timezone": "America/New_York",
     "hazard_index": 4.4,
+    "hazard_index_live": 4.4,
+    "replay_override": false,
     "top_hazard": "wildfire",
     "conditions": {
       "heat": {
@@ -498,6 +508,8 @@
     "county": "Miami-Dade",
     "timezone": "America/New_York",
     "hazard_index": 5.3,
+    "hazard_index_live": 5.3,
+    "replay_override": false,
     "top_hazard": "heat",
     "conditions": {
       "heat": {

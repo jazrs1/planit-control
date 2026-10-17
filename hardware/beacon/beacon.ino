@@ -7,6 +7,9 @@
 //   CLEAR <site name>
 //   UNKNOWN
 // No line for 15 seconds counts as UNKNOWN. Green is shown only after an explicit CLEAR.
+//
+// A short button press silences the beeps. Holding it for 2 seconds sends "SITE" back to the
+// bridge, which switches to its next --site.
 
 #include <LiquidCrystal.h>
 
@@ -24,6 +27,7 @@ const unsigned long BEEP_ON_MS = 120;
 const unsigned long BEEP_OFF_MS = 120;
 const uint8_t BEEP_COUNT = 3;
 const unsigned long DEBOUNCE_MS = 40;
+const unsigned long LONG_PRESS_MS = 2000; // hold the button this long to switch sites
 
 enum State { ST_UNKNOWN, ST_STOP, ST_APPR, ST_FLOOD, ST_CLEAR };
 
@@ -50,6 +54,8 @@ unsigned long beepPhaseMs = 0;
 bool buttonStable = HIGH;
 bool buttonLastRead = HIGH;
 unsigned long buttonChangedMs = 0;
+unsigned long buttonDownMs = 0;
+bool longPressSent = false;
 
 char shownLine0[17] = "";
 char shownLine1[17] = "";
@@ -208,7 +214,17 @@ void readButton(unsigned long now) {
     if (buttonStable == LOW) {  // pressed (INPUT_PULLUP)
       silenced = true;
       stopBeeps();
+      buttonDownMs = now;
+      longPressSent = false;
     }
+  }
+  if (buttonStable == LOW && !longPressSent && now - buttonDownMs >= LONG_PRESS_MS) {
+    // Ask the bridge for the next site. Until its first line for that site arrives we don't
+    // know the new site's state, so show NO DATA rather than the old site's.
+    longPressSent = true;
+    Serial.println("SITE");
+    strcpy(siteName, "Switching site");
+    enterState(ST_UNKNOWN);
   }
 }
 

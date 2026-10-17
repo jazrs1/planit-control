@@ -81,6 +81,10 @@ def _reading(inputs, hazard: str, metric: str) -> float | None:
 def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -> dict:
     inputs = snap.inputs[site["id"]]
     scored = predict(inputs, snap.species_counts[site["id"]])
+    today = scored["hazard_index_today"]
+    # The same site with real alerts only (hazards/snapshot.py); only differs when a replay alert is in use.
+    live_inputs = snap.live_inputs.get(site["id"])
+    live = predict(live_inputs, snap.species_counts[site["id"]])["hazard_index_today"] if live_inputs else today
     cards = scored["cards"]
     mock = _placeholder_for(site)["conditions"]
 
@@ -105,8 +109,10 @@ def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -
             "crew_hazards": cards["crew_hazards"],
         },
         # Hybrid: ML weather score or safety rules, whichever is higher (hazards/risk.py).
-        "hazard_index": scored["hazard_index_today"],
-        "hazard_index_today": scored["hazard_index_today"],
+        "hazard_index": today,
+        "hazard_index_live": live,
+        "replay_override": today > live,
+        "hazard_index_today": today,
         "hazard_index_tomorrow": scored["hazard_index_tomorrow"],
         "top_hazard": scored["top_hazard"],
         "top_factors": scored["top_factors"],
@@ -143,7 +149,8 @@ def _placeholder_detail(site: dict) -> dict:
         "id": site["id"], "name": site["name"], "lat": site["lat"], "lon": site["lon"],
         "county": site["county"], "timezone": site["timezone"],
         "conditions": conditions,
-        "hazard_index": mock["hazard_index"], "hazard_index_today": mock["hazard_index_today"],
+        "hazard_index": mock["hazard_index"], "hazard_index_live": mock["hazard_index"], "replay_override": False,
+        "hazard_index_today": mock["hazard_index_today"],
         "hazard_index_tomorrow": mock["hazard_index_tomorrow"], "top_hazard": top,
         "top_factors": [f for f in mock["top_factors"] if f["hazard"] != "lightning"],
         "updated_at": mock["updated_at"],

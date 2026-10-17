@@ -1,0 +1,21 @@
+# Runs the beacon bridge at boot and restarts it if it ever exits.
+# install.sh copies this to /etc/systemd/system/ and sets User= to the installing user.
+# The bridge only reads public GET endpoints: no token or other secret belongs here.
+
+[Unit]
+Description=PlanIT Control stop-work beacon bridge
+Wants=network-online.target
+After=network-online.target
+# Never give up restarting.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=planit
+SupplementaryGroups=dialout
+ExecStart=/usr/bin/python3 -u /opt/planit-beacon/bridge.py https://api.stormsafecrews.us --site vandolah-power-station --site okeechobee-clean-energy-center
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
