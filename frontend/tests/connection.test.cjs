@@ -116,3 +116,15 @@ test("push API methods use the contract bodies and do not send the demo code or 
   await assert.rejects(api.getPushPublicKey(), /Push unavailable/);
   await assert.rejects(api.subscribePush({ subscription, role: "crew", site_ids: null }), /Push unavailable/);
 });
+
+test("a replay timeline 503 is 'not ready': retried quietly, never marks the app offline", async () => {
+  let requested;
+  const { api, conn } = load(async (url) => { requested = url; return new Response(JSON.stringify({ detail: "preparing" }), { status: 503, headers: { "content-type": "application/json", "retry-after": "5" } }); });
+  for (const call of [api.getReplayEvents, api.getReplaySeries]) {
+    const error = await call().catch((err) => err);
+    assert.ok(error instanceof api.NotReadyError);
+    assert.equal(error.retryAfterMs, 5_000);
+    assert.equal(conn.getConnectionSnapshot().failingSince, null, "the server answered: not a connection failure");
+  }
+  assert.equal(requested, "http://api.test/replay/series");
+});

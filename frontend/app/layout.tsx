@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Overpass, Overpass_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { APP_COLORS } from "@/lib/branding";
 import { APP_DESCRIPTION, APP_NAME, pageMetadata } from "@/lib/metadata";
@@ -8,6 +9,10 @@ import OutageShell from "@/components/OutageShell";
 import TopNavigation from "@/components/TopNavigation";
 import { getAlerts, orNull } from "@/lib/api";
 import "./globals.css";
+
+// Overpass descends from Highway Gothic, the US road-sign face: built to be read fast, outdoors.
+const overpass = Overpass({ subsets: ["latin"], variable: "--font-overpass", display: "swap" });
+const overpassMono = Overpass_Mono({ subsets: ["latin"], variable: "--font-overpass-mono", display: "swap" });
 
 // The navigation count is live safety data on every route.
 export const dynamic = "force-dynamic";
@@ -42,8 +47,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const alerts = await orNull(getAlerts());
 
   return (
-    <html lang="en">
-      <body className="min-h-screen pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[calc(env(safe-area-inset-bottom)+5rem)] pl-[env(safe-area-inset-left)] antialiased sm:pb-0">
+    <html lang="en" className={`${overpass.variable} ${overpassMono.variable}`}>
+      <body className="min-h-svh pbs-[env(safe-area-inset-top,0px)] pe-[env(safe-area-inset-right,0px)] pbe-[calc(env(safe-area-inset-bottom,0px)+5rem)] ps-[env(safe-area-inset-left,0px)] antialiased sm:pbe-0">
         <AlertsProvider initialAlerts={alerts}>
           <PushProvider>
             <TopNavigation />

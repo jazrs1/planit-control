@@ -1,4 +1,4 @@
-import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, PushEndpointRequest, PushPublicKey, PushSubscribeRequest, PushSubscriptionInfo, PushTestResponse, PushUnsubscribeResponse, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, FireDetection, HazardReport, ReplayEvent, ReplaySeries, WildlifeSightingPoint, LightningCellsResponse, LightningFlash, ModelInfo, PushEndpointRequest, PushPublicKey, PushSubscribeRequest, PushSubscriptionInfo, PushTestResponse, PushUnsubscribeResponse, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
@@ -9,6 +9,8 @@ import mockScoreHistory from "@shared/mocks/score_history.json";
 import mockPushSubscription from "@shared/mocks/push_subscription.json";
 
 import mockReports from "@shared/mocks/reports.json";
+import mockFires from "@shared/mocks/fires_recent.json";
+import mockWildlife from "@shared/mocks/wildlife_recent.json";
 import { markFailure, markSuccess } from "@/lib/connection";
 import { demoCodeHeaders } from "@/lib/demoCode";
 
@@ -21,9 +23,17 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** The backend is up but this data isn't ready yet (503 with Retry-After): retry later, quietly. It says
+ *  nothing about the connection, so it never marks the app offline. */
+export class NotReadyError extends Error {
+  constructor(readonly retryAfterMs: number) {
+    super("Not ready yet");
+  }
+}
+
 /** Request the backend and throw if it's unreachable or returns an error. Never falls back to mocks:
  *  safety data the UI can't verify must show as unknown, not as sample values. */
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, { quietNotReady = false } = {}): Promise<T> {
   // Reads report failures to the shared connection state; a failed write (e.g. a 503 from a POST)
   // is the action's error, not proof the backend is down.
   const read = (init?.method ?? "GET") === "GET";
@@ -33,6 +43,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch (err) {
     if (read) markFailure();
     throw err;
+  }
+  if (quietNotReady && res.status === 503) {
+    // Answered, so the server is reachable; the data is still being prepared.
+    markSuccess();
+    const seconds = Number(res.headers.get("retry-after"));
+    throw new NotReadyError(Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 5_000);
   }
   if (res.status < 500) markSuccess();
   else if (read) markFailure();
@@ -77,6 +93,15 @@ export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${en
 export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
   request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
+/** The current or most recent replay's events, oldest first. 503 (NotReadyError) for ~30 s while the
+ *  server prepares a window's timeline. Stop-work starts and all clears cover the whole storm: show
+ *  only those at or before simulated now. */
+export const getReplayEvents = () => request<ReplayEvent[]>("/replay/events", undefined, { quietNotReady: true });
+/** 5-minute bins through simulated now. Same 503 as events. */
+export const getReplaySeries = () => request<ReplaySeries>("/replay/series", undefined, { quietNotReady: true });
+/** Map layers. */
+export const getFires = () => request<FireDetection[]>("/fires/recent");
+export const getWildlife = () => request<WildlifeSightingPoint[]>("/wildlife/recent");
 /** Starting or stopping a replay needs the demo code (a 401 without it). */
 export const startReplay = (body: StartReplayRequest = {}) =>
   request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json", ...demoCodeHeaders() }, body: JSON.stringify(body) });
@@ -85,6 +110,8 @@ export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: 
 /** shared/mocks, for the explicit "Demo data" mode only. Anything showing these must say so. */
 export const DEMO_DATA = {
   reports: mockReports as HazardReport[],
+  fires: mockFires as FireDetection[],
+  wildlife: mockWildlife as WildlifeSightingPoint[],
   sites: mockSites as Site[],
   alerts: mockAlerts as Alert[],
   lightning: mockLightning as LightningFlash[],

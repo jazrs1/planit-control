@@ -77,7 +77,7 @@ function find(tree, predicate) {
 const site = { id: "big-bend", name: "Big Bend", timezone: "America/Chicago" };
 const now = Date.parse("2026-10-16T20:00:00Z");
 const point = (hours, score, extra = {}) => ({ scored_at: new Date(now + hours * 3600_000).toISOString(), for_date: "2026-10-16", horizon: "today", hazard_index: score, top_hazard: "heat", model_score: null, ...extra });
-const history = { site_id: site.id, points: [point(-2, 3), point(-1, 4), point(0, 7)] };
+const history = { site_id: site.id, points: [point(-5, 3), point(-4, 3), point(-3, 3), point(-2, 3), point(-1, 4), point(0, 7)] };
 const helpers = loader()("lib/scoreHistory.ts");
 const Chart = loader()("components/ScoreSparkline.tsx").default;
 const renderChart = (props) => renderToStaticMarkup(React.createElement(Chart, { site, history, ...props }));
@@ -91,8 +91,8 @@ test("history uses hybrid today scores only, sorted and deduplicated, within sev
   assert.deepEqual(Array.from(segments, segment => segment.length), [2, 1]);
 });
 
-test("missing, single-point and duplicate-only series show Not enough history yet, with no invented line", () => {
-  for (const value of [null, { site_id: site.id, points: [] }, { site_id: site.id, points: [point(0, 7)] }, { site_id: site.id, points: [point(0, 7), point(0, 7)] }, { ...history, site_id: "another-site" }]) {
+test("missing, short (under 6 runs) and duplicate-only series show Not enough history yet, with no invented line", () => {
+  for (const value of [null, { site_id: site.id, points: [] }, { site_id: site.id, points: [point(0, 7)] }, { site_id: site.id, points: [point(0, 7), point(0, 7)] }, { site_id: site.id, points: [point(-4, 3), point(-3, 3), point(-2, 3), point(-1, 4), point(0, 7)] }, { ...history, site_id: "another-site" }]) {
     const html = renderChart({ history: value });
     assert.match(html, /Not enough history yet/);
     assert.doesNotMatch(html, /<svg|<polyline/);
@@ -113,7 +113,7 @@ test("risk zones have fixed 0–10 geometry, latest point uses shared risk bands
   assert.doesNotMatch(stale, /fill-risk-(?:red|amber|green)/);
   assert.match(renderChart({ demo: true }), /Demo data/);
   for (const [score, band] of [[3.9, "green"], [4, "amber"], [6.9, "amber"], [7, "red"]]) {
-    assert.match(renderChart({ history: { ...history, points: [point(-1, 3), point(0, score)] } }), new RegExp(`r="4.5" class="fill-risk-${band}`));
+    assert.match(renderChart({ history: { ...history, points: [point(-5, 3), point(-4, 3), point(-3, 3), point(-2, 3), point(-1, 3), point(0, score)] } }), new RegExp(`r="4.5" class="fill-risk-${band}`));
   }
 });
 
@@ -126,14 +126,15 @@ test("tooltips work with keyboard, hover and touch and always use the site's tim
   svg(tree).props.onFocus(); tree = draw();
   assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 3:00 PM CDT · 7\.0 \/ 10/);
   svg(tree).props.onKeyDown({ key: "Home", preventDefault() {}, stopPropagation() {} }); tree = draw();
-  assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 1:00 PM CDT · 3\.0 \/ 10/);
-  svg(tree).props.onKeyDown({ key: "ArrowRight", preventDefault() {}, stopPropagation() {} }); tree = draw();
+  assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 10:00 AM CDT · 3\.0 \/ 10/);
+  svg(tree).props.onKeyDown({ key: "End", preventDefault() {}, stopPropagation() {} }); tree = draw();
+  svg(tree).props.onKeyDown({ key: "ArrowLeft", preventDefault() {}, stopPropagation() {} }); tree = draw();
   assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 2:00 PM CDT · 4\.0 \/ 10/);
   const event = { currentTarget: { getBoundingClientRect: () => ({ left: 0, width: 600 }) }, clientX: 592 };
   svg(tree).props.onPointerDown(event); tree = draw();
   assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 3:00 PM CDT · 7\.0 \/ 10/);
   svg(tree).props.onPointerMove({ ...event, clientX: 0 }); tree = draw();
-  assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 1:00 PM CDT · 3\.0 \/ 10/);
+  assert.match(renderToStaticMarkup(tree), /role="tooltip"[^>]*>Oct 16, 10:00 AM CDT · 3\.0 \/ 10/);
 });
 
 function historyLoader({ lazy = false, state, getHistory, siteId = site.id } = {}) {

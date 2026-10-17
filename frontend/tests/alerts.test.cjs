@@ -37,10 +37,17 @@ const conditions = { status: "warning", source: "NWS Flood Warning", hazard_stat
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 
 test("strike distances floor to one decimal, including the ten-mile boundary", () => {
-  for (const [input, expected] of [[9.996, "9.9 mi"], [9.999999999, "9.9 mi"], [9.9, "9.9 mi"], [2.49, "2.4 mi"], [2, "2.0 mi"], [0.099, "0.0 mi"], [0, "0.0 mi"], [10, "10.0 mi"]]) {
+  for (const [input, expected] of [[9.996, "9.9 mi"], [9.999999999, "9.9 mi"], [9.9, "9.9 mi"], [2.49, "2.4 mi"], [2, "2.0 mi"], [0.099, "0.0 mi"], [0, "0.0 mi"], [9.96, "9.9 mi"], [10, "10 mi"], [12.9, "12 mi"]]) {
     assert.equal(helpers.formatStrikeDistance(input), expected);
   }
   for (const missing of [null, NaN, Infinity, -1]) assert.equal(helpers.formatStrikeDistance(missing), null);
+});
+
+test("distances: one decimal under 10 mi, whole miles from 10 up", () => {
+  for (const [input, expected] of [[0.04, "0.0 mi"], [9.6, "9.6 mi"], [9.96, "10 mi"], [10.4, "10 mi"], [99.55, "100 mi"]]) {
+    assert.equal(helpers.formatMiles(input), expected);
+  }
+  for (const missing of [null, undefined, NaN, -1]) assert.equal(helpers.formatMiles(missing), null);
 });
 
 test("flood banners are amber with reason and site-local start time, never countdowns", () => {
@@ -76,13 +83,40 @@ test("only lightning gets STOP WORK, red styling and a countdown", () => {
 
 test("dashboard cards show simultaneous flood and lightning alerts separately", () => {
   const Card = load("components/SiteCard.tsx").default;
-  const html = render(Card, { site, alerts: [lightning, flood], flood: conditions });
+  // The compact row: the stop-work tag and its countdown.
+  const row = render(Card, { site, alerts: [lightning, flood], flood: conditions });
+  assert.match(row, /Stop work/);
+  assert.equal((row.match(/data-countdown/g) || []).length, 1);
+  assert.doesNotMatch(row, /Heavy rain near the river/);
+  // The selected row expands to both alerts, with one countdown.
+  const html = render(Card, { site, alerts: [lightning, flood], flood: conditions, selected: true });
   assert.match(html, /STOP WORK/);
   assert.match(html, /FLOOD RISK/);
   assert.match(html, /Heavy rain near the river/);
   assert.match(html, /9\.9 mi/);
   assert.equal((html.match(/data-countdown/g) || []).length, 1);
-  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true }), /Not confirmed/);
+  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true, selected: true }), /Last known · connection lost/);
+  const lastKnown = render(Card, { site, alerts: [flood], alertsUnconfirmed: true });
+  assert.match(lastKnown, /pc-chip--unknown/);
+  assert.match(lastKnown, /Last known/);
+  assert.doesNotMatch(lastKnown, /\?/);
+});
+
+test("a real stop-work wins over a replay one for the same site, in the row and on the crew view helper", () => {
+  const Card = load("components/SiteCard.tsx").default;
+  const replayed = { ...lightning, id: "replay-1", replay: true, all_clear_at: "2025-08-04T22:40:00Z" };
+  // /alerts lists replay alerts first.
+  const html = render(Card, { site, alerts: [replayed, lightning] });
+  assert.match(html, /pc-chip--stop/);
+  assert.match(html, /bg-risk-red-bg/);
+  assert.doesNotMatch(html, /pc-chip--replay-stop|REPLAY/);
+  assert.equal(helpers.siteAlert([replayed, lightning], site.id, "lightning").id, lightning.id);
+  assert.equal(helpers.siteAlert([replayed], site.id, "lightning").id, "replay-1");
+  // A replay-only stop-work stays blue and dashed, never the real red.
+  const replayOnly = render(Card, { site, alerts: [replayed] });
+  assert.match(replayOnly, /REPLAY/);
+  assert.match(replayOnly, /pc-chip--replay-stop/);
+  assert.doesNotMatch(replayOnly, /bg-risk-red-bg|pc-chip--stop"/);
 });
 
 function nav(alerts, status = "live") {
@@ -94,16 +128,23 @@ function nav(alerts, status = "live") {
 }
 
 test("navigation breaks down alert types and chooses amber for flood-only alerts", () => {
-  assert.match(nav([flood]), /bg-risk-amber-bg/);
-  assert.doesNotMatch(nav([flood]), /bg-risk-red-bg/);
+  assert.match(nav([flood]), /bg-risk-amber-solid/);
+  assert.doesNotMatch(nav([flood]), /bg-risk-red/);
   assert.match(nav([flood]), /0 stop work · 1 flood risk/);
   assert.match(nav([lightning, flood]), /1 stop work · 1 flood risk/);
   assert.match(nav([lightning, flood]), /Alerts, 2 active/);
-  assert.match(nav([lightning, flood]), /bg-risk-red-bg/);
+  assert.match(nav([lightning, flood]), /bg-risk-red-solid/);
   assert.match(nav(null, "unreachable"), /— stop work · — flood risk/);
   assert.match(nav([flood], "stale"), /0\? stop work · 1\? flood risk/);
-  assert.doesNotMatch(nav([flood], "stale"), /bg-risk-amber-bg/);
+  assert.doesNotMatch(nav([flood], "stale"), /bg-risk-amber/);
   assert.match(nav([flood], "demo"), /Demo data/);
+});
+
+test("navigation counts never include replay alerts", () => {
+  const replayed = { ...lightning, id: "replay-1", replay: true };
+  assert.match(nav([flood, replayed]), /0 stop work · 1 flood risk/);
+  assert.match(nav([flood, replayed]), /Alerts, 1 active/);
+  assert.doesNotMatch(nav([flood, replayed]), /bg-risk-red/);
 });
 
 test("flood reason does not repeat the FLOOD RISK label", () => {
@@ -115,6 +156,15 @@ test("a factor with no hazard type (a downed-line crew report) is labeled Crew h
   const risk = load("lib/risk.ts");
   assert.equal(risk.factorHazardLabel(null), "Crew hazard");
   assert.equal(risk.factorHazardLabel("lightning"), "Lightning");
+});
+
+test("real risk uses hazard_index_live: a replay can't raise it or hide a site that is red on its own", () => {
+  const risk = load("lib/risk.ts");
+  const raisedOnly = { hazard_index: 9, hazard_index_live: 2.4, replay_override: true };   // replay stop-work only
+  const redAnyway = { hazard_index: 9, hazard_index_live: 8, replay_override: true };      // a fire nearby, plus a replay stop-work
+  assert.equal(risk.riskLevel(risk.liveHazardIndex(raisedOnly)), "green");
+  assert.equal(risk.riskLevel(risk.liveHazardIndex(redAnyway)), "red");                     // still counts as High risk
+  assert.equal(risk.liveHazardIndex({ hazard_index: 5.1 }), 5.1);                            // backend without the field
 });
 
 test("replay alerts carry a REPLAY tag; real alerts don't", () => {

@@ -8,9 +8,9 @@ export default async function ReportsPage() {
   const [reports, sites] = await Promise.all([orNull(getReports()), orNull(getSites())]);
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
-      <header className="mb-5">
-        <h1 id="reports-heading" className="text-2xl font-bold text-brand">Crew hazard reports</h1>
-        <p className="mt-1 text-sm text-muted">Select a pin or report to explore hazards reported by crews.</p>
+      <header className="mbe-5">
+        <h1 id="reports-heading" className="pc-title">Crew hazard reports</h1>
+        <p className="mbs-1 text-sm text-muted">Select a pin or report to explore hazards reported by crews.</p>
       </header>
       <ReportsView initialReports={reports} sites={sites} />
     </main>

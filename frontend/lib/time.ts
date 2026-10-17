@@ -27,6 +27,13 @@ export function timeZoneAbbr(timeZone: string) {
   return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
 }
 
+/** "Eastern time" / "Central time", for people rather than code. */
+export function timeZoneName(timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longGeneric" }).formatToParts();
+  const name = parts.find((p) => p.type === "timeZoneName")?.value;
+  return name ? name.replace(/ Time$/, " time") : timeZone;
+}
+
 /** "just now", "12 min ago", "3 h ago", "2 days ago". */
 export function formatAgo(ms: number) {
   const min = Math.floor(ms / 60_000);

@@ -12,9 +12,9 @@ export default async function AlertsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-brand">Active alerts</h1>
-        <p className="mt-1 text-sm text-muted">
+      <header className="mbe-6">
+        <h1 className="pc-title">Active alerts</h1>
+        <p className="mbs-1 text-sm text-muted">
           Lightning stop-work countdowns and flood-risk notices.
         </p>
       </header>

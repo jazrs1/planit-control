@@ -6,6 +6,9 @@ export const HISTORY_GAP_MS = 3 * 60 * 60_000;
 
 /** One series: the hybrid score for "today" at each hourly run, not tomorrow's forecast or model alone.
  * End the seven-day window at the latest run: score history stays on real time during lightning replay. */
+/** Fewer hourly runs than this is too little to read a trend from: the chart says so instead. */
+export const MIN_HISTORY_POINTS = 6;
+
 export function historyPoints(history: ScoreHistory | null): ScorePoint[] {
   const byTime = new Map<number, ScorePoint>();
   for (const point of history?.points ?? []) {

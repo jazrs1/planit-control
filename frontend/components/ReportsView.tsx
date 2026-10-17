@@ -56,7 +56,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p role="status" className="text-sm text-muted">{unknown ? "— Reports unknown" : `${sorted.length}${stale ? "? last known" : ""} ${sorted.length === 1 ? "report" : "reports"} · Newest first`}</p>
-        {!demo && <button type="button" disabled={refreshing} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-brand disabled:opacity-50" onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>}
+        {!demo && <button type="button" disabled={refreshing} className="pc-btn pc-btn--quiet" onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>}
       </div>
       {demo && <div role="status" className="rounded-card border border-border bg-surface p-3 text-sm text-muted"><strong>Demo data</strong> · Sample reports, not live conditions. <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 font-semibold text-brand underline">Exit demo</button></div>}
       {unknown && <section role="status" className="space-y-3 rounded-card border border-border bg-surface p-4">
@@ -73,7 +73,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
             const site = report.site_id ? sitesById.get(report.site_id) : undefined;
             const time = new Intl.DateTimeFormat("en-US", { timeZone: site?.timezone ?? "UTC", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(report.created_at));
             return <li key={report.id} ref={(element) => { if (element) rows.current.set(report.id, element); else rows.current.delete(report.id); }}>
-              <article className={`h-full rounded-card border bg-surface p-4 shadow-card ${selectedId === report.id ? "border-brand ring-2 ring-brand" : "border-border"}`}>
+              <article className={`h-full rounded-card border bg-surface p-4 ${selectedId === report.id ? "border-brand ring-2 ring-brand" : "border-border"}`}>
                 <div className="flex items-start gap-3">
                   <ReportPhoto key={report.photo_url} src={report.photo_url} alt={`${REPORT_LABEL[report.category]} reported by crew`} className="h-20 w-20 shrink-0" />
                   <div className="min-w-0">
@@ -82,9 +82,9 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
                     <time dateTime={report.created_at} className="text-sm text-muted">{time}</time>
                   </div>
                 </div>
-                {report.note && <p className="mt-3 break-words whitespace-pre-wrap text-sm">{report.note}</p>}
-                <p className="mt-2 text-xs text-muted">{ROLE_LABEL[report.reporter_role]} · {report.lat.toFixed(5)}, {report.lon.toFixed(5)}</p>
-                <button type="button" aria-pressed={selectedId === report.id} onClick={() => { setSelectedId(report.id); document.getElementById("reports-heading")?.scrollIntoView({ block: "start" }); }} className="mt-2 min-h-11 rounded-card border border-border px-3 text-sm font-semibold text-brand">Show on map</button>
+                {report.note && <p className="mbs-3 break-words whitespace-pre-wrap text-sm">{report.note}</p>}
+                <p className="mbs-2 text-xs text-muted">{ROLE_LABEL[report.reporter_role]} · {report.lat.toFixed(5)}, {report.lon.toFixed(5)}</p>
+                <button type="button" aria-pressed={selectedId === report.id} onClick={() => { setSelectedId(report.id); document.getElementById("reports-heading")?.scrollIntoView({ block: "start" }); }} className="mbs-2 min-h-11 rounded-card border border-border px-3 text-sm font-semibold text-brand">Show on map</button>
               </article>
             </li>;
           })}

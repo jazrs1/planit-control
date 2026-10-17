@@ -1,41 +1,108 @@
 /*
- * PlanIT Control design tokens. Use these (via the Tailwind names in app/globals.css),
- * never raw hex values in components. Light, high-contrast theme for outdoor phone use.
+ * PlanIT Control design tokens: the Signal system, built on safety signs (ANSI Z535) and highway signs.
+ * Use them through the Tailwind names in app/globals.css, never raw colors in components.
+ *
+ * Sign language (solid red/amber/green panels, heavy black rules, uppercase legends) is only for safety
+ * moments: stop-work, flood, alert badges and the crew view. Everything else is calm: white space,
+ * light grey hairlines, big numbers with small grey labels. Blue is the notice color: REPLAY and focus.
+ * Live is light; the replay is the one dark instrument panel, so it can't be mistaken for a real stop-work.
+ *
+ * Each color holds its light and dark value; a scope switches with color-scheme, never by redefining.
+ * The block is also declared on [data-theme] because browsers resolve light-dark() where a custom
+ * property is declared: a dark scope inside a light page (the replay panel) needs its own resolution.
  */
-:root {
+:root, [data-theme] {
+  /* Light everywhere, whatever the device setting. The dark values serve [data-theme="dark"] scopes:
+     the replay panel is the one dark element. */
+  color-scheme: light;
+
+  /* Read literally by lib/branding.ts for the web manifest and browser chrome, so plain hex. */
+  --pc-brand: #141414;
+  --pc-bg: #f4f4f2;
+
   /* Surfaces */
-  --pc-bg: #f4f5f7;
-  --pc-surface: #ffffff;
-  --pc-border: #d9dde3;
+  --pc-page: light-dark(var(--pc-bg), oklch(0.15 0 none));
+  --pc-surface: light-dark(oklch(1 0 none), oklch(0.2 0 none));
+  --pc-surface-2: light-dark(oklch(0.95 0 none), oklch(0.255 0 none));
+  /* Hairline between rows; --pc-rule is the black sign rule around panels. */
+  --pc-border: light-dark(oklch(0.9 0 none), oklch(0.32 0 none));
+  --pc-border-strong: light-dark(oklch(0.8 0 none), oklch(0.42 0 none));
+  --pc-rule: light-dark(oklch(0.16 0 none), oklch(0.9 0 none));
 
   /* Text */
-  --pc-text: #111827;
-  --pc-text-muted: #5b6472;
+  --pc-text: light-dark(oklch(0.16 0 none), oklch(0.97 0 none));
+  --pc-text-muted: light-dark(oklch(0.43 0 none), oklch(0.74 0 none));
 
-  /* Brand */
-  --pc-brand: #0b3d91;
+  /* Ink: primary buttons and the top bar. Flips to white on black in dark mode. */
+  --pc-ink: light-dark(var(--pc-brand), oklch(0.97 0 none));
+  --pc-on-ink: light-dark(oklch(1 0 none), oklch(0.15 0 none));
 
-  /* Risk bands (hazard_index): green 0-3, amber 4-6, red 7-10 */
-  --pc-risk-green: #166534;
-  --pc-risk-green-bg: #dcfce7;
-  --pc-risk-amber: #92400e;
-  --pc-risk-amber-bg: #fef3c7;
-  --pc-risk-red: #b91c1c;
-  --pc-risk-red-bg: #fee2e2;
+  /* The replay instrument: dark in both themes (a touch of blue in dark mode, to stay distinct). */
+  --pc-instrument: light-dark(oklch(0.18 0.006 260), oklch(0.12 0.02 260));
+  --pc-instrument-line: light-dark(oklch(0.32 0.008 260), oklch(0.3 0.03 260));
 
-  /* Lightning flashes on the map: bright fill, dark ring so they read on the light basemap */
-  --pc-lightning: #facc15;
-  --pc-lightning-ring: #854d0e;
+  /* Notice blue: REPLAY tags, focus rings, selection. Never a safety meaning. */
+  --pc-notice: light-dark(oklch(0.46 0.17 258), oklch(0.74 0.13 250));
+  --pc-on-notice: light-dark(oklch(1 0 none), oklch(0.15 0 none));
 
-  /* Shape */
-  --pc-radius-card: 12px;
+  /* Risk bands (hazard_index): green < 4, amber 4 to < 7, red >= 7.
+     -solid fills a sign panel, on- is the type on it, plain is text and rules on white, -bg is a quiet tint. */
+  --pc-risk-red-solid: light-dark(oklch(0.53 0.21 28), oklch(0.6 0.21 28));
+  --pc-on-risk-red: oklch(1 0 none);
+  --pc-risk-red: light-dark(oklch(0.49 0.2 28), oklch(0.74 0.16 25));
+  --pc-risk-red-bg: light-dark(oklch(0.955 0.03 25), oklch(0.29 0.075 25));
+
+  --pc-risk-amber-solid: oklch(0.81 0.165 78);
+  --pc-on-risk-amber: oklch(0.16 0 none);
+  --pc-risk-amber: light-dark(oklch(0.48 0.11 62), oklch(0.85 0.14 82));
+  --pc-risk-amber-bg: light-dark(oklch(0.965 0.05 92), oklch(0.31 0.06 75));
+
+  --pc-risk-green-solid: light-dark(oklch(0.5 0.13 152), oklch(0.62 0.14 152));
+  --pc-on-risk-green: light-dark(oklch(1 0 none), oklch(0.15 0 none));
+  --pc-risk-green: light-dark(oklch(0.42 0.11 152), oklch(0.8 0.14 152));
+  --pc-risk-green-bg: light-dark(oklch(0.955 0.035 152), oklch(0.29 0.055 152));
+
+  /* Lightning flashes on the map: bright fill, dark ring so they read on the basemap */
+  --pc-lightning: oklch(0.88 0.18 98);
+  --pc-lightning-ring: light-dark(oklch(0.16 0 none), oklch(0.1 0 none));
+
+  /* Basemap, read by components/SiteMap.tsx */
+  --pc-map-land: light-dark(oklch(0.955 0 none), oklch(0.24 0.005 250));
+  --pc-map-land-alt: light-dark(oklch(0.93 0 none), oklch(0.26 0.006 250));
+  --pc-map-water: light-dark(oklch(0.87 0.025 235), oklch(0.17 0.012 245));
+  --pc-map-road: light-dark(oklch(1 0 none), oklch(0.32 0.006 250));
+  --pc-map-road-case: light-dark(oklch(0.84 0 none), oklch(0.28 0.006 250));
+  --pc-map-boundary: light-dark(oklch(0.62 0 none), oklch(0.5 0.01 250));
+  --pc-map-label: light-dark(oklch(0.3 0 none), oklch(0.8 0.005 250));
+  --pc-map-water-label: light-dark(oklch(0.45 0.05 240), oklch(0.6 0.04 240));
+
+  /* Shape. Signs have square corners; --pc-radius-pill is only for true circles (dots, markers). */
+  --pc-radius-card: 0px;
+  --pc-radius-chip: 0px;
   --pc-radius-pill: 999px;
+  /* Dashboard rules are 2px for long reading; the crew view uses the heavy rule. */
+  --pc-rule-width: 2px;
+  --pc-rule-heavy: 3px;
 
   /* Layout */
-  --pc-nav-height: 3.75rem;
-  --pc-shadow-card: 0 1px 2px rgb(17 24 39 / 0.06), 0 1px 3px rgb(17 24 39 / 0.1);
+  --pc-nav-height: 3.5rem;
+  /* Width of the site list docked over the dashboard map. */
+  --pc-rail-width: 25rem;
+  /* Panels over the map float with a soft shadow; panels on the page are separated by hairlines. */
+  --pc-shadow-card: none;
+  --pc-shadow-float: 0 1px 2px light-dark(oklch(0 0 none / 0.06), oklch(0 0 none / 0.4)), 0 8px 24px light-dark(oklch(0 0 none / 0.08), oklch(0 0 none / 0.45));
 
-  /* Type */
-  --pc-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --pc-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* Type: Overpass, from the Highway Gothic lineage of US road signs. Loaded in app/layout.tsx. */
+  --pc-font-sans: var(--font-overpass), ui-sans-serif, system-ui, sans-serif;
+  --pc-font-mono: var(--font-overpass-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Fluid display sizes (320px to 1240px): headings, the crew sign and its countdown. */
+  --pc-text-title: clamp(1.5rem, 1.33rem + 0.87vw, 2rem);
+  --pc-text-sign: clamp(2.25rem, 1.82rem + 2.17vw, 3.5rem);
+  --pc-text-timer: clamp(3rem, 2.48rem + 2.61vw, 4.5rem);
+
+  /* Motion */
+  --pc-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
+
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Alert } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 
-export default function StopWorkCountdown({ all_clear_at, replay, prominent = false }: Pick<Alert, "all_clear_at"> & Partial<Pick<Alert, "replay">> & { prominent?: boolean }) {
+export default function StopWorkCountdown({ all_clear_at, replay, prominent = false, inline = false }: Pick<Alert, "all_clear_at"> & Partial<Pick<Alert, "replay">> & { prominent?: boolean; inline?: boolean }) {
   // Start with a placeholder so the server and hydration render agree.
   const [now, setNow] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
@@ -56,12 +56,22 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
           ? "--:--"
           : `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
+  // A compact list row: just the time (or its unknown state), same reset flash.
+  if (inline) {
+    return (
+      <span className={`whitespace-nowrap px-1 font-mono text-sm font-bold ${unconfirmed ? "text-muted" : cleared ? "text-risk-green" : replay ? "text-notice" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+        <span role="timer" aria-live="off">{label}</span>
+        <span role="status" className="sr-only">{resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : cleared ? "All clear" : ""}</span>
+      </span>
+    );
+  }
+
   return (
-    <div className={`rounded-card px-3 py-2 ${cleared ? "bg-risk-green-bg text-risk-green" : "bg-surface text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
-      <span className="block text-xs font-medium">
+    <div className={`${prominent ? "px-4 py-3" : "border-2 border-current px-3 py-2"} ${cleared ? "bg-risk-green-bg text-risk-green" : "bg-surface text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+      <span className="pc-label block">
         {target === null ? "Stop-work status" : "All-clear countdown"}
       </span>
-      <span role="timer" aria-live="off" className={`block font-mono ${prominent ? "text-4xl" : "text-2xl"} font-bold tabular-nums`}>
+      <span role="timer" aria-live="off" className={`block font-mono ${prominent ? "text-timer leading-none" : "text-2xl leading-tight"} font-bold tabular-nums`}>
         {label}
       </span>
       <span role="status" className={resetting || unconfirmed ? "block text-sm font-semibold" : "sr-only"}>

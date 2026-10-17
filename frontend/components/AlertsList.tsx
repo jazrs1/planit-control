@@ -4,13 +4,16 @@ import type { Site } from "@shared/types";
 import AlertBanner from "@/components/AlertBanner";
 import { useAlertsState } from "@/components/AlertsProvider";
 import { DEMO_DATA } from "@/lib/api";
-import { countAlerts } from "@/lib/alerts";
+import { countAlerts, realAlerts } from "@/lib/alerts";
 import { useFloodConditions } from "@/lib/useFloodConditions";
 
 export default function AlertsList({ sites }: { sites: Site[] }) {
   const { alerts, status, staleSince, replay } = useAlertsState();
   const floodConditions = useFloodConditions();
-  const counts = countAlerts(alerts ?? []);
+  // Counts never mix real and replay alerts: real first, replay ones named separately.
+  const real = realAlerts(alerts ?? []);
+  const counts = countAlerts(real);
+  const replayCount = (alerts ?? []).length - real.length;
   const sitesById = new Map((status === "demo" ? DEMO_DATA.sites : sites).map((site) => [site.id, site]));
 
   if (alerts === null) {
@@ -24,17 +27,17 @@ export default function AlertsList({ sites }: { sites: Site[] }) {
   return (
     <>
       {status === "demo" && (
-        <p role="status" className="mb-4 rounded-card border border-border bg-surface p-3 text-sm font-semibold text-muted">
+        <p role="status" className="mbe-4 rounded-card border border-border bg-surface p-3 text-sm font-semibold text-muted">
           Demo data · sample alerts from shared/mocks, not live conditions
         </p>
       )}
       {staleSince && (
-        <p role="status" className="mb-4 rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
+        <p role="status" className="mbe-4 rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
           Connection lost · showing alerts from {staleSince.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
         </p>
       )}
-      <p role="status" className="mb-4 text-sm text-muted">
-        {alerts.length}{status === "stale" ? "? last known" : " active"} {alerts.length === 1 ? "alert" : "alerts"} · {counts.lightning} stop work · {counts.flood} flood risk · Newest first
+      <p role="status" className="mbe-4 text-sm text-muted">
+        {real.length}{status === "stale" ? "? last known" : " active"} {real.length === 1 ? "alert" : "alerts"} · {counts.lightning} stop work · {counts.flood} flood risk{replayCount > 0 ? ` · plus ${replayCount} REPLAY` : ""} · Newest first
         {status !== "demo" && (replay?.running ? " · Storm replay: updates every 3 seconds" : " · Updates every 30 seconds")}
       </p>
       {alerts.length === 0 ? (

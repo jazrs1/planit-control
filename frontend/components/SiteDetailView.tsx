@@ -10,7 +10,7 @@ import HazardPanel from "@/components/HazardPanel";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import SiteScoreHistory from "@/components/SiteScoreHistory";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { formatStrikeDistance } from "@/lib/alerts";
+import { formatMiles, formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
@@ -83,7 +83,7 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
     <>
       {alerts.map((alert) =>
         alert.type === "lightning" ? (
-          <article key={alert.id} className="flex flex-col gap-3 rounded-card border border-risk-red bg-risk-red p-4 text-surface shadow-card sm:flex-row sm:items-center sm:justify-between">
+          <article key={alert.id} className="flex flex-col gap-3 rounded-card border border-risk-red bg-risk-red-solid p-4 text-on-risk-red sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-lg font-bold">{alert.replay && <ReplayTag />}⚡ STOP WORK: lightning</p>
               <p className="text-sm">
@@ -95,7 +95,7 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
             <div className="shrink-0 sm:min-w-56"><StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} /></div>
           </article>
         ) : alert.type === "flood" ? (
-          <article key={alert.id} className="rounded-card border border-risk-amber bg-risk-amber-bg p-4 text-risk-amber shadow-card">
+          <article key={alert.id} className="rounded-card border border-risk-amber bg-risk-amber-bg p-4 text-risk-amber">
             <p className="text-lg font-bold">{alert.replay && <ReplayTag />}FLOOD RISK</p>
             <p className="text-sm">
               {alert.all_clear_at
@@ -105,7 +105,7 @@ function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; time
             </p>
           </article>
         ) : (
-          <article key={alert.id} className="rounded-card border border-risk-red bg-risk-red-bg p-4 text-risk-red shadow-card">
+          <article key={alert.id} className="rounded-card border border-risk-red bg-risk-red-bg p-4 text-risk-red">
             <p className="text-lg font-bold">{alert.replay && <ReplayTag />}{HAZARD_LABEL[alert.type].toUpperCase()} ALERT</p>
             <p className="text-sm">Started {formatSiteDateTime(alert.started_at, timeZone)}.</p>
           </article>
@@ -190,7 +190,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
     return (
       <main className="mx-auto max-w-5xl px-4 py-6">
         {backLink}
-        <section role="status" className="mt-6 flex flex-col items-center gap-3 p-8 text-center">
+        <section role="status" className="mbs-6 flex flex-col items-center gap-3 p-8 text-center">
           {demo ? (
             <>
               <h1 className="text-lg font-semibold">No demo data for this site</h1>
@@ -204,7 +204,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
               <h1 className="text-lg font-semibold text-risk-red">Can&apos;t reach the server</h1>
               <p className="max-w-md text-sm text-muted">This site&apos;s conditions and stop-work status are unknown. Don&apos;t treat it as clear. Retrying every 5 seconds.</p>
               <div className="flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => { void poll(); void refreshAlerts(); }} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
+                <button type="button" onClick={() => { void poll(); void refreshAlerts(); }} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
                 {siteId in DEMO_DATA.siteDetails && (
                   <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
                 )}
@@ -230,14 +230,14 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <div>
         {backLink}
         {demo && (
-          <p role="status" className="mt-2 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-3 text-sm font-semibold text-muted">
-            <span className="rounded-pill border border-border px-2 py-0.5 text-xs">Demo data</span>
+          <p role="status" className="mbs-2 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-3 text-sm font-semibold text-muted">
+            <span className="rounded-chip border border-border px-2 py-0.5 text-xs">Demo data</span>
             Sample conditions from shared/mocks · not live
             <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 text-brand underline focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
           </p>
         )}
         {connectionLost && (
-          <p role="status" className="mt-2 rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
+          <p role="status" className="mbs-2 rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
             Connection lost · showing last known conditions from {timeOfDay(lostSince)} · ? = may be out of date
           </p>
         )}
@@ -250,7 +250,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
             {detail.county} County · {timeZoneAbbr(tz)} · Updated {formatSiteDateTime(detail.updated_at, tz)}
             {nowMs !== null && ` (${formatAgo(Math.max(0, nowMs - Date.parse(detail.updated_at)))})`}
           </p>
-          <p className="mt-1 text-sm">
+          <p className="mbs-1 text-sm">
             <span className="text-muted">Top hazard: </span>
             <span className="font-medium">{HAZARD_LABEL[detail.top_hazard]}</span>
           </p>
@@ -260,7 +260,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
             <IndexBadge label="Today" value={detail.hazard_index_today} uncertain={connectionLost} unknown={noLiveData} />
             <IndexBadge label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} unknown={noLiveData} />
           </div>
-          <p className="text-xs text-muted">Hazard index 0–10 · interim rule-based score</p>
+          <p className="text-xs text-muted">Hazard index 0–10 · weather model + safety rules</p>
         </div>
       </header>
 
@@ -268,19 +268,19 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : serverNow()} demo={demo} />
       <SiteScoreHistory site={detail} unconfirmed={connectionLost} />
 
-      <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4 shadow-card">
+      <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4">
         <h2 id="nws-heading" className="text-base font-semibold">National Weather Service alerts</h2>
         {nws == null ? (
-          <p className="mt-2 text-sm text-muted">NWS alerts unavailable for this site.</p>
+          <p className="mbs-2 text-sm text-muted">NWS alerts unavailable for this site.</p>
         ) : nws.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No active NWS alerts{connectionLost ? " (last known)" : ""}.</p>
+          <p className="mbs-2 text-sm text-muted">No active NWS alerts{connectionLost ? " (last known)" : ""}.</p>
         ) : (
-          <ul className="mt-2 divide-y divide-border">
+          <ul className="mbs-2 divide-y divide-border">
             {nws.map((a, i) => (
               <li key={`${a.event}-${i}`} className="py-2 text-sm">
                 <p className="font-semibold">
                   {a.event}
-                  {a.severity && <span className="ml-2 rounded-pill bg-bg px-2 py-0.5 text-xs font-medium text-muted">{a.severity}</span>}
+                  {a.severity && <span className="ms-2 rounded-chip bg-bg px-2 py-0.5 text-xs font-medium text-muted">{a.severity}</span>}
                 </p>
                 {a.headline && <p className="text-muted">{a.headline}</p>}
                 <p className="text-xs text-muted">{a.ends_at ? `Until ${formatSiteDateTime(a.ends_at, tz)}` : "End time not given"}</p>
@@ -294,7 +294,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         <HazardPanel
           title="Lightning" card={c.lightning} freshness={{ kind: "live" }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           rows={[
-            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : `${c.lightning.nearest_strike_mi} mi` },
+            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : formatStrikeDistance(c.lightning.nearest_strike_mi) },
             { label: "Strike time", value: c.lightning.nearest_strike_at && formatSiteTime(c.lightning.nearest_strike_at, tz) },
             { label: "Strikes, last 30 min", value: String(c.lightning.strikes_last_30_min) },
           ]}
@@ -333,7 +333,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         <HazardPanel
           title="Wildfire" card={c.wildfire} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.wildfire }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           rows={[
-            { label: "Nearest fire", value: c.wildfire.nearest_detection_mi === null ? "None detected" : `${c.wildfire.nearest_detection_mi} mi` },
+            { label: "Nearest fire", value: c.wildfire.nearest_detection_mi === null ? "None detected" : formatMiles(c.wildfire.nearest_detection_mi) },
             { label: "Detected", value: c.wildfire.detected_at && formatSiteDateTime(c.wildfire.detected_at, tz) },
             { label: "Confidence", value: c.wildfire.confidence },
             { label: "Fires within 25 mi (24 h)", value: c.wildfire.detections_25mi == null ? null : String(c.wildfire.detections_25mi) },
@@ -349,11 +349,11 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           ] : []}
         >
           {c.wildlife.length > 0 && (
-            <ul className="divide-y divide-border border-t border-border text-sm">
+            <ul className="divide-y divide-border border-bs border-border text-sm">
               {c.wildlife.slice(0, 8).map((s, i) => (
                 <li key={`${s.species}-${s.seen_at}-${i}`} className="flex flex-wrap justify-between gap-x-2 py-1">
                   <span className="min-w-0 font-medium">{s.species}</span>
-                  <span className="shrink-0 text-muted tabular-nums">{s.distance_mi} mi · {formatSiteDateTime(s.seen_at, tz)}</span>
+                  <span className="shrink-0 text-muted tabular-nums">{formatMiles(s.distance_mi) ?? "Distance unknown"} · {formatSiteDateTime(s.seen_at, tz)}</span>
                 </li>
               ))}
             </ul>
@@ -372,20 +372,20 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         onRegenerate={demo ? undefined : regenerateBriefing}
       />
 
-      <section aria-labelledby="factors-heading" className="rounded-card border border-border bg-surface p-4 shadow-card">
+      <section aria-labelledby="factors-heading" className="rounded-card border border-border bg-surface p-4">
         <h2 id="factors-heading" className="text-base font-semibold">What drives today&apos;s index</h2>
         {detail.top_factors.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No contributing factors.</p>
+          <p className="mbs-2 text-sm text-muted">No contributing factors.</p>
         ) : (
-          <ul className="mt-3 flex flex-col gap-3">
+          <ul className="mbs-3 flex flex-col gap-3">
             {detail.top_factors.map((f) => (
               <li key={`${f.hazard}-${f.label}`} className="text-sm">
                 <div className="flex justify-between gap-2">
                   <span><span className="font-medium">{factorHazardLabel(f.hazard)}</span> · {f.label}</span>
                   <span className="shrink-0 tabular-nums text-muted">{Math.round(f.weight * 100)}%</span>
                 </div>
-                <div className="mt-1 h-2 rounded-pill bg-bg" aria-hidden="true">
-                  <div className={`h-2 rounded-pill ${connectionLost ? "bg-border" : "bg-brand"}`} style={{ width: `${Math.min(100, Math.max(0, f.weight * 100))}%` }} />
+                <div className="mbs-1 h-2 rounded-chip bg-bg" aria-hidden="true">
+                  <div className={`h-2 rounded-chip ${connectionLost ? "bg-border" : "bg-brand"}`} style={{ width: `${Math.min(100, Math.max(0, f.weight * 100))}%` }} />
                 </div>
               </li>
             ))}

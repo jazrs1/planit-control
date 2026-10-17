@@ -17,11 +17,13 @@ export default function LightningApproachChip({ approach, stopWork, unconfirmed,
     ? `Storm approaching from the ${approach.from_direction} at ${Math.round(approach.speed_mph)} mph`
     : "Storm direction and speed unavailable";
 
-  return <div role="status" className={`space-y-1 rounded-card border p-3 ${uncertain ? "border-dashed border-border bg-bg text-muted" : "border-risk-amber bg-risk-amber-bg text-risk-amber"}`}>
-    <p className="text-xs font-bold tracking-wide">
-      <span className="inline-block rounded-pill bg-surface px-2 py-1">LIGHTNING POSSIBLE WITHIN THE HOUR{uncertain && " ?"}</span>
+  return <div role="status" className={`space-y-1.5 border-2 border-dashed p-3 ${uncertain ? "border-muted bg-bg text-muted" : "border-risk-amber-solid bg-risk-amber-bg text-text"}`}>
+    <p>
+      {approach.replay && <span className="pc-chip pc-chip--replay me-2 align-middle" title="From a storm replay, not a real advisory">REPLAY</span>}
+      <span className={`pc-chip ${uncertain ? "pc-chip--unknown" : approach.replay ? "pc-chip--replay-stop" : "pc-chip--approach"}`}>LIGHTNING POSSIBLE WITHIN THE HOUR</span>
+      {uncertain && <span className="pc-label ms-2 align-middle">Unconfirmed</span>}
     </p>
-    <p className="pt-1 text-sm font-medium">{uncertain && "Last known: "}{motion}</p>
+    <p className="text-sm font-semibold">{uncertain && "Last known: "}{motion}</p>
     <p className="text-xs">{demo ? "Demo data · " : ""}{uncertain ? "Not confirmed · " : ""}Lightning can arrive sooner. Stay alert for stop-work orders.</p>
   </div>;
 }

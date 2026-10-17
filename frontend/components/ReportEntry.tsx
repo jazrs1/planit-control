@@ -20,7 +20,7 @@ export default function ReportEntry({ initialSites, initialSiteId = "" }: { init
     <section role="status" className="space-y-3 rounded-card border border-border bg-surface p-4">
       <h2 className="font-semibold">Demo data</h2>
       <p className="text-sm text-muted">Reporting is disabled in demo mode. Exit demo to submit a real crew report.</p>
-      <button type="button" onClick={() => setDemo(false)} className="min-h-12 rounded-card bg-brand px-4 font-semibold text-surface">Exit demo</button>
+      <button type="button" onClick={() => setDemo(false)} className="min-h-12 rounded-card bg-brand px-4 font-semibold text-on-brand">Exit demo</button>
     </section>
   );
 

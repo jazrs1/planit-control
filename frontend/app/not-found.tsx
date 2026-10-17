@@ -5,8 +5,8 @@ export const metadata = pageMetadata("Page not found", "This page is unavailable
 
 export default function NotFound() {
   return <main className="mx-auto max-w-2xl space-y-4 px-4 py-8">
-    <h1 className="text-2xl font-bold text-brand">Page not found</h1>
+    <h1 className="pc-title">Page not found</h1>
     <p>This link may have changed.</p>
-    <Link href="/crew" className="inline-flex min-h-12 items-center rounded-card bg-brand px-4 font-semibold text-surface">Open crew view</Link>
+    <Link href="/crew" className="pc-btn pc-btn--primary">Open crew view</Link>
   </main>;
 }

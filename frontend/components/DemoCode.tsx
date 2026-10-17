@@ -27,10 +27,10 @@ export function DemoCodeForm({ wrong, onSubmit, onCancel }: { wrong: boolean; on
         onChange={(e) => setCode(e.target.value)}
         className="min-h-11 w-40 rounded-card border border-border bg-surface px-3 text-text focus-visible:outline-2 focus-visible:outline-brand"
       />
-      <button type="submit" disabled={!code.trim()} className="min-h-11 rounded-card bg-brand px-3 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50">
+      <button type="submit" disabled={!code.trim()} className="pc-btn pc-btn--primary">
         Continue
       </button>
-      <button type="button" onClick={onCancel} className="min-h-11 rounded-card border border-border px-3 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">
+      <button type="button" onClick={onCancel} className="pc-btn pc-btn--quiet">
         Cancel
       </button>
       <p role={wrong ? "alert" : "status"} className={`w-full ${wrong ? "text-risk-red" : "text-muted"}`}>
