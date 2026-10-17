@@ -211,19 +211,19 @@ def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetim
     return {"site_id": site_id, "state": state, "seconds_to_all_clear": None, "minutes_to_arrival": None, "as_of": now}
 
 
-BEACON_PRIORITY = ("stop", "unknown", "approaching", "flood", "clear")
-
-
 def combine_beacons(beacons: list[dict]) -> dict:
-    """The highest-priority state of several beacons (real and replay): stop > unknown > approaching >
-    flood > clear. A real stop-work beats a replay one (its countdown is real time; the replay's is
-    simulated seconds); otherwise two stops: the longer wait wins; two approaching: the sooner arrival;
-    otherwise the first (real) one."""
-    def rank(b: dict) -> tuple:
-        return (BEACON_PRIORITY.index(b["state"]), b["state"] == "stop" and b.get("replay", False),
-                -(b["seconds_to_all_clear"] or 0),
-                b["minutes_to_arrival"] if b["minutes_to_arrival"] is not None else 0)
-    return min(beacons, key=rank)
+    """The beacon to show from the real one and (during a replay) the replay's, each tagged `replay`.
+    Real first: any real state other than clear (stop, unknown, approaching, flood) wins over every
+    replay state, so a demo can never hide or outrank a real alert. The replay's state shows only when
+    the real one is clear (or there is no real layer, e.g. live ingestion turned off); when both are
+    clear the real one is shown, so `replay` is true only when the shown state came from the replay."""
+    real = next((b for b in beacons if not b.get("replay")), None)
+    replayed = next((b for b in beacons if b.get("replay")), None)
+    if real is None:
+        return replayed
+    if real["state"] != "clear" or replayed is None or replayed["state"] == "clear":
+        return real
+    return replayed
 
 
 # ---------- replay lead times ----------
