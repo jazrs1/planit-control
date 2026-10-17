@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
+import numpy as np
 import psycopg
 from psycopg import Connection
 from psycopg.types.json import Jsonb
@@ -72,40 +73,10 @@ def components(sites: list[dict], forecasts: list[dict], now: datetime) -> dict[
 def run(pool: ConnectionPool, sites: list[dict], forecasts: list[dict], now: datetime) -> str:
     """Score every site and store the run. Never raises: the weather readings are already saved,
     and a model problem must not mark the weather poll failed."""
-    from hazards import snapshot
-    from hazards.risk import local_days, predict
-
     try:
         fresh = components(sites, forecasts, now)
-        version = model_version()
-        snap = snapshot.load(pool, replay=False)  # stored history is live: never replay lightning
-        rows = []
-        for site in snap.sites:
-            inp = snap.inputs[site["id"]]
-            inp.model = {**inp.model, **fresh.get(site["id"], {})}
-            scored = predict(inp, snap.species_counts[site["id"]])
-            today, tomorrow = local_days(inp)
-            for day, index, top, factors, ml in (
-                (today, scored["hazard_index_today"], scored["top_hazard"], scored["top_factors"], scored["model_today"]),
-                (tomorrow, scored["hazard_index_tomorrow"], scored["top_hazard_tomorrow"],
-                 scored["top_factors_tomorrow"], scored["model_tomorrow"]),
-            ):
-                rows.append({
-                    "site_id": site["id"], "scored_at": now, "for_date": day, "score": index,
-                    "factors": Jsonb(factors), "top_hazard": top,
-                    "model_probability": ml["probability"] if ml else None, "model_score": ml["score"] if ml else None,
-                    "model_factors": Jsonb(ml["factors"]) if ml else None,
-                    "model_version": version if ml else None,
-                })
-        with pool.connection() as conn, conn.cursor() as cur:
-            cur.executemany(
-                """INSERT INTO hazard_scores (site_id, scored_at, for_date, score, factors, top_hazard,
-                                              model_probability, model_score, model_factors, model_version)
-                   VALUES (%(site_id)s, %(scored_at)s, %(for_date)s, %(score)s, %(factors)s, %(top_hazard)s,
-                           %(model_probability)s, %(model_score)s, %(model_factors)s, %(model_version)s)
-                   ON CONFLICT (site_id, for_date, scored_at) DO NOTHING""",
-                rows)
-        detail = f"scored {len(fresh)} of {len(sites)} sites with the model; stored {len(rows)} hybrid scores"
+        stored = store_run(pool, now, fresh)
+        detail = f"scored {len(fresh)} of {len(sites)} sites with the model; stored {stored} hybrid scores"
         mark_source(pool, NAME, now, detail=detail)
         return detail
     except Exception as err:  # noqa: BLE001 - keep the weather poll's result; log why scoring failed
@@ -115,6 +86,43 @@ def run(pool: ConnectionPool, sites: list[dict], forecasts: list[dict], now: dat
         except Exception:  # noqa: BLE001 - database may be the thing that's down
             pass
         return f"model scoring failed: {type(err).__name__}"
+
+
+def store_run(pool: ConnectionPool, now: datetime, fresh: dict[str, dict[str, dict]]) -> int:
+    """Combine every site's model part (`fresh`, else the latest stored one, re-mapped to the current
+    anchors) with the current rules and store one hazard_scores row per site and day. Returns rows."""
+    from hazards import snapshot
+    from hazards.risk import local_days, predict
+
+    version = model_version()
+    snap = snapshot.load(pool, replay=False)  # stored history is live: never replay lightning
+    rows = []
+    for site in snap.sites:
+        inp = snap.inputs[site["id"]]
+        inp.model = {**inp.model, **fresh.get(site["id"], {})}
+        scored = predict(inp, snap.species_counts[site["id"]])
+        today, tomorrow = local_days(inp)
+        for day, index, top, factors, ml in (
+            (today, scored["hazard_index_today"], scored["top_hazard"], scored["top_factors"], scored["model_today"]),
+            (tomorrow, scored["hazard_index_tomorrow"], scored["top_hazard_tomorrow"],
+             scored["top_factors_tomorrow"], scored["model_tomorrow"]),
+        ):
+            rows.append({
+                "site_id": site["id"], "scored_at": now, "for_date": day, "score": index,
+                "factors": Jsonb(factors), "top_hazard": top,
+                "model_probability": ml["probability"] if ml else None, "model_score": ml["score"] if ml else None,
+                "model_factors": Jsonb(ml["factors"]) if ml else None,
+                "model_version": version if ml else None,
+            })
+    with pool.connection() as conn, conn.cursor() as cur:
+        cur.executemany(
+            """INSERT INTO hazard_scores (site_id, scored_at, for_date, score, factors, top_hazard,
+                                          model_probability, model_score, model_factors, model_version)
+               VALUES (%(site_id)s, %(scored_at)s, %(for_date)s, %(score)s, %(factors)s, %(top_hazard)s,
+                       %(model_probability)s, %(model_score)s, %(model_factors)s, %(model_version)s)
+               ON CONFLICT (site_id, for_date, scored_at) DO NOTHING""",
+            rows)
+    return len(rows)
 
 
 def latest(conn: Connection, now: datetime) -> dict[str, dict[str, dict]]:
@@ -133,8 +141,18 @@ def latest(conn: Connection, now: datetime) -> dict[str, dict[str, dict]]:
     out: dict[str, dict[str, dict]] = {}
     for r in rows:
         out.setdefault(r["site_id"], {})[r["for_date"].isoformat()] = {
-            "probability": r["model_probability"], "score": r["model_score"], "factors": r["model_factors"] or []}
+            "probability": r["model_probability"], "score": rescore(r["model_probability"], r["model_score"]),
+            "factors": r["model_factors"] or []}
     return out
+
+
+def rescore(probability: float | None, stored_score: float) -> float:
+    """The ML index for a stored probability with the current anchors (ml/models/hazard_model.json), so
+    a re-anchored index applies to rows scored before the change. The stored score if there's no
+    probability."""
+    if probability is None:
+        return stored_score
+    return float(model().index(np.asarray([probability]))[0])
 
 
 def history(conn: Connection, site: dict, now: datetime, days: int = HISTORY_DAYS) -> list[dict]:
