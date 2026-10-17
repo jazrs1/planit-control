@@ -16,7 +16,7 @@ from app import clock
 from app.cache import TTLCache
 from app.config import BACKEND_DIR, get_settings
 from app.routers import lightning as route
-from app.schemas import LightningFlash, LightningRecentCounts
+from app.schemas import LightningCell, LightningFlash, LightningRecentCounts
 
 SIM = datetime(2031, 1, 6, 17, 0, tzinfo=timezone.utc)   # the fake replay clock: no stored flash is near it
 LAT, LON = 24.123456, -83.654321
@@ -120,8 +120,45 @@ def test_each_layer_has_its_own_cap(conn, monkeypatch):
     assert sum(not f.replay for f in got) <= 2
 
 
+def storm(conn, now):
+    """25 flashes within about a mile of the test spot over the last 10 minutes: one storm cell."""
+    for i in range(25):
+        conn.execute("INSERT INTO lightning_flashes (ts, lat, lon, energy, source_file) VALUES (%s, %s, %s, NULL, 'test')",
+                     (now - (i % 10) * MIN - i * timedelta(seconds=1), LAT + (i % 5) * 0.003, LON + (i // 5) * 0.003))
+
+
+def cells(conn):
+    route.api_cache.invalidate()
+    found = [LightningCell(**c) for c in json.loads(route.storm_cells(FakePool(conn)).body)]
+    return found, [c for c in found if abs(c.lat - LAT) < 0.05 and abs(c.lon - LON) < 0.05]
+
+
+def test_cells_without_a_replay_are_real_as_before(conn):
+    storm(conn, clock.real_now())
+    storm(conn, SIM)                                   # replay-era flashes: not clustered without a replay
+    found, here = cells(conn)
+    assert len(here) == 1 and here[0].replay is False and here[0].id.startswith("cell-")
+    assert all(not c.replay and c.id.startswith("cell-") for c in found)
+
+
+def test_cells_during_a_replay_real_and_replay_both_show(conn, monkeypatch):
+    storm(conn, clock.real_now())
+    storm(conn, SIM)
+    replaying(monkeypatch)
+    found, here = cells(conn)
+    assert sorted((c.replay, c.id.split("-")[0]) for c in here) == [(False, "cell"), (True, "replay")]
+    real_cell = next(c for c in here if not c.replay)
+    assert clock.real_now() - real_cell.last_flash_at < 20 * MIN   # on real time, not the replay clock
+    replay_cell = next(c for c in here if c.replay)
+    assert SIM - replay_cell.last_flash_at < 20 * MIN               # on the replay clock
+    assert len({c.id for c in found}) == len(found)    # ids never clash
+    first_replay = next(i for i, c in enumerate(found) if c.replay)
+    assert all(not c.replay for c in found[:first_replay]) and all(c.replay for c in found[first_replay:])
+
+
 def test_mocks_match_the_schemas():
     mocks = BACKEND_DIR.parent / "shared" / "mocks"
     flashes = [LightningFlash(**f) for f in json.loads((mocks / "lightning_recent.json").read_text())]
     assert flashes and all(f.replay is False for f in flashes)
     LightningRecentCounts(**json.loads((mocks / "lightning_recent_counts.json").read_text()))
+    assert all(LightningCell(**c).replay is False for c in json.loads((mocks / "lightning_cells.json").read_text()))

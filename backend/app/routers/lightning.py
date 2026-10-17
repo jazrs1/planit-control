@@ -69,15 +69,18 @@ def recent_flash_counts(minutes: int = Query(15, ge=1, le=180), pool: Connection
 
 @router.get("/cells", response_model=list[LightningCell])
 def storm_cells(pool: ConnectionPool = Depends(get_pool)):
-    """Storm cells from the last 20 minutes of flashes (app clock, so simulated during replay), largest
-    first: center, size, flash counts and, when tracked, motion. Same cells the "approaching"
-    forecast uses (lightning/cells.py). Cached like /lightning/recent."""
+    """Storm cells from the last 20 minutes of flashes, each with `replay`: real cells (real time) always,
+    largest first, then while a replay runs the replay's cells (replay clock), largest first. Center,
+    size, flash counts and, when tracked, motion: the same cells the "approaching" forecast uses
+    (lightning/cells.py). Ids are per response; replay ones start with "replay-" so the two never clash.
+    Cached like /lightning/recent."""
     def compute() -> bytes:
-        now = clock.now()
+        rows = []
         with pool.connection() as conn:
-            found = approach.current_cells(conn, now)
-        rows = [{**c.__dict__, "moving_toward": cellmod.compass(c.heading_deg) if c.heading_deg is not None else None}
-                for c in found]
+            for replay, _start, now in _windows(int(cellmod.HISTORY.total_seconds() // 60)):
+                rows += [{**c.__dict__, "id": f"replay-{c.id}" if replay else c.id, "replay": replay,
+                          "moving_toward": cellmod.compass(c.heading_deg) if c.heading_deg is not None else None}
+                         for c in approach.current_cells(conn, now)]
         return _cells.dump_json(_cells.validate_python(rows))
 
     return Response(api_cache.get_or_compute(("lightning-cells", clock.is_simulated()), compute),

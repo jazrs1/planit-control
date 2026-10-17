@@ -40,7 +40,7 @@ Only change files in folders you own. If you need something in another folder (a
 | POST | `/uploads` | raw image body (`Content-Type: image/*`), returns `UploadResponse` (201) | — |
 | GET | `/lightning/recent?minutes=15` | `LightningFlash[]` (real flashes newest first, then a running replay's, each with `replay`) | `lightning_recent.json` |
 | GET | `/lightning/recent/counts?minutes=15` | `LightningRecentCounts` (`real` and `replay` flash counts for the same windows, uncapped) | `lightning_recent_counts.json` |
-| GET | `/lightning/cells` | `LightningCell[]` (storm cells from the last 20 min, largest first) | `lightning_cells.json` |
+| GET | `/lightning/cells` | `LightningCell[]` (storm cells from the last 20 min: real ones largest first, then a running replay's, each with `replay`) | `lightning_cells.json` |
 | GET | `/sites/{id}/beacon` | `Beacon` (stop / unknown / approaching / flood / clear, for a hardware alarm) | `beacon.json` |
 | GET | `/push/public-key` | `PushPublicKey` (VAPID key for `PushManager.subscribe`) | `push_public_key.json` |
 | POST | `/push/subscribe` | body `PushSubscribeRequest` (sites or all, role), returns `PushSubscriptionInfo` (201) | `push_subscribe_request.json`, `push_subscription.json` |

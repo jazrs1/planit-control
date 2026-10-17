@@ -2,7 +2,10 @@
 
 Database tests run inside one rolled-back transaction (skipped without DATABASE_URL). If migration
 009 isn't applied yet, its tables are created inside that transaction. Lightning alerts use replay
-mode and a 2031 clock, so they never meet real rows or the live alert engine's lock.
+mode and a 2001 replay clock: GOES-19 lightning data starts in 2025, so no stored replay alert can
+expire at that clock. The engine's clear-expired step never touches replay alerts a stopped replay left
+on the shared database, and none of their events fall in the push window. Sends are only counted for
+the test's own sites.
 """
 
 import base64
@@ -33,7 +36,7 @@ from push import notify, webpush
 from scripts import generate_vapid_keys as keygen
 from tests.push_schema import ensure_push_schema
 
-T0 = datetime(2031, 1, 6, 17, 0, tzinfo=timezone.utc)
+T0 = datetime(2001, 1, 6, 17, 0, tzinfo=timezone.utc)   # before any GOES-19 replay window
 MIN = timedelta(minutes=1)
 SITE = {"id": "big-bend", "name": "Big Bend", "timezone": "America/New_York"}
 FCM = "https://fcm.googleapis.com/fcm/send/"
@@ -367,7 +370,10 @@ def outbox(monkeypatch, push_on):
     got, answers = [], {}
 
     def fake_send(sub, message):
-        got.append((sub["id"], message.title))
+        # Only the test's own sites (and multi-site briefing summaries) count: anything else on the
+        # shared database is not this test's business.
+        if message.site_id is None or message.site_id.startswith("test-push-"):
+            got.append((sub["id"], message.title))
         return answers.get(sub["id"], "sent")
     monkeypatch.setattr(webpush, "send", fake_send)
     return got, answers
@@ -425,6 +431,29 @@ def test_stop_work_and_all_clear_push_once_to_the_right_subscriptions(conn, outb
     sent = conn.execute("SELECT kind, sent FROM push_log WHERE site_id = 'test-push-a' ORDER BY claimed_at, kind").fetchall()
     # `sent` counts every subscription reached, ours and everyone else's.
     assert sorted((r["kind"], r["sent"]) for r in sent) == [("all_clear", len(got)), ("stop_work", stop_sends)]
+
+
+def test_leftover_replay_alerts_are_never_touched(conn, outbox, others):
+    """A replay stopped mid-storm leaves replay alerts active (2025 clock). The tests' engine and sender
+    must leave them alone: not cleared, no events written, nothing claimed or pushed."""
+    got, _ = outbox
+    conn.execute("""INSERT INTO sites (plant_id, id, name, utility, county, lat, lon, technology, capacity_mw, timezone)
+                    VALUES (-910100, 'leftover-site', 'Leftover', 'Test', 'Test', 26.0, -80.5, 'Test', 0, 'America/New_York')""")
+    left = conn.execute(
+        """INSERT INTO alerts (site_id, type, status, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay)
+           VALUES ('leftover-site', 'lightning', 'active', '2025-08-04 22:30Z', '2025-08-04 23:00Z', '2025-08-04 22:30Z', 4.0, true)
+           RETURNING id""").fetchone()["id"]
+    subscribe(conn, "all")
+    pool = FakePool(conn)
+    engine.process(conn, [strike(TEST_SITES[0], 3.2, T0)], T0, TEST_SITES, replay=True)
+    engine.process(conn, [], T0 + 31 * MIN, TEST_SITES, replay=True)
+    notify.dispatch_alerts(pool, T0, replay=True)
+    notify.dispatch_alerts(pool, T0 + 31 * MIN, replay=True)
+    row = conn.execute("SELECT status FROM alerts WHERE id = %s", (left,)).fetchone()
+    assert row["status"] == "active"
+    assert conn.execute("SELECT count(*) AS n FROM alert_events WHERE alert_id = %s", (left,)).fetchone()["n"] == 0
+    assert conn.execute("SELECT count(*) AS n FROM push_log WHERE site_id = 'leftover-site'").fetchone()["n"] == 0
+    assert all("Leftover" not in t for _, t in got)
 
 
 def test_old_events_are_not_pushed(conn, outbox, others):
@@ -491,7 +520,7 @@ def test_briefing_summary_per_subscription(conn, outbox, others):
     one, everyone = subscribe(conn, "one", ["test-push-a"]), subscribe(conn, "all")
     for site, go in (("test-push-a", "caution"), ("test-push-b", "go")):
         conn.execute("""INSERT INTO briefings (site_id, for_date, text, created_at, go_status, headline)
-                        VALUES (%s, '2031-01-07', 'x', %s, %s, 'Heat index 101°F after noon')""", (site, T0 + MIN, go))
+                        VALUES (%s, '2001-01-07', 'x', %s, %s, 'Heat index 101°F after noon')""", (site, T0 + MIN, go))
     pool = FakePool(conn)
     notify.dispatch_briefings(pool, ["test-push-a", "test-push-b"], T0)
     notify.dispatch_briefings(pool, ["test-push-a", "test-push-b"], T0)   # same briefings: no repeat

@@ -11,12 +11,10 @@ export default async function AlertsPage() {
   const sites = (await orNull(getSites())) ?? [];
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <header className="mbe-6">
-        <h1 className="pc-title">Active alerts</h1>
-        <p className="mbs-1 text-sm text-muted">
-          Lightning stop-work countdowns and flood-risk notices.
-        </p>
+    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em]">Active alerts</h1>
+        <p className="text-muted">Lightning stop-work countdowns and flood-risk notices.</p>
       </header>
       <AlertsList sites={sites} />
     </main>

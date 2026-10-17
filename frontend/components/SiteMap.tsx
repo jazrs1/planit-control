@@ -87,6 +87,9 @@ type SiteMapProps = {
   fires?: FireDetection[];
   /** Alligator and venomous-snake sightings and crew wildlife reports, last 30 days. */
   wildlife?: WildlifeSightingPoint[];
+  /** The last fires / wildlife refresh failed or the connection is lost: draw those points greyed, as last known. */
+  firesStale?: boolean;
+  wildlifeStale?: boolean;
   /** Changes when "Show on map" asks to center on the selected site again. */
   focusKey?: number;
   /** Label stop-work and flood sites on the map. Labels never cover [data-map-avoid] panels or leave the map. */
@@ -104,7 +107,7 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0, isReplayFlash = NO_REPLAY, realFlashNowMs }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], firesStale = false, wildlifeStale = false, focusKey = 0, isReplayFlash = NO_REPLAY, realFlashNowMs }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -421,6 +424,23 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       paint: { "circle-color": resolveColor("--pc-surface"), "circle-radius": 4, "circle-stroke-color": resolveColor("--pc-text"), "circle-stroke-width": 2 },
     });
   }, [styleLoaded, wildlife]);
+
+  // Unknown must look unknown: after a failed refresh (or a lost connection) the last known fires and
+  // sightings stay on the map, greyed, instead of looking current.
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    if (instance.getLayer(FIRES_SOURCE)) {
+      if (!instance.hasImage("pc-fire-stale")) instance.addImage("pc-fire-stale", fireIcon(resolveColor("--pc-text-muted")), { pixelRatio: 2 });
+      instance.setLayoutProperty(FIRES_SOURCE, "icon-image", firesStale ? "pc-fire-stale" : "pc-fire");
+      instance.setPaintProperty(FIRES_SOURCE, "icon-opacity", firesStale ? 0.8 : ["case", ["get", "confirmed"], 0.9, 0.5]);
+    }
+    if (instance.getLayer(WILDLIFE_SOURCE)) {
+      instance.setPaintProperty(WILDLIFE_SOURCE, "circle-stroke-color", resolveColor(wildlifeStale ? "--pc-text-muted" : "--pc-text"));
+      instance.setPaintProperty(WILDLIFE_SOURCE, "circle-opacity", wildlifeStale ? 0.8 : 1);
+      instance.setPaintProperty(WILDLIFE_SOURCE, "circle-stroke-opacity", wildlifeStale ? 0.8 : 1);
+    }
+  }, [styleLoaded, firesStale, wildlifeStale, fires, wildlife]);
 
   return <><div ref={container} className="h-full w-full bg-(--pc-map-land)" />
     <ul className="sr-only" aria-label="Storm cell motion">

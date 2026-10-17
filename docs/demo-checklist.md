@@ -18,7 +18,7 @@
 - **Counts:** **High risk**, **Stop work** and the nav badge count real alerts only. The replay's counts are on the dark replay panel.
 - **Index:** the score shown is the live one (`hazard_index_live`). A replay-raised score gets a dashed blue outline, never a real red.
 
-**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** On the beacon, a replay stop-work or approach puts `REPLAY` before the site name on line 1 (`REPLAY Vandolah`); a real alert shows the plain site name. The beacon shows the site's combined state, and a real stop-work always wins.
+**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** On the beacon, a replay stop-work or approach puts `REPLAY` before the site name on line 1 (`REPLAY Vandolah`); a real alert shows the plain site name. **Any real alert always beats a replay on the beacon:** a real stop-work, storm warning, flood alert or unknown always shows over the replay. The replay's state shows only when the real state is clear.
 
 ## 1. Preflight (15 minutes before)
 
