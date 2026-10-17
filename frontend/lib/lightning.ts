@@ -10,9 +10,25 @@ export function approachUnconfirmed(approach: LightningApproach, nowMs: number |
   return !Number.isFinite(updated) || (nowMs !== null && (nowMs - updated > APPROACH_STALE_MS || updated > nowMs + 60_000));
 }
 
-export function cellUnconfirmed(cell: LightningCell, nowMs: number): boolean {
+// A replay cell's flashes are hours older than real time (the recorded storm's date).
+const REPLAY_AGE_MS = 3 * 60 * 60_000;
+
+/** A storm cell from a running replay: LightningCell.replay when the server sends it (#52), else the
+ *  "replay-" id prefix, else a last flash hours older than real time. */
+export function cellIsReplay(cell: LightningCell, realNowMs: number): boolean {
+  const flag = (cell as LightningCell & { replay?: boolean }).replay;
+  if (typeof flag === "boolean") return flag;
+  if (cell.id.startsWith("replay-")) return true;
   const updated = Date.parse(cell.last_flash_at);
-  return !Number.isFinite(updated) || nowMs - updated > CELL_STALE_MS || updated > nowMs + 60_000;
+  return Number.isFinite(updated) && realNowMs - updated > REPLAY_AGE_MS;
+}
+
+/** Each layer on its own clock: a replay cell against the replay clock (`nowMs`), a real cell against
+ *  real time (`realNowMs`, defaulting to `nowMs` outside a replay), so real cells stay during a replay. */
+export function cellUnconfirmed(cell: LightningCell, nowMs: number, realNowMs: number = nowMs): boolean {
+  const clock = cellIsReplay(cell, realNowMs) ? nowMs : realNowMs;
+  const updated = Date.parse(cell.last_flash_at);
+  return !Number.isFinite(updated) || clock - updated > CELL_STALE_MS || updated > clock + 60_000;
 }
 
 /** Destination on a sphere; bearings are clockwise from north and distances are miles. */
@@ -29,13 +45,13 @@ function destination(lon: number, lat: number, bearing: number, miles: number): 
 
 /** Geographic circles use radius_mi, so they retain the right size as the map zooms.
  * Arrows show direction only; their length is not an arrival or travel-distance forecast. */
-export function stormCellsGeoJson(cells: LightningCell[], nowMs: number, unconfirmed: boolean, demo = false): GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiLineString> {
+export function stormCellsGeoJson(cells: LightningCell[], nowMs: number, unconfirmed: boolean, demo = false, realNowMs: number = nowMs): GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiLineString> {
   const features: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiLineString>[] = [];
   for (const cell of cells) {
     if (!Number.isFinite(cell.lat) || !Number.isFinite(cell.lon) || !Number.isFinite(cell.radius_mi) || cell.radius_mi < 0) continue;
-    const uncertain = unconfirmed || (!demo && cellUnconfirmed(cell, nowMs));
-    // Replay cells are drawn blue once the API flags them (#48); real ones keep the storm colors.
-    const properties = { uncertain, replay: (cell as LightningCell & { replay?: boolean }).replay === true };
+    const uncertain = unconfirmed || (!demo && cellUnconfirmed(cell, nowMs, realNowMs));
+    // Replay cells are drawn blue; real ones keep the storm colors.
+    const properties = { uncertain, replay: cellIsReplay(cell, realNowMs) };
     const ring = Array.from({ length: 64 }, (_, i) => destination(cell.lon, cell.lat, i * 360 / 64, cell.radius_mi));
     ring.push(ring[0]);
     features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties });

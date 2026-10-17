@@ -63,9 +63,9 @@ def score_history(site_id: str, pool: ConnectionPool | None = Depends(get_pool_o
 def site_beacon(site_id: str, pool: ConnectionPool = Depends(get_pool)):
     """Tiny state for a hardware alarm: stop > unknown > approaching > flood > clear, with seconds to
     the lightning all-clear or minutes until the storm arrives. The real state is worked out on real
-    time; during a replay the replay's state is worked out on the replay clock too, and the higher
-    priority wins (approach.combine_beacons), so a real stop-work, advisory or flood alert is never
-    hidden by a replay. "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on
+    time; during a replay the replay's state is worked out on the replay clock too, and the real one
+    wins unless it's clear (approach.combine_beacons): a real stop-work, unknown, advisory or flood alert
+    is never hidden or outranked by a replay. `replay` is true only when the shown state is the replay's. "unknown" when lightning ingestion hasn't succeeded in the last 2 minutes on
     that clock (lightning/health.py). A backend with live ingestion turned off (LIGHTNING_INGEST_ENABLED)
     has no real lightning layer to report during a replay, so only a real stop-work counts there.
     Cached like /alerts; alert and advisory changes clear the cache."""

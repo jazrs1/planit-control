@@ -14,8 +14,8 @@ import { formatMiles, formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
-import { HAZARD_LABEL, factorHazardLabel, riskLevel } from "@/lib/risk";
 import { rainForecast } from "@/lib/rainForecast";
+import { factorHazardLabel, HAZARD_LABEL, liveHazardIndex, riskLevel } from "@/lib/risk";
 import { formatPageTime, zoneLabel } from "@/lib/siteTime";
 import { formatAgo } from "@/lib/time";
 import { usePolling } from "@/lib/usePolling";
@@ -232,7 +232,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-x-10 gap-y-4" title="Hazard index 0–10: weather model + safety rules">
-          <IndexStat label="Today" value={detail.hazard_index_today} uncertain={connectionLost} unknown={noLiveData} />
+          <IndexStat label="Today" value={liveHazardIndex(detail)} uncertain={connectionLost} unknown={noLiveData} />
           <IndexStat label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} unknown={noLiveData} />
           <div className="flex flex-col">
             <span className="text-xs text-muted">Top hazard</span>

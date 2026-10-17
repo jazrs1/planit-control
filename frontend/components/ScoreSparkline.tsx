@@ -25,7 +25,12 @@ function compactPoints(all: ScorePoint[]): { points: ScorePoint[]; label: string
   return { points: all.filter((point) => Date.parse(point.scored_at) >= Date.parse(latest.scored_at) - 24 * 60 * 60_000), label: "Last 24 h" };
 }
 
-export default function ScoreSparkline({ history, site, compact = false, unconfirmed = false, demo = false }: { history: ScoreHistory | null; site: Site; compact?: boolean; unconfirmed?: boolean; demo?: boolean }) {
+/** "Oct 16, 3:00 PM" without the zone, for axis labels on a page that already states the zone. */
+function axisTime(iso: string, timeZone: string) {
+  return new Date(iso).toLocaleString("en-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+export default function ScoreSparkline({ history, site, compact = false, unconfirmed = false, demo = false, zoneStated = false }: { history: ScoreHistory | null; site: Site; compact?: boolean; unconfirmed?: boolean; demo?: boolean; zoneStated?: boolean }) {
   const all = history?.site_id === site.id ? historyPoints(history) : [];
   const { points, label: spanLabel } = compact ? compactPoints(all) : { points: all, label: "7 days" };
   const latest = points.at(-1);
@@ -39,7 +44,9 @@ export default function ScoreSparkline({ history, site, compact = false, unconfi
   const span = Math.max(1, end - start);
   const x = (point: ScorePoint) => LEFT + (Date.parse(point.scored_at) - start) / span * (RIGHT - LEFT);
   const selected = active === null ? null : points[Math.min(active, points.length - 1)];
-  const describe = (point: ScorePoint) => `${formatSiteDateTime(point.scored_at, site.timezone)} · ${point.hazard_index.toFixed(1)} / 10${unconfirmed ? " ? · Last known · Not confirmed" : ""}${demo ? " · Demo data" : ""}`;
+  // A lightning stop-work lifts today's index to at least 9.0 (backend hazards/risk.py): say so on the spike.
+  const stopWork = (point: ScorePoint) => point.hazard_index >= 9 && point.top_hazard === "lightning";
+  const describe = (point: ScorePoint) => `${formatSiteDateTime(point.scored_at, site.timezone)} · ${point.hazard_index.toFixed(1)} / 10${stopWork(point) ? " · Stop-work active at this run" : ""}${unconfirmed ? " ? · Last known · Not confirmed" : ""}${demo ? " · Demo data" : ""}`;
   const pick = (event: PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const target = (event.clientX - rect.left) / rect.width * WIDTH;
@@ -81,7 +88,7 @@ export default function ScoreSparkline({ history, site, compact = false, unconfi
       </svg>
       {selected && <div id={tooltipId} role="tooltip" className="pointer-events-none absolute inset-x-1 inset-be-full z-10 rounded-card border border-border bg-surface px-2 py-1 text-xs text-text">{describe(selected)}</div>}
     </div>
-    {!compact && <div className="flex justify-between gap-2 text-xs text-muted"><span>{formatSiteDateTime(points[0].scored_at, site.timezone)}</span><span>{formatSiteDateTime(latest.scored_at, site.timezone)}</span></div>}
+    {!compact && <div className="flex justify-between gap-2 text-xs text-muted">{[points[0], latest].map((point) => <span key={point.scored_at}>{zoneStated ? axisTime(point.scored_at, site.timezone) : formatSiteDateTime(point.scored_at, site.timezone)}</span>)}</div>}
     {unconfirmed && <p className="text-xs text-muted">? Last known history · Not confirmed.</p>}
   </figure>;
 }

@@ -9,7 +9,7 @@ import SiteScoreHistory from "@/components/SiteScoreHistory";
 import InfoButton from "@/components/InfoButton";
 import SiteMap, { LIGHTNING_WINDOW_MIN, type MapLayers } from "@/components/SiteMap";
 import { DEMO_DATA, getFires, getLightningCells, getLightningCounts, getLightningRecent, getReports, getSites, getWildlife } from "@/lib/api";
-import { cellUnconfirmed } from "@/lib/lightning";
+import { cellIsReplay, cellUnconfirmed } from "@/lib/lightning";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
 import { countAlerts, realAlerts } from "@/lib/alerts";
@@ -64,14 +64,13 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const demo = alertsStatus === "demo";
   const replaying = replay?.running ?? false;
   const sites = demo ? DEMO_DATA.sites : liveSites;
+  // /lightning/recent returns real flashes always, plus the replay's while one runs (#48). Both are
+  // drawn: real ones fade on real time, replay ones blue on the replay clock, and they're counted apart.
   const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
-  // During a replay /lightning/recent runs on the simulated clock, so it returns only the replay's
-  // flashes, timestamped in the recorded storm. A real flash is never more than minutes old in real
-  // time, so a flash hours older than real time can only be a replay one: drawn blue, counted apart.
-  // The API is adding an explicit per-flash replay flag; use it when present, the age rule otherwise.
+  // LightningFlash.replay says which; a flash hours older than real time can only be a replay one, the
+  // fallback for a server without the flag.
   const isReplayFlash = useCallback((flash: LightningFlash) => {
-    const flag = (flash as LightningFlash & { replay?: boolean }).replay;
-    if (typeof flag === "boolean") return flag;
+    if (typeof flash.replay === "boolean") return flash.replay;
     const ts = Date.parse(flash.ts);
     return Number.isFinite(ts) && Date.now() - ts > REPLAY_FLASH_AGE_MS;
   }, []);
@@ -90,7 +89,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   useEffect(() => { if (!lightningStale) lastOnlineNow.current = nowMs; });
   const cellsUnconfirmed = !demo && (offline || cellsFailed);
   // Each quiet cell is already drawn as unconfirmed; the legend only says so when every cell is.
-  const oldCells = !demo && !!cells?.length && cells.every((cell) => cellUnconfirmed(cell, serverNow()));
+  const oldCells = !demo && !!cells?.length && cells.every((cell) => cellUnconfirmed(cell, serverNow(), Date.now()));
   const alertsKnown = knownAlerts !== null;
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
@@ -221,8 +220,12 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     </li>
   );
   // A real count or no count: cells we can't confirm are drawn grey and described, never counted with "?".
+  // Real and replay cells counted apart, never mixed.
+  const replayCells = (cells ?? []).filter((cell) => cellIsReplay(cell, Date.now())).length;
+  const realCells = (cells?.length ?? 0) - replayCells;
   const cellsText = cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…"
-    : cellsUnconfirmed ? "last known · Not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed" : `${cells.length} active`;
+    : cellsUnconfirmed ? "last known · Not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed"
+    : replayCells > 0 ? `${realCells} real · ${replayCells} replay` : `${realCells} active`;
   // A map layer's count, or why there isn't one: never a "0" for data we couldn't fetch.
   const pointsText = (count: number, loaded: boolean, failed: boolean, unit: string) =>
     !loaded ? failed ? "Unavailable · can't load" : "Loading…" : failed ? `${count} ${unit} · last known` : `${count} ${unit}`;
@@ -258,7 +261,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
       ) : (
         <>
           <section ref={map} aria-label="Florida site safety map" className="pc-dash-map relative h-[min(56svh,30rem)] min-h-80 lg:absolute lg:inset-0 lg:h-auto">
-            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} focusKey={focusKey} isReplayFlash={isReplayFlash} realFlashNowMs={realFlashNowMs} callouts />
+            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} firesStale={!demo && (firesFailed || offline)} wildlifeStale={!demo && (wildlifeFailed || offline)} focusKey={focusKey} isReplayFlash={isReplayFlash} realFlashNowMs={realFlashNowMs} callouts />
             <details ref={layersPanel} data-map-avoid className="pc-float group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)]">
               <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3">
                 <span className="flex items-center gap-2 text-sm font-semibold">

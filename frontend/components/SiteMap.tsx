@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Alert, FireDetection, HazardReport, LightningCell, LightningFlash, Site, WildlifeSightingPoint } from "@shared/types";
 import type { ExpressionSpecification, GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
-import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
+import { cellIsReplay, cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 import { formatStrikeDistance } from "@/lib/alerts";
 import { paintBasemap } from "@/lib/mapStyle";
 import { formatAgo } from "@/lib/time";
@@ -87,6 +87,9 @@ type SiteMapProps = {
   fires?: FireDetection[];
   /** Alligator and venomous-snake sightings and crew wildlife reports, last 30 days. */
   wildlife?: WildlifeSightingPoint[];
+  /** The last fires / wildlife refresh failed or the connection is lost: draw those points greyed, as last known. */
+  firesStale?: boolean;
+  wildlifeStale?: boolean;
   /** Changes when "Show on map" asks to center on the selected site again. */
   focusKey?: number;
   /** Label stop-work and flood sites on the map. Labels never cover [data-map-avoid] panels or leave the map. */
@@ -104,7 +107,7 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0, isReplayFlash = NO_REPLAY, realFlashNowMs }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], firesStale = false, wildlifeStale = false, focusKey = 0, isReplayFlash = NO_REPLAY, realFlashNowMs }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -177,7 +180,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   useEffect(() => {
     const instance = map.current;
     if (!styleLoaded || !instance) return;
-    const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo);
+    const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo, realFlashNowMs ?? nowMs);
     // Paint needs real colors, so resolve them from tokens.css (light or dark).
     const ink: ExpressionSpecification = ["case", ["get", "replay"], resolveColor("--pc-notice"), resolveColor("--pc-risk-amber")];
     const muted = resolveColor("--pc-text-muted");
@@ -212,7 +215,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 1.5, "line-opacity": 0.7 },
     }, before);
-  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs]);
+  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs, realFlashNowMs]);
 
   // Recent lightning: a GeoJSON circle layer under the site markers (markers are DOM, always on top).
   useEffect(() => {
@@ -422,11 +425,28 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     });
   }, [styleLoaded, wildlife]);
 
+  // Unknown must look unknown: after a failed refresh (or a lost connection) the last known fires and
+  // sightings stay on the map, greyed, instead of looking current.
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    if (instance.getLayer(FIRES_SOURCE)) {
+      if (!instance.hasImage("pc-fire-stale")) instance.addImage("pc-fire-stale", fireIcon(resolveColor("--pc-text-muted")), { pixelRatio: 2 });
+      instance.setLayoutProperty(FIRES_SOURCE, "icon-image", firesStale ? "pc-fire-stale" : "pc-fire");
+      instance.setPaintProperty(FIRES_SOURCE, "icon-opacity", firesStale ? 0.8 : ["case", ["get", "confirmed"], 0.9, 0.5]);
+    }
+    if (instance.getLayer(WILDLIFE_SOURCE)) {
+      instance.setPaintProperty(WILDLIFE_SOURCE, "circle-stroke-color", resolveColor(wildlifeStale ? "--pc-text-muted" : "--pc-text"));
+      instance.setPaintProperty(WILDLIFE_SOURCE, "circle-opacity", wildlifeStale ? 0.8 : 1);
+      instance.setPaintProperty(WILDLIFE_SOURCE, "circle-stroke-opacity", wildlifeStale ? 0.8 : 1);
+    }
+  }, [styleLoaded, firesStale, wildlifeStale, fires, wildlife]);
+
   return <><div ref={container} className="h-full w-full bg-(--pc-map-land)" />
     <ul className="sr-only" aria-label="Storm cell motion">
       {cells.map((cell) => <li key={cell.id}>
-        {demo && "Demo data · "}Storm cell at {cell.lat.toFixed(2)}, {cell.lon.toFixed(2)}, radius {cell.radius_mi.toFixed(1)} mi. {cell.tracked ? cell.heading_deg !== null && cell.speed_mph !== null && cell.speed_mph >= 2 ? `Moving toward ${cell.moving_toward ?? `${cell.heading_deg} degrees`} at ${Math.round(cell.speed_mph)} mph.` : "Stationary." : "Motion unconfirmed."}
-        {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs))) && " Last known · Not confirmed."}
+        {demo && "Demo data · "}{cellIsReplay(cell, realFlashNowMs ?? nowMs) && "Replay · "}Storm cell at {cell.lat.toFixed(2)}, {cell.lon.toFixed(2)}, radius {cell.radius_mi.toFixed(1)} mi. {cell.tracked ? cell.heading_deg !== null && cell.speed_mph !== null && cell.speed_mph >= 2 ? `Moving toward ${cell.moving_toward ?? `${cell.heading_deg} degrees`} at ${Math.round(cell.speed_mph)} mph.` : "Stationary." : "Motion unconfirmed."}
+        {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs, realFlashNowMs ?? nowMs))) && " Last known · Not confirmed."}
       </li>)}
     </ul>
     {!painted && !error && <p role="status" className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Loading map…</p>}

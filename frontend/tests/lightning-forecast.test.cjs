@@ -46,7 +46,8 @@ const helpers = load("lib/lightning.ts");
 const chipProps = { approach, nowMs, stopWork: false, unconfirmed: false };
 
 function advisory(html) {
-  assert.match(html, /LIGHTNING POSSIBLE WITHIN THE HOUR/);
+  assert.match(html, /Lightning possible within the hour/);
+  assert.match(html, /Advisory/, "reads as an advisory, not a confirmed alert");
   assert.match(html, /Storm approaching from the W at 18 mph/);
   assert.doesNotMatch(html, /20:57|4:57|17 min|arrival_at|role="timer"|All clear/);
 }
@@ -70,7 +71,7 @@ test("stale and unknown advisories stay visible, grey with ? and Not confirmed; 
   ]) {
     const html = render(Chip, props);
     advisory(html);
-    assert.match(html, /Unconfirmed/);
+    assert.match(html, /unconfirmed/i);
     assert.doesNotMatch(html, /WITHIN THE HOUR \?/);
     assert.match(html, /Last known/);
     assert.match(html, /Not confirmed/);
@@ -90,7 +91,7 @@ test("dashboard cards suppress advisories for a stop-work, including last-known 
   for (const alertsUnconfirmed of [false, true]) {
     const html = render(Card, { site, nowMs, alerts: [lightning], alertsUnconfirmed, selected: true });
     assert.match(html, /STOP WORK/);
-    assert.doesNotMatch(html, /LIGHTNING POSSIBLE|Storm approaching/);
+    assert.doesNotMatch(html, /Lightning possible|Storm approaching/i);
   }
   assert.match(render(Card, { site, nowMs, approachUnconfirmed: true, selected: true }), /Not confirmed/);
   assert.match(render(Card, { site, nowMs }), /Lightning possible/);
@@ -122,12 +123,12 @@ test("site detail shows the advisory, respects stop-work priority, and labels co
     if (state.status === "demo") assert.match(html, /Demo data/);
   }
   const Detail = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [lightning] })).default;
-  assert.doesNotMatch(render(Detail, { siteId: site.id, initialDetail: detail }), /LIGHTNING POSSIBLE/);
+  assert.doesNotMatch(render(Detail, { siteId: site.id, initialDetail: detail }), /Lightning possible/i);
   // A replay stop-work is only a secondary tag: it never hides a real advisory.
   const Replay = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [{ ...lightning, replay: true }] })).default;
   const replayHtml = render(Replay, { siteId: site.id, initialDetail: detail });
   advisory(replayHtml);
-  assert.ok(replayHtml.indexOf("LIGHTNING POSSIBLE") < replayHtml.indexOf("Replay"), "the real advisory comes before the replay tag");
+  assert.ok(replayHtml.indexOf("Lightning possible") < replayHtml.indexOf("Replay"), "the real advisory comes before the replay tag");
   const Offline = load("components/SiteDetailView.tsx", modules({ ...baseState, status: "stale", connection: { level: "offline", lastSuccessAt: nowMs } })).default;
   const html = render(Offline, { siteId: site.id, initialDetail: detail });
   advisory(html);
@@ -174,7 +175,7 @@ test("crew view shows direction and speed and gives known stop-work priority", (
     const html = renderToStaticMarkup(driver.render(selected.type, selected.props));
     if (state.alerts?.length) {
       assert.match(html, /STOP WORK/);
-      assert.doesNotMatch(html, /LIGHTNING POSSIBLE/);
+      assert.doesNotMatch(html, /Lightning possible/i);
     } else {
       advisory(html);
       if (state.alerts === null) assert.match(html, /Not confirmed/);
@@ -215,6 +216,20 @@ test("untracked or stationary cells get circles only; old and failed cells are m
     const features = helpers.stormCellsGeoJson([cell], time, failed, demo).features;
     assert.ok(features.every(f => f.properties.uncertain === uncertain));
   }
+});
+
+test("storm cells: each layer on its own clock, so real cells stay current during a replay", () => {
+  const real = Date.parse("2026-10-17T22:00:00Z"), sim = Date.parse("2025-08-04T22:20:00Z");
+  const realCell = { ...cell, id: "cell-1", last_flash_at: new Date(real - 60_000).toISOString() };
+  const replayCell = { ...cell, id: "replay-cell-1", last_flash_at: new Date(sim - 60_000).toISOString() };
+  assert.equal(helpers.cellIsReplay(realCell, real), false);
+  assert.equal(helpers.cellIsReplay(replayCell, real), true, "the replay- id prefix");
+  assert.equal(helpers.cellIsReplay({ ...realCell, replay: true }, real), true, "the explicit flag wins");
+  assert.equal(helpers.cellUnconfirmed(realCell, sim, real), false, "a fresh real cell during a replay");
+  assert.equal(helpers.cellUnconfirmed(replayCell, sim, real), false, "a fresh replay cell on the replay clock");
+  const features = helpers.stormCellsGeoJson([realCell, replayCell], sim, false, false, real).features.filter(f => f.geometry.type === "Polygon");
+  assert.equal(JSON.stringify(features.map(f => f.properties.replay)), "[false,true]");
+  assert.ok(features.every(f => !f.properties.uncertain));
 });
 
 test("storm cells share lightning polling, speed up in replay, retain failed data, and isolate demo data", async () => {

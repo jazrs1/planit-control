@@ -56,7 +56,7 @@ function HistoryForMode({ site, compact = false, lazy = false, unconfirmed = fal
     </dl> : <h2 className="font-semibold text-text">Hazard index history</h2>}
     {demo && <p className="text-xs font-semibold text-muted">Demo data · sample history, not live</p>}
     {history === null && !demo ? <p role="status" className="text-sm text-muted">{failed ? "History unavailable · Not confirmed" : visible ? "Loading history…" : "History loads when this card is visible"}</p>
-      : <ScoreSparkline history={history} site={site} compact={compact} unconfirmed={uncertain} demo={demo} />}
+      : <ScoreSparkline history={history} site={site} compact={compact} unconfirmed={uncertain} demo={demo} zoneStated={!compact} />}
     {uncertain && history !== null && <p role="status" className="text-xs font-semibold text-muted">{old ? "Old scoring data · " : ""}? Last known history · Not confirmed</p>}
     {!compact && replay?.running && <p className="text-xs text-muted">Scoring history stays live during lightning replay.</p>}
   </div>;

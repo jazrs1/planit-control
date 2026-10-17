@@ -134,7 +134,7 @@
   /* A label, tag or heading set like a sign legend. Uppercase is only for these, never sentences. */
   .pc-label {
     font-size: 0.6875rem;
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: 0.06em;
     line-height: 1.2;
     text-transform: uppercase;
@@ -143,12 +143,12 @@
   /* Page title: calm and large. The sign variant (uppercase, black weight) is for the crew view. */
   .pc-title {
     font-size: var(--pc-text-title);
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.15;
   }
   .pc-title--sign {
-    font-weight: 900;
+    font-weight: 600;
     letter-spacing: 0.01em;
     text-transform: uppercase;
   }
@@ -187,7 +187,7 @@
     padding: 0.25em 0.45em 0.15em;
     border-radius: var(--pc-radius-chip);
     font-size: 0.6875rem;
-    font-weight: 900;
+    font-weight: 600;
     letter-spacing: 0.06em;
     line-height: 1.1;
     text-transform: uppercase;
@@ -208,8 +208,8 @@
   .pc-chip--approach {
     background: var(--pc-surface);
     color: var(--pc-risk-amber);
-    outline: 2px dashed var(--pc-risk-amber-solid);
-    outline-offset: -2px;
+    outline: 1px dashed var(--pc-risk-amber-solid);
+    outline-offset: -1px;
   }
   .pc-chip--quiet { background: var(--pc-surface-2); color: var(--pc-text); }
   .pc-chip--unknown {
@@ -221,7 +221,7 @@
 
   /* Buttons */
   .pc-btn {
-    font-size: 0.875rem;
+    font-size: var(--pc-text-body);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -249,7 +249,7 @@
     align-items: center;
     gap: 0.25em;
     min-block-size: 2.75rem;
-    font-size: 0.875rem;
+    font-size: var(--pc-text-body);
     font-weight: 600;
     color: var(--pc-text);
     text-decoration: underline;
@@ -266,7 +266,7 @@
     .pc-link:hover { text-decoration-color: currentColor; }
   }
   .pc-btn--danger { color: var(--pc-risk-red); border-color: var(--pc-risk-red); }
-  .pc-btn--large { min-block-size: 4rem; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
+  .pc-btn--large { min-block-size: 4rem; font-size: var(--pc-text-value); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
   .pc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .pc-btn:not(:disabled):active { scale: 0.97; }
   .pc-btn:focus-visible { outline: 3px solid var(--pc-notice); outline-offset: 2px; }
@@ -430,7 +430,7 @@
 .site-callout__row--replay > span { color: var(--pc-text); }
 .site-callout__row--flood { border-inline-start-color: var(--pc-risk-amber-solid); }
 .site-callout__row--flood > span { color: var(--pc-risk-amber); }
-.site-callout__more { font-weight: 700; color: var(--pc-text-muted); }
+.site-callout__more { font-weight: 600; color: var(--pc-text-muted); }
 
 /* MapLibre controls: floating, hairline */
 .maplibregl-ctrl-group:not(:empty) {
