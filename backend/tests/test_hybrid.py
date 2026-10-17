@@ -333,6 +333,89 @@ def test_scoring_run_is_stored_and_read_back(conn):  # noqa: F811
 from tests.test_crew_reports import conn  # noqa: E402,F401 - the rolled-back DB fixture
 
 
+# ---------- lift-based index anchors ----------
+
+def test_index_anchors_are_lifts_over_the_reference_base_rate():
+    from ml.model import INDEX_VALUES, index_anchors
+    rng = np.random.default_rng(0)
+    p = rng.beta(0.5, 20, 20_000)
+    y = rng.random(20_000) < p
+    a = index_anchors(p, y, 2024)
+    base = float(np.mean(y))
+    assert a["method"] == "lift" and a["index_values"] == INDEX_VALUES and a["reference_year"] == 2024
+    probs = a["probability_anchors"]
+    assert probs[1] == pytest.approx(2 * base, abs=1e-8) and probs[2] == pytest.approx(5 * base, abs=1e-8)
+    assert probs[3] == pytest.approx(np.quantile(p, 0.99), abs=1e-8) and probs[4] == pytest.approx(np.quantile(p, 0.999), abs=1e-8)
+    assert all(b > a_ for a_, b in zip(probs, probs[1:]))
+    assert a["percentiles"][1] == pytest.approx(np.mean(p < probs[1]))
+
+
+def test_committed_model_uses_the_lift_anchors():
+    from ml.model import HazardModel
+    m = HazardModel.load()
+    idx = m.meta["index"]
+    assert idx["method"] == "lift" and 0.02 < idx["base_rate"] < 0.04
+    assert idx["probability_anchors"][1] == pytest.approx(2 * idx["base_rate"])
+    assert idx["probability_anchors"][2] == pytest.approx(5 * idx["base_rate"])
+    # An average 2024 day (the base rate) is green; 2x is where amber starts, 5x where red starts.
+    assert m.index(np.array([idx["base_rate"], 2 * idx["base_rate"], 5 * idx["base_rate"]])).tolist() == [2.0, 4.0, 7.0]
+
+
+def test_stored_scores_are_remapped_from_their_probability():
+    from ml.model import HazardModel
+    base = HazardModel.load().meta["index"]["base_rate"]
+    assert model_scores.rescore(round(2 * base, 4), stored_score=6.0) == pytest.approx(4.0, abs=0.1)
+    assert model_scores.rescore(0.0261, stored_score=5.1) < 4.0          # Anclote, Oct 17: amber under the old anchors
+    assert model_scores.rescore(None, stored_score=5.1) == 5.1           # nothing to remap
+
+
+# ---------- chronic rules can't color a site on their own ----------
+
+def _fire(miles):
+    return {("wildfire", "nearest_detection_mi"): miles, ("wildfire", "nearest_detection_epoch"): NOW.timestamp(),
+            ("wildfire", "nearest_confidence"): 1.0, ("wildfire", "detections_25mi"): 2.0,
+            ("wildfire", "passes_5mi"): 2.0, ("wildfire", "high_confidence_5mi"): 0.0}
+
+
+def test_wildlife_sightings_count_at_most_3_but_are_listed():
+    scored = predict(inputs({("wildlife", "observations_30d"): 6.0, ("wildlife", "venomous_30d"): 2.0}), {})
+    assert scored["hazard_index_today"] == 3.0
+    assert scored["cards"]["wildlife"]["hazard_status"] == "watch"            # the card still warns
+    assert [f["hazard"] for f in scored["top_factors"]] == ["wildlife"]
+    with_model = predict(inputs({("wildlife", "venomous_30d"): 1.0, ("wildlife", "observations_30d"): 1.0},
+                                model={"2026-07-15": ml(2.5)}), {})
+    assert with_model["hazard_index_today"] == 3.0
+    assert {f["hazard"] for f in with_model["top_factors"]} >= {"wildlife"}   # listed even though below 4
+
+
+@pytest.mark.parametrize("miles, index, status", [(20.0, 3.0, "watch"), (8.0, 6.0, "watch"), (3.0, 8.0, "danger")])
+def test_fires_10_to_25_mi_count_at_most_3_closer_fires_unchanged(miles, index, status):
+    scored = predict(inputs(_fire(miles)), {})
+    assert scored["hazard_index_today"] == index
+    assert scored["cards"]["wildfire"]["hazard_status"] == status
+    assert scored["top_factors"][0]["hazard"] == "wildfire"
+
+
+def test_crew_report_floor_heat_and_nws_floors_are_unchanged_by_the_caps():
+    wildlife_report = {"id": "r1", "category": "wildlife", "species": "Cottonmouth", "created_at": NOW - timedelta(hours=2),
+                       "distance_mi": 0.3}
+    scored = predict(inputs({("wildlife", "venomous_30d"): 1.0, ("wildlife", "observations_30d"): 1.0},
+                            crew_reports=[wildlife_report]), {})
+    assert scored["hazard_index_today"] == 4.0                                  # the 48 h crew report still counts 4
+    assert predict(inputs({("heat", "heat_index_f"): 98.0}), {})["hazard_index_today"] == 5.0
+
+
+def test_factors_shown_only_when_their_reading_raises_the_risk():
+    from datetime import date
+    from ml.model import top_factors
+    contrib = pd.Series({"rain_in": 0.30, "gust_max_mph": 0.20, "cape_max": -0.10, "lat": 0.05, "lon": 0.05})
+    row = pd.Series({"rain_in": 0.02, "gust_max_mph": 34.0, "cape_max": 2500.0, "lat": 27.0, "lon": -82.0})
+    floors = {"rain_in": 0.05, "gust_max_mph": 19.7, "cape_max": 1360.0}
+    shown = top_factors(contrib, row, date(2026, 10, 17), factor_min=floors)
+    assert [f["factor"] for f in shown] == ["gust_max_mph", "location"]           # 0.02 in of rain isn't a cause
+    assert not any(f["label"].startswith("0.0 in") for f in shown)
+    assert sum(f["weight"] for f in shown) == pytest.approx(1.0, abs=0.02)
+
 
 # ---------- "lightning" means detected strikes; forecast storm potential is "storm" ----------
 

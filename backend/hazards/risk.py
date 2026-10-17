@@ -4,11 +4,14 @@ evening briefing all call predict().
 Hybrid index, for today and tomorrow (site-local dates):
 
   index = the highest of
-    - the ML weather score: the hazard model's calibrated probability mapped to 0-10
-      (ml/model.py; scored hourly from the weather poll, hazards/model_scores.py)
+    - the ML weather score: the hazard model's calibrated probability mapped to 0-10 by lift over
+      the 2024 base rate (4 = 2x, 7 = 5x; ml/model.py; scored hourly from the weather poll and
+      re-mapped from the stored probability on read, hazards/model_scores.py)
     - the OSHA heat-index band score (lower 0-2, moderate 5, high 7.5, very high 9.5)
     - the wildfire rule (FIRMS distance), the wildlife rule, and crew reports
-      (a crew report that raises a card to watch counts 4.0; today only)
+      (a crew report that raises a card to watch counts 4.0; today only). Chronic conditions,
+      wildlife sightings over 30 days and fires 10-25 mi away, count at most 3 (CHRONIC_MAX): they
+      are always listed as factors but can't color a site on their own
     - floors that only ever raise the index:
         an NWS Hurricane Warning for the site                                      at least 9
         an NWS warning for the site (flood, flash flood, coastal flood, severe thunderstorm,
@@ -25,7 +28,7 @@ The ML model is the weather part (storms, rain, flooding); the rules cover what 
 from its labels (heat, fire, wildlife), what crews see on the ground, and what forecasters have
 officially warned about. Every factor says whether it came from the model or a rule. Factors list
 the stop-work first, then warning-level floors (official warnings, downed lines), then the winning
-part's reasons, then any other part at watch or above; weight = that part's share of the summed
+part's reasons, then any other part at watch or above or chronic; weight = that part's share of the summed
 scores (the model's share split by its own factor weights). top_hazard is the first factor's hazard.
 Returns:
 
@@ -47,6 +50,7 @@ HURRICANE_FLOOR = 9.0
 WARNING_FLOOR = 7.0
 WATCH_FLOOR = 4.0
 SHOW_RULES_FROM = 4.0  # rule factors at watch or above are listed even when another source wins
+CHRONIC_MAX = 3.0      # wildlife sightings and fires 10-25 mi away count at most this (always listed)
 MAX_FACTORS = 4
 
 # NWS event -> (family, hazard, floor). Each family gives one floor, from its most severe alert, so a
@@ -92,6 +96,7 @@ class Component:
     score: float           # 0-10
     factors: list[tuple[str, str, float]] = field(default_factory=list)  # (hazard, label, share of this component)
     urgent: bool = False   # an official warning or downed line: listed right after the stop-work
+    listed: bool = False   # always listed as a factor, even below SHOW_RULES_FROM (chronic rules)
 
 
 def _model_component(model: dict | None) -> Component | None:
@@ -112,7 +117,7 @@ def combine(components: list[Component | None], stop_work: bool) -> tuple[float,
     index = winner.score if winner else 0.0
     if stop_work:
         index = max(index, STOP_WORK_MIN)
-    shown = [c for c in comps if c.score > 0 and (c is winner or c.score >= SHOW_RULES_FROM)]
+    shown = [c for c in comps if c.score > 0 and (c is winner or c.score >= SHOW_RULES_FROM or c.listed)]
     shown.sort(key=lambda c: not c.urgent)  # stable: urgent first, then winner first by score
     total = sum(c.score for c in shown) + (STOP_WORK_MIN if stop_work else 0.0)
     factors = [{"hazard": h, "label": label, "weight": c.score / total * share, "source": c.source}
@@ -185,7 +190,12 @@ def _rule_part(rules: dict, hazard: str, when: str) -> Component | None:
     """A card rule's sub-score. NWS alerts count only through the floors, so a rule whose factor is
     just the NWS event (e.g. the wildfire rule's "Red Flag Warning") isn't listed twice."""
     label = rules[hazard][f"label_{when}"]
-    return None if label in NWS_EVENTS else _rule(hazard, rules[hazard][when], label)
+    if label in NWS_EVENTS:
+        return None
+    part = _rule(hazard, rules[hazard][when], label)
+    if part and rules[hazard].get("chronic"):
+        part.score, part.listed = min(part.score, CHRONIC_MAX), True
+    return part
 
 
 def local_days(inputs: Inputs) -> tuple[str, str]:
