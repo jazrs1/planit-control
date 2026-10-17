@@ -56,7 +56,14 @@ export interface Site {
   county: string;
   /** IANA zone, e.g. "America/New_York" or "America/Chicago" (panhandle). */
   timezone: string;
+  /** Today's index as shown (during a replay, replay stop-works count too). */
   hazard_index: HazardIndex;
+  /** Today's index without replay overrides: the same value the site would have with no replay
+   * running. Equals hazard_index outside a replay. */
+  hazard_index_live: HazardIndex;
+  /** True when a replay alert (stop-work or flood) raised this site's hazard_index above
+   * hazard_index_live. */
+  replay_override: boolean;
   top_hazard: HazardType;
   /** Sent by the live backend (null when no storm is approaching or the site is in stop-work);
    * absent in older mocks. */

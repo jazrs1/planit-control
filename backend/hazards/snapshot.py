@@ -5,7 +5,7 @@ and in its detail view.
 """
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 
 from psycopg_pool import ConnectionPool
@@ -35,6 +35,9 @@ class Snapshot:
     sightings: dict[str, list[dict]] = field(default_factory=dict)  # site -> WildlifeSighting dicts
     # site -> open lightning advisory, with "view_now": the clock its minutes count on (real or replay)
     approaching: dict[str, dict] = field(default_factory=dict)
+    # site -> its inputs with real alerts only, for sites whose stop-work or flood alert is a replay one:
+    # scoring these gives hazard_index_live, the index the site would have with no replay running.
+    live_inputs: dict[str, Inputs] = field(default_factory=dict)
 
 
 def _merge(real: list[dict], replayed: list[dict]) -> dict[str, dict]:
@@ -66,6 +69,8 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
                WHERE a.ends_at IS NULL OR a.ends_at > %s""", (real_now,)).fetchall()
         real_alerts = engine.active_alerts(conn, real_now, replay=False)
         replay_alerts = engine.active_alerts(conn, sim_now, replay=True) if replay else []
+        real_lightning = _merge([a for a in real_alerts if a["type"] == engine.ALERT_TYPE], [])
+        real_flood = _merge([a for a in real_alerts if a["type"] == "flood"], [])
         lightning = _merge([a for a in real_alerts if a["type"] == engine.ALERT_TYPE],
                            [a for a in replay_alerts if a["type"] == engine.ALERT_TYPE])
         flood_alerts = _merge([a for a in real_alerts if a["type"] == "flood"],
@@ -119,4 +124,7 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
             crew_wildlife_reports=len(near_reports), firms_detail=firms["detail"] if firms else None,
             crew_reports=crew_recent, now=real_now, model=model.get(s["id"], {}),
         )
+        if (lightning.get(s["id"]) or {}).get("replay") or (flood_alerts.get(s["id"]) or {}).get("replay"):
+            snap.live_inputs[s["id"]] = replace(snap.inputs[s["id"]], lightning_alert=real_lightning.get(s["id"]),
+                                                flood_alert=real_flood.get(s["id"]))
     return snap
