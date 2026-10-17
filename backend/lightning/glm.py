@@ -65,6 +65,12 @@ class CycleResult:
     files_failed: int = 0
     disk_flashes: int = 0  # all flashes in the files (whole GOES-East view)
     new_flashes: list[Flash] = field(default_factory=list)  # Florida flashes inserted this cycle
+    hook_failed: bool = False  # the alert hook (stop-work engine) raised
+
+    @property
+    def ok(self) -> bool:
+        """Every file ingested and the stop-work engine ran."""
+        return self.files_failed == 0 and not self.hook_failed
 
 
 # ---------- S3 ----------
@@ -263,13 +269,20 @@ def ingest_cycle(pool: ConnectionPool, files: Iterable[tuple[str, Loader]], now:
     try:
         alert_hook.on_new_flashes(result.new_flashes, now, replay=replay)
     except Exception:  # noqa: BLE001 - the alert engine must not break ingestion
+        result.hook_failed = True
         log.exception("Alert hook failed")
     return result
 
 
 def poll_latest(pool: ConnectionPool, now: datetime, lookback: timedelta = timedelta(minutes=3)) -> CycleResult:
-    """One live cycle: ingest every recent GLM file not processed yet."""
+    """One live cycle: ingest every recent GLM file not processed yet. Recorded as a success
+    (lightning/health.py) when it all worked and NOAA's newest file is less than 2 minutes old."""
+    from lightning import health
+
     keys = newest_keys(now, lookback)
     done = processed_files(pool, [k.rsplit("/", 1)[1] for k in keys])
     todo = [(k.rsplit("/", 1)[1], lambda k=k: download(k)) for k in keys if k.rsplit("/", 1)[1] not in done]
-    return ingest_cycle(pool, todo, now, replay=False)
+    result = ingest_cycle(pool, todo, now, replay=False)
+    if result.ok and keys and now - file_start(keys[-1]) <= health.STALE_AFTER:
+        health.record_success(now, replay=False)
+    return result

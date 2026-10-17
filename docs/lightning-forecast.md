@@ -28,7 +28,7 @@ The fit gives speed and direction.
 The arrival time is when that edge first comes within 10 miles of the site, if it does within 60 minutes. The earliest cell wins.
 
 **4. The advisory.** Each cycle the advisory is created, updated (new arrival estimate, direction, speed), or cleared:
-- It is cleared once no cell has projected an arrival for 2 minutes. The grace period keeps one noisy cycle from making it flicker.
+- Once raised, it is held until 15 minutes after the later of (a) the last cycle in which a cell projected an arrival and (b) its estimated arrival time. Tracks come and go as cells merge, split or weaken, and a site must never flip to "clear" in the minutes before lightning arrives. The cost: an advisory for a storm that fades can stay up to about 75 minutes (a 60-minute estimate plus 15).
 - When a stop-work starts at the site, its advisory is closed as "superseded".
 
 ### Safety rules
@@ -44,9 +44,11 @@ The arrival time is when that edge first comes within 10 miles of the site, if i
 |---|---|
 | `GET /sites`, `GET /sites/{id}` | `lightning_approach` on each site: `arrival_at`, `minutes_to_arrival`, `from_direction` (e.g. "WSW"), `speed_mph`, `heading_deg`, `distance_mi`, `issued_at`, `updated_at`. `null` when nothing is approaching or the site is already in stop-work. |
 | `GET /lightning/cells` | Current storm cells, largest first: center, `radius_mi`, `flash_count` (20 min), `recent_flashes` (5 min), `tracked`, `speed_mph`, `heading_deg`, `moving_toward`. Ids are per response, not stable. |
-| `GET /sites/{id}/beacon` | Tiny JSON for a hardware alarm: `state` is `stop` > `approaching` > `flood` > `clear`, with `seconds_to_all_clear` (stop) or `minutes_to_arrival` (approaching). Cached like `/alerts`; every alert or advisory change clears the cache. |
+| `GET /sites/{id}/beacon` | Tiny JSON for a hardware alarm: `state` is `stop` > `unknown` > `approaching` > `flood` > `clear`, with `seconds_to_all_clear` (stop) or `minutes_to_arrival` (approaching), and `replay` (whose clock the countdown is on). Cached like `/alerts`; every alert or advisory change clears the cache. |
 
-`flood` is our own flood-risk alert (`alerts/flood.py`). It's live-only, so during a replay a beacon shows `stop`, `approaching` or `clear`, just as `/alerts` shows only replay alerts.
+- **`unknown`**: lightning ingestion hasn't succeeded in the last 2 minutes on that clock (`lightning/health.py`): no data never reads as clear. An active stop-work still shows `stop`.
+- **During a replay** the real state (real time) and the replay's state (replay clock) are both worked out and the higher one wins, so a real stop-work, advisory or flood alert (`alerts/flood.py`, live-only) is never hidden by a replay. Two stop-works: the real one wins, with its real-time countdown and `replay: false`.
+- **Live ingestion turned off** (`LIGHTNING_INGEST_ENABLED=false`, e.g. a laptop after the server cutover): there is no real lightning layer, so during a replay only a real stop-work from the shared database counts and the replay's approaching / flood / clear show normally. Ingestion turned **on** but stalled is different: the real `unknown` stays above the replay's approaching and clear.
 
 ## How well it worked on the Aug 4, 2025 replay
 
@@ -59,7 +61,8 @@ The test: `python -m scripts.evaluate_lightning_forecast` replays `2025-08-04_22
 | Warned, all stop-works | 8 of 22 (36%) |
 | **Median lead time** (when warned) | **10.8 min** (range 3–26) |
 | First arrival estimate vs the actual stop-work | **late in 7 of 8**, median off by 30 min |
-| Advisories issued / followed by a stop-work within 60 min | 24 / 10 |
+| Advisories issued / followed by a stop-work within 60 min | 19 / 8 |
+| **Green gaps**: an advisory cleared, then a stop-work at that site within the hour | **0** (6 with the original 2-minute grace, 1 with a plain 15-minute hold) |
 
 Per stop-work, after warm-up:
 
@@ -81,7 +84,7 @@ Per stop-work, after warm-up:
 
 The first 9 stop-works (21:59–22:06) started before the forecast had enough history to track anything. Seven were already under lightning when the window opens. In live use, the forecast always has history.
 
-**Choosing the leading edge.** This was tuned on the same hour it is tested on (there is only one replay hour), so treat it as a judgment call, not a measured result. With the first version (center + radius), arrival estimates ran even later. All three definitions, on this hour:
+**Choosing the leading edge.** This was tuned on the same hour it is tested on (there is only one replay hour), so treat it as a judgment call, not a measured result. With the first version (center + radius), arrival estimates ran even later. All three definitions, on this hour (measured with the original 2-minute grace, so the advisory counts differ from the table above):
 
 | Leading edge | Warned (after warm-up) | Median lead | Median arrival error | Advisories / followed |
 |---|---|---|---|---|
@@ -96,7 +99,7 @@ The first 9 stop-works (21:59–22:06) started before the forecast had enough hi
 - **One hour of test data.** The parameters (3-mile clustering, 20 flashes, 2.5-mile track fit, leading edge) were set by hand and the edge was chosen on the same hour. 13 stop-works are far too few to trust the percentages. It needs testing on more storm days before anyone relies on it.
 - **Arrival times are too optimistic.** In 7 of 8 warned stop-works, the first lightning within 10 miles came *before* the estimate, by a median of 30 minutes. Crews should treat `minutes_to_arrival` as "lightning could arrive any time in the next N minutes", **not as a countdown**, and the UI shouldn't present it as one. Part of the reason: a stop-work starts on a *single* flash within 10 miles, and outlying flashes from a storm's edge or anvil come well ahead of its core.
 - **It misses storms that form overhead.** New cells that pop up near a site have no track yet, which is typical of Florida's afternoon sea-breeze storms. Five of the 13 warmed-up stop-works got no warning, and the forecast can't help in those cases.
-- **False alarms.** 14 of 24 advisories weren't followed by a stop-work within the hour. Some of those were storms that weakened or turned, and some arrive after the end of the one-hour data, so they can't be checked. Expect advisories that don't pan out; they cost a heads-up, not work time.
+- **False alarms.** 11 of 19 advisories weren't followed by a stop-work within the hour, and the hold keeps each one up for at least 15 minutes. Some of those were storms that weakened or turned, and some arrive after the end of the one-hour data, so they can't be checked. Expect advisories that don't pan out; they cost a heads-up, not work time.
 - **Straight lines only.** Cells are assumed to keep their speed and direction for up to an hour. Real storms curve, speed up, split and die.
 - **Satellite position error.** GLM locates flashes to within a few miles (and records in-cloud flashes too), which is the same data stop-work uses, so the two are consistent with each other.
 - **Cold start.** After a restart or at the start of a replay, nothing is tracked for about 15 minutes.

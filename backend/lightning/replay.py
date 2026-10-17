@@ -23,7 +23,7 @@ from psycopg_pool import ConnectionPool
 from app import clock
 from app.cache import api_cache
 from app.config import BACKEND_DIR
-from lightning import glm
+from lightning import glm, health
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +88,7 @@ class ReplayRunner:
         end = glm.file_start(names[-1]) + timedelta(seconds=glm.FILE_SECONDS)
         await asyncio.to_thread(_reset_window, pool, names, start, end)
 
+        health.reset(replay=True)   # unknown until the first replay cycle succeeds
         clock.start_simulation(start, self.speed)
         api_cache.invalidate()
         log.info("Replay %s started at %sx (%d files)", self.window, self.speed, len(files))
@@ -100,8 +101,10 @@ class ReplayRunner:
                     # Ingestion fell behind the requested speed. Hold the clock back to this file's
                     # moment instead of letting simulated time race ahead of the data.
                     clock.start_simulation(due, self.speed)
-                result = await asyncio.to_thread(
-                    glm.ingest_cycle, pool, [(path.name, path.read_bytes)], clock.now(), True)
+                now = clock.now()
+                result = await asyncio.to_thread(glm.ingest_cycle, pool, [(path.name, path.read_bytes)], now, True)
+                if result.ok:
+                    health.record_success(now, replay=True)
                 self.files_done += 1
                 self.flashes_ingested += len(result.new_flashes)
             log.info("Replay %s: all files in (%d Florida flashes); quiet tail for countdowns",
@@ -109,7 +112,9 @@ class ReplayRunner:
             tail_end = end + QUIET_TAIL
             while clock.now() < tail_end:
                 await clock.sleep_until(min(clock.now() + FILE_PERIOD, tail_end))
-                await asyncio.to_thread(glm.ingest_cycle, pool, [], clock.now(), True)
+                now = clock.now()
+                if (await asyncio.to_thread(glm.ingest_cycle, pool, [], now, True)).ok:
+                    health.record_success(now, replay=True)
             log.info("Replay %s finished", self.window)
         except asyncio.CancelledError:
             log.info("Replay %s stopped after %d/%d files", self.window, self.files_done, self.files_total)

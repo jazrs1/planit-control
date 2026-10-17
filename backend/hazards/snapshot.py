@@ -33,15 +33,24 @@ class Snapshot:
     inputs: dict[str, Inputs]
     species_counts: dict[str, dict[str, int]]                       # site -> {species: n}
     sightings: dict[str, list[dict]] = field(default_factory=dict)  # site -> WildlifeSighting dicts
-    approaching: dict[str, dict] = field(default_factory=dict)      # site -> open lightning advisory
-    clock_now: datetime | None = None                               # lightning time (simulated in replay)
+    # site -> open lightning advisory, with "view_now": the clock its minutes count on (real or replay)
+    approaching: dict[str, dict] = field(default_factory=dict)
+
+
+def _merge(real: list[dict], replayed: list[dict]) -> dict[str, dict]:
+    """site -> alert or advisory: the real one when a site has both (each row keeps its `replay` flag)."""
+    out = {a["site_id"]: a for a in replayed}
+    out.update({a["site_id"]: a for a in real})
+    return out
 
 
 def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
-    """`replay`: which lightning alerts to use (default: replay alerts while a replay runs)."""
+    """`replay`: also use replay alerts and advisories (default: while a replay runs). Real alerts are
+    always loaded, on real time, so a real stop-work or flood alert still sets a site's cards and index
+    during a replay; a site with both uses the real one. replay=False: real only (stored history)."""
     real_now = datetime.now(timezone.utc)   # live sources
     replay = clock.is_simulated() if replay is None else replay
-    clock_now = clock.now() if replay else real_now   # lightning (simulated during replay)
+    sim_now = clock.now() if replay else None   # the replay clock
     since = real_now - timedelta(days=WILDLIFE_DAYS)
     with pool.connection() as conn:
         sites = conn.execute(
@@ -55,11 +64,18 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
             """SELECT sa.site_id, a.event, a.headline, a.severity, a.onset, a.ends_at
                FROM site_nws_alerts sa JOIN nws_alerts a ON a.id = sa.alert_id
                WHERE a.ends_at IS NULL OR a.ends_at > %s""", (real_now,)).fetchall()
-        lightning = {a["site_id"]: a for a in engine.active_alerts(conn, clock_now, replay=replay)
-                     if a["type"] == engine.ALERT_TYPE}
-        flood_alerts = {a["site_id"]: a for a in engine.active_alerts(conn, real_now, replay=False)
-                        if a["type"] == "flood"}
-        approaching = {a["site_id"]: a for a in approach.active_advisories(conn, replay=clock.is_simulated())}
+        real_alerts = engine.active_alerts(conn, real_now, replay=False)
+        replay_alerts = engine.active_alerts(conn, sim_now, replay=True) if replay else []
+        lightning = _merge([a for a in real_alerts if a["type"] == engine.ALERT_TYPE],
+                           [a for a in replay_alerts if a["type"] == engine.ALERT_TYPE])
+        flood_alerts = _merge([a for a in real_alerts if a["type"] == "flood"],
+                              [a for a in replay_alerts if a["type"] == "flood"])
+        approaching = _merge(
+            [{**a, "replay": False, "view_now": real_now} for a in approach.active_advisories(conn, replay=False)],
+            [{**a, "replay": True, "view_now": sim_now} for a in approach.active_advisories(conn, replay=True)]
+            if replay else [])
+        # A site in stop-work (either mode) gets no "approaching": the stop-work is the bigger news.
+        approaching = {k: v for k, v in approaching.items() if k not in lightning}
         firms = conn.execute("SELECT detail FROM data_sources WHERE name = 'firms'").fetchone()
         reports = conn.execute(
             """SELECT id, lat, lon, created_at, category, species, reporter_role FROM reports
@@ -74,7 +90,7 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
         if r["site_id"] in by_site:
             by_site[r["site_id"]][(r["hazard"], r["metric"])] = (r["value"], r["ts"])
 
-    snap = Snapshot(sites=sites, inputs={}, species_counts={}, approaching=approaching, clock_now=clock_now)
+    snap = Snapshot(sites=sites, inputs={}, species_counts={}, approaching=approaching)
     for s in sites:
         near_obs = [(miles(s["lat"], s["lon"], o["lat"], o["lon"]), o) for o in observations]
         near_obs = [(d, o) for d, o in near_obs if d <= WILDLIFE_RADIUS_MI]

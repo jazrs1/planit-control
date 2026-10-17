@@ -1,7 +1,7 @@
 """Protection for actions that change shared state or cost money.
 
-- Admin token: POST /replay/start, POST /replay/stop and POST /briefing/send-now for all sites need
-  the X-Admin-Token header to match ADMIN_TOKEN in backend/.env (the "demo code" the frontend asks
+- Admin token: POST /replay/start, POST /replay/stop and POST /briefing/send-now (one site or all)
+  need the X-Admin-Token header to match ADMIN_TOKEN in backend/.env (the "demo code" the frontend asks
   for). Without ADMIN_TOKEN set, those actions are off (503). Read-only routes stay open.
 - Rate limits (in-process, real time): send-now for all sites at most once per 15 minutes and
   never while a run is in progress; one site at most once per minute per site.
