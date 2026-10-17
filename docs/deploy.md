@@ -177,10 +177,9 @@ open https://api.planit.example.com/docs          # interactive API docs
 ssh root@203.0.113.10 'systemctl status planit-api --no-pager; journalctl -u planit-api -n 50 --no-pager'
 ```
 
-A healthy server log shows, within a minute:
-- `GLM live ingestion started (every 20 s)`;
-- `Hazard source open-meteo: …` and `Hazard source nws-alerts: …`;
-- the hourly weather poll after that.
+A healthy server log shows:
+- within a minute, `GLM live ingestion started (every 20 s)` and then `GLM live: N files, …` every 20 seconds;
+- `Hazard source nws-alerts: …`, `Hazard source open-meteo: …` and the others once each source is due. On a fresh database that's right away. Right after a laptop handover, each source waits out its interval from the laptop's last successful poll (NWS 5 min, FIRMS 30 min, weather 60 min, iNaturalist 6 h), so a quiet first few minutes is normal.
 
 ### 6. Frontend on Vercel (about 5 minutes)
 
@@ -267,7 +266,8 @@ Running `--rollback` twice goes back to the newer commit, since the rollback its
 | `BRIEFING_CONCURRENCY` | `4` | — | |
 | `FIRMS_MAP_KEY` | **required for fires** | keep | No wildfire data without it. |
 | `CORS_ORIGINS` | **your domain(s) + `<project>.vercel.app`**, comma-separated, `https://`, no path | `http://localhost:3000` | Set by `copy-to-server.sh --cors`. Trailing slashes are ignored. |
-| `CORS_ORIGIN_REGEX` | optional | empty | Vercel preview URLs, anchored regex. |
+| `CORS_ORIGIN_REGEX` | optional (set by `--cors-regex`) | empty | Vercel preview URLs, anchored regex (`^https://…$`). |
+| `ADMIN_TOKEN` | **required for the demo** | same | The demo code: `X-Admin-Token` for replay start/stop and send-now. Empty turns those off (503). |
 | `LIGHTNING_INGEST_ENABLED` | `true` (forced by the copy script) | **`false`** | GOES-19 polling and the stop-work engine. |
 | `LIGHTNING_POLL_SECONDS` | `20` | — | |
 | `HAZARD_POLLING_ENABLED` | `true` (forced) | **`false`** | Weather, NWS, FIRMS, iNaturalist, FEMA/river, flood alerts, hazard scores. |
