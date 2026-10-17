@@ -29,6 +29,7 @@ export default function TopNavigation() {
           <span className="sm:hidden">PlanIT</span><span className="hidden sm:inline">PlanIT Control</span>
         </Link>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+        <Link href="/crew" aria-current={pathname === "/crew" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2"><span className="sm:hidden">Crew</span><span className="hidden sm:inline">Crew view</span></Link>
         <Link href="/briefings" aria-current={pathname === "/briefings" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Briefings</Link>
         <Link href="/reports" className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Reports</Link>
         <Link
@@ -50,7 +51,7 @@ export default function TopNavigation() {
           </span>
           <span aria-hidden="true" className="text-[10px] font-normal text-muted sm:text-xs">{breakdown}</span>
         </Link>
-        <Link href="/report" className={`min-h-12 items-center justify-center rounded-card bg-brand px-4 font-semibold text-surface shadow-card sm:static sm:flex sm:min-h-11 sm:text-sm ${pathname === "/report" ? "hidden" : "fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex"}`}>Report hazard</Link>
+        <Link href="/report" className={`min-h-12 items-center justify-center rounded-card bg-brand px-4 font-semibold text-surface shadow-card sm:static sm:flex sm:min-h-11 sm:text-sm ${pathname === "/report" || pathname === "/crew" ? "hidden" : "fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex"}`}>Report hazard</Link>
         </div>
       </div>
     </nav>
