@@ -35,6 +35,12 @@ as_app() { sudo -u "$APP_USER" -H "$@"; }
 export DEBIAN_FRONTEND=noninteractive
 cd /
 
+# Some providers (e.g. Vultr) set a hostname that isn't in /etc/hosts; sudo then warns
+# "unable to resolve host" on every call.
+if ! getent hosts "$(hostname)" >/dev/null; then
+  echo "127.0.1.1 $(hostname)" >> /etc/hosts
+fi
+
 step "System packages (git, libgomp1 for LightGBM, firewall)"
 apt-get update -q
 apt-get install -y -q git curl ca-certificates gnupg ufw libgomp1 sudo software-properties-common
@@ -86,14 +92,26 @@ if ! as_app ssh-keygen -F github.com -f "$KNOWN" >/dev/null 2>&1; then
     || fail "github.com's host key doesn't match GitHub's published fingerprint"
   echo "$scanned" | as_app tee -a "$KNOWN" >/dev/null
 fi
+shown=0
 until as_app git ls-remote "$REPO" HEAD >/dev/null 2>&1; do
-  echo
-  echo "Add this key as a read-only deploy key (no write access):"
-  echo "  https://github.com/jazrs1/planit-control/settings/keys/new"
-  echo
-  cat "$KEY.pub"
-  echo
-  read -rp "Press Enter once it's added (Ctrl-C to stop)... "
+  if (( ! shown )); then
+    echo
+    echo "Add this key as a read-only deploy key (no write access):"
+    echo "  https://github.com/jazrs1/planit-control/settings/keys/new"
+    echo "  or from a machine with gh: gh repo deploy-key add KEYFILE -R jazrs1/planit-control -t <title>"
+    echo
+    cat "$KEY.pub"
+    echo
+    shown=1
+  fi
+  if [[ -t 0 ]]; then
+    read -rp "Press Enter once it's added (Ctrl-C to stop)... "
+  else
+    # No terminal (e.g. ssh without -t, or run by another script): wait for the key instead of
+    # exiting at the prompt.
+    echo "Waiting for the deploy key (checking every 10 s; Ctrl-C to stop)..."
+    sleep 10
+  fi
 done
 echo "GitHub access OK"
 
@@ -129,8 +147,11 @@ systemctl enable planit-api >/dev/null
 
 step "Caddy reverse proxy for https://$DOMAIN"
 install -d -o caddy -g caddy /var/log/caddy
+chown -R caddy:caddy /var/log/caddy   # repair a log file left root-owned by an earlier run
 sed "s/API_DOMAIN/$DOMAIN/g" "$APP_DIR/deploy/Caddyfile" > /etc/caddy/Caddyfile
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+# Validate as the caddy user: validating opens the log file, and as root it would create it root-owned
+# (mode 600), so the caddy service couldn't write it and every reload would fail.
+sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
 systemctl enable caddy >/dev/null
 systemctl reload-or-restart caddy
 

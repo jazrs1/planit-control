@@ -8,6 +8,7 @@ import AlertBanner from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import CrewReadings from "@/components/CrewReadings";
 import CrewBriefing from "@/components/CrewBriefing";
+import PushSettings from "@/components/PushSettings";
 import { DEMO_DATA, getSites } from "@/lib/api";
 import { chooseCrewSite, hasReading, rememberedSite, rememberSite } from "@/lib/crew";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
@@ -86,6 +87,7 @@ function CrewModeView({ initialSites, demo }: { initialSites: Site[] | null; dem
       <p>Site conditions and stop-work status are unknown.</p>
       {!demo && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void refresh()} className="min-h-12 rounded-card bg-brand px-4 font-semibold text-surface">Retry now</button><button type="button" onClick={() => setDemo(true)} className="min-h-12 rounded-card border border-border px-4 font-semibold text-brand">Show demo data</button></div>}
     </section>}
+    <PushSettings sites={sites} defaultSiteId={selected?.id} defaultRole="crew" compact sitesUnconfirmed={!demo && sitesFailed} />
   </main>;
 }
 
