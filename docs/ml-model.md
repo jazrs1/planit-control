@@ -218,11 +218,11 @@ LightGBM computes exact **SHAP values** for tree models (`pred_contrib=True`). F
 | wettest hour | "Downpours up to 1.4 in/hr forecast" (≥ 3 in/hr shown as "Extreme downpours forecast (3+ in/hr)") | flood |
 | prior rain | "3.1 in of rain in the past 3 days" | flood |
 | soil | "Wet ground (22% soil moisture)" | soil_saturation |
-| gusts / CAPE / thunder code | "Wind gusts to 35 mph" / "Unstable air for storms (CAPE 4,640 J/kg)" | lightning |
+| gusts / CAPE / thunder code | "Wind gusts to 35 mph" / "Unstable air for storms (CAPE 4,640 J/kg)" | storm |
 | season | "Peak storm season (August)" | the top weather factor's hazard |
-| location | "Area with frequent past severe-weather reports" | the top weather factor's hazard |
+| location | "Area with frequent past severe-weather reports" | storm |
 
-Each factor also gets a `weight`: its share of the upward push, so the weights sum to ≤ 1. The API's `ContributingFactor` needs a `HazardType`, and it has no `storm` type, so storm factors (CAPE, gusts, thunder) use `lightning`. *Season* and *location* aren't hazards: they borrow the hazard of the strongest weather factor in the same prediction (or `lightning` if there is none), since they mostly reflect storm and flood reports.
+Each factor also gets a `weight`: its share of the upward push, so the weights sum to ≤ 1. The API's `ContributingFactor` needs a `HazardType`. **`lightning` means satellite-detected strikes only** (stop-work alerts, the lightning card), so forecast storm potential (CAPE, gusts, thunder hours) and NWS thunderstorm, tornado and tropical alerts use **`storm`** ("Storms & wind" in the app). *Location* ("Area with frequent past severe-weather reports") is storm context, so it's `storm` too. *Season* isn't a hazard: it borrows the hazard of the strongest weather factor in the same prediction (or `storm` if there is none). Stored scores are re-labelled on read (`model_scores.current_hazards`), so rows from before this mapping read the same way.
 
 **What drives the model overall** (mean |SHAP| on 2025, log-odds): CAPE 0.98 · location 0.77 · season 0.57 · soil moisture 0.48 · rain 0.41 · gusts 0.27 · high temp 0.18 · heat index 0.16 · wettest hour 0.12 · prior 3-day rain 0.09 · prior 7-day rain 0.04 · thunder hours 0.00.
 

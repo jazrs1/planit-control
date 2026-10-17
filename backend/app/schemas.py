@@ -9,7 +9,9 @@ ReportCategory = Literal[
     "downed_line", "flooding", "wildlife", "fire_smoke", "heat_illness", "unsafe_ground", "other"
 ]
 
-HazardType = Literal["heat", "lightning", "flood", "soil_saturation", "wildfire", "wildlife"]
+# "lightning": satellite-detected strikes only. "storm": forecast storm potential (gusts, CAPE, thunder
+# hours, NWS thunderstorm/tornado/tropical alerts, areas with frequent past severe-weather reports).
+HazardType = Literal["heat", "lightning", "storm", "flood", "soil_saturation", "wildfire", "wildlife"]
 HazardIndex = Annotated[float, Field(ge=0, le=10)]
 
 

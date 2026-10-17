@@ -35,15 +35,16 @@ FACTOR_HAZARD = {
     "rain_prior3_in": "flood",
     "rain_prior7_in": "flood",
     "soil_moisture_pct": "soil_saturation",
-    # The contract has no generic "storm" hazard; lightning is the crew-facing storm hazard.
-    "gust_max_mph": "lightning",
-    "cape_max": "lightning",
-    "thunder_hours": "lightning",
-    # No hazard of their own: they take the hazard of the strongest weather factor (see top_factors).
+    # Forecast storm potential is "storm"; "lightning" is reserved for satellite-detected strikes.
+    "gust_max_mph": "storm",
+    "cape_max": "storm",
+    "thunder_hours": "storm",
+    # "Area with frequent past severe-weather reports": mostly storm reports, so storm context.
+    "location": "storm",
+    # No hazard of its own: takes the hazard of the strongest weather factor (see top_factors).
     "season": None,
-    "location": None,
 }
-DEFAULT_HAZARD = "lightning"  # storms are most of the labels
+DEFAULT_HAZARD = "storm"  # storms are most of the labels
 STORM_MONTHS = {5, 6, 7, 8, 9}
 
 
@@ -134,12 +135,12 @@ def hazard_index(p, prob_anchors, index_values=INDEX_VALUES) -> np.ndarray:
 def top_factors(contrib: pd.Series, row: pd.Series, day: date, top: int = 3) -> list[dict]:
     """Largest positive contributors, grouped, in plain language. weight = share of the positive push.
 
-    Every factor gets a HazardType (the API requires one): season and location borrow the hazard of
-    the weather factor that pushed risk up the most."""
+    Every factor gets a HazardType (the API requires one): location is storm context; season borrows the
+    hazard of the weather factor that pushed risk up the most."""
     grouped = contrib.groupby(lambda f: FACTOR_GROUPS.get(f, f)).sum()
     positive = grouped[grouped > 0].sort_values(ascending=False)
     total = positive.sum()
-    weather = [f for f in positive.index if FACTOR_HAZARD[f]]
+    weather = [f for f in positive.index if FACTOR_HAZARD[f] and f not in FACTOR_GROUPS.values()]
     fallback = FACTOR_HAZARD[weather[0]] if weather else DEFAULT_HAZARD
     return [
         {"factor": f, "label": factor_label(f, row, day), "hazard": FACTOR_HAZARD[f] or fallback,
