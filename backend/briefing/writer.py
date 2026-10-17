@@ -2,8 +2,9 @@
 
   1. Gemini (GEMINI_MODEL, default gemini-3.8-flash) writes a headline, the top 3 risks with times,
      and concrete actions, as structured JSON, from the input JSON only.
-  2. The result is checked: every number in it must appear in the input JSON, and the whole
-     briefing must be under 150 words. One retry with the problems listed; then
+  2. The result is checked: every number in it must appear in the input JSON, hazard words must
+     match it (no "saturated" soil that is only moist, no NWS alert that isn't in effect, no
+     thunderstorms at 0% chance), and the whole briefing must be under 150 words. One retry with the problems listed; then
   3. a template built from the same JSON (always grounded by construction) is used instead.
      The template is also used when GEMINI_API_KEY is missing or Gemini fails.
 
@@ -87,10 +88,38 @@ def compose(go_status: str, day: str, headline: str, risks: list[str], actions: 
     return "\n".join(lines)
 
 
+NWS_EVENT_WORDS = ["flood warning", "flash flood warning", "flood watch", "flash flood watch", "flood advisory",
+                   "heat advisory", "excessive heat warning", "extreme heat warning", "red flag warning",
+                   "fire weather watch", "severe thunderstorm warning", "severe thunderstorm watch", "tornado warning"]
+
+
+def unsupported_claims(text: str, inputs: dict) -> list[str]:
+    """Hazard words the input doesn't support (numbers are checked separately). Catches e.g.
+    "saturated soil" when the soil is only moist, or a Flood Warning that isn't in effect."""
+    lowered = text.lower()
+    claims = []
+    soil = (inputs.get("soil") or {}).get("level")
+    if "saturated" in lowered and soil != "saturated":
+        claims.append(f"'saturated' (soil is {soil or 'unknown'})")
+    events = {a["event"].lower() for a in inputs.get("nws_alerts") or []}
+    for phrase in NWS_EVENT_WORDS:
+        if phrase in lowered and phrase not in events and not any(phrase in e for e in events):
+            claims.append(f"'{phrase}' (no such NWS alert)")
+    storm_chance = max([p.get("thunderstorm_chance_pct") or 0 for p in inputs.get("periods", [])] + [0])
+    if "thunderstorm" in lowered and storm_chance == 0 and not any("thunderstorm" in e for e in events):
+        claims.append("'thunderstorm' (0% thunderstorm chance)")
+    band = ((inputs.get("heat") or {}).get("osha_risk_band") or "")
+    if ("very high" in lowered or "extreme" in lowered) and band != "very high":
+        claims.append(f"'very high'/'extreme' heat (OSHA band is {band or 'unknown'})")
+    return claims
+
+
 def problems(text: str, inputs: dict) -> list[str]:
     issues = []
     if (bad := ungrounded_numbers(text, inputs)):
         issues.append(f"these numbers are not in the JSON: {', '.join(bad)}")
+    if (claims := unsupported_claims(text, inputs)):
+        issues.append(f"these hazards are not in the JSON: {'; '.join(claims)}")
     if (words := len(text.split())) >= MAX_WORDS:
         issues.append(f"{words} words; must be under {MAX_WORDS}")
     return issues
