@@ -8,7 +8,13 @@ API_DOMAIN {
 		max_size 12MB
 	}
 
-	reverse_proxy 127.0.0.1:8000
+	# During an API restart (deploys) the upstream refuses connections for 1-2 s. Retry the connection
+	# for up to 10 s instead of answering 502 at once. Only failed connections are retried, so a request
+	# that reached the API is never sent twice.
+	reverse_proxy 127.0.0.1:8000 {
+		lb_try_duration 10s
+		lb_try_interval 250ms
+	}
 
 	log {
 		output file /var/log/caddy/planit-api.log {
