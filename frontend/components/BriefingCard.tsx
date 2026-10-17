@@ -36,7 +36,8 @@ const DECISION: Record<GoStatus, { badge: string; shape: string | null }> = {
   go: { badge: "bg-risk-green-bg text-risk-green", shape: "pc-shape--green" },
 };
 
-const WRITER = { claude: "Claude", gemini: "Gemini", template: "Template" } as const;
+// Who wrote it: one small line inside the details only, never on the card face or footer.
+const SOURCE = { claude: "Written by Claude", gemini: "Written by Gemini", template: "Standard template" } as const;
 
 function keyValue(key: keyof BriefingKeyNumbers, v: number) {
   switch (key) {
@@ -161,6 +162,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
     </p>
   );
 
+  const source = b?.generator ? <p className="text-xs text-muted">{SOURCE[b.generator]}</p> : null;
   const fullTextBlock = structured && fullText && b && <p className="pc-reveal max-w-[68ch] whitespace-pre-wrap text-muted">{b.text}</p>;
 
   const regenerateLink = onRegenerate && entry.kind !== "loading" && (
@@ -186,7 +188,6 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
   </>;
 
   const article = `flex flex-col gap-6 rounded-card bg-surface p-6 max-sm:p-5 ${b && !uncertain ? "shadow-card" : "border-2 border-dashed border-border"}`;
-  const writer = b?.generator ? WRITER[b.generator] : null;
 
   // /briefings: decision, site, headline and index up front; numbers, risks and actions behind "Show details".
   if (collapsible) {
@@ -215,7 +216,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
             {regenerateLink}
           </span>
           <p className="text-xs text-muted">
-            {b ? <>{writer ?? "Generated"}{ago && <>{" · "}{ago}</>}{connectionLost && <>{" · "}last known</>}</> : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
+            {b ? <>Generated {ago ?? formatPageTime(b.generated_at, timeZone, nowMs)}{connectionLost && <>{" · "}last known</>}</> : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
           </p>
         </footer>
         {b && open && (
@@ -225,6 +226,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
             {factors}
             {structured && <button type="button" aria-expanded={fullText} onClick={() => setFullText((v) => !v)} className="pc-link self-start text-xs">{fullText ? "Hide full briefing text" : "Full briefing text"}</button>}
             {fullTextBlock}
+            {source}
           </div>
         )}
         {demoCode.form}
@@ -255,14 +257,14 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
           {lists}
           {factors}
           {fullTextBlock}
+          {fullText && source}
         </div>
       )}
       <footer className="flex flex-wrap items-center justify-between gap-x-6">
         <p className="text-xs text-muted">
           {b ? (
             <>
-              {writer === "Template" ? "Template" : writer ? `Written by ${writer}${b.model ? ` (${b.model})` : ""}` : "Generated"}
-              {" · "}<span className="whitespace-nowrap">{formatPageTime(b.generated_at, timeZone, nowMs)}{ago && `, ${ago}`}</span>
+              Generated <span className="whitespace-nowrap">{formatPageTime(b.generated_at, timeZone, nowMs)}{ago && `, ${ago}`}</span>
               {connectionLost && <>{" · "}last known</>}
             </>
           ) : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
