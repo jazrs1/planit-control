@@ -22,7 +22,8 @@ from psycopg_pool import ConnectionPool
 from app import clock, mocks
 from app.config import BACKEND_DIR
 from hazards import snapshot
-from hazards.scoring import score_site, soil_level
+from hazards.risk import predict
+from hazards.scoring import soil_level
 
 SITES_FILE = BACKEND_DIR / "data" / "sites.json"
 
@@ -78,7 +79,7 @@ def _reading(inputs, hazard: str, metric: str) -> float | None:
 
 def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -> dict:
     inputs = snap.inputs[site["id"]]
-    scored = score_site(inputs, snap.species_counts[site["id"]])
+    scored = predict(inputs, snap.species_counts[site["id"]])
     cards = scored["cards"]
     mock = _placeholder_for(site)["conditions"]
 
@@ -113,16 +114,32 @@ def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -
     }
 
 
+NO_DATA_READING = "No live data: database unavailable"
+CARD_KEYS = ("heat", "lightning", "flood", "soil", "wildfire", "wildlife_summary")
+
+
+def _no_data(card: dict | None) -> dict | None:
+    """A placeholder card the frontend must show as "No data": no hazard_status, as_of null,
+    and a reading that doesn't sound live (the mock's own numbers would)."""
+    if card is None:
+        return None
+    card = {k: v for k, v in card.items() if k != "hazard_status"}
+    return {**card, "as_of": None, "reading": NO_DATA_READING}
+
+
 def _placeholder_detail(site: dict) -> dict:
-    """No database: placeholder hazards from shared/mocks (lightning never claimed)."""
+    """No database: placeholder hazards from shared/mocks (lightning never claimed). Every card
+    is marked as having no live data, so it never looks current."""
     mock = _placeholder_for(site)
     top = mock["top_hazard"]
     if top == "lightning":
         top = next((f["hazard"] for f in mock["top_factors"] if f["hazard"] != "lightning"), "heat")
+    conditions = {**mock["conditions"], "lightning": NO_LIGHTNING}
+    conditions.update({k: _no_data(conditions.get(k)) for k in CARD_KEYS if conditions.get(k) is not None})
     return {
         "id": site["id"], "name": site["name"], "lat": site["lat"], "lon": site["lon"],
         "county": site["county"], "timezone": site["timezone"],
-        "conditions": {**mock["conditions"], "lightning": NO_LIGHTNING},
+        "conditions": conditions,
         "hazard_index": mock["hazard_index"], "hazard_index_today": mock["hazard_index_today"],
         "hazard_index_tomorrow": mock["hazard_index_tomorrow"], "top_hazard": top,
         "top_factors": [f for f in mock["top_factors"] if f["hazard"] != "lightning"],

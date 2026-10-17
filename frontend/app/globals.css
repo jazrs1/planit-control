@@ -86,3 +86,24 @@ body {
     outline: 2px solid var(--pc-risk-red);
   }
 }
+
+.report-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--pc-surface);
+  border-radius: var(--pc-radius-pill);
+  background: var(--pc-risk-red);
+  color: var(--pc-surface);
+  font-weight: 700;
+  font-size: 20px;
+  box-shadow: var(--pc-shadow-card);
+  cursor: pointer;
+}
+.report-marker--draft { background: var(--pc-brand); }
+.report-marker[aria-pressed="true"], .report-marker:focus-visible {
+  outline: 3px solid var(--pc-brand);
+  outline-offset: 3px;
+}

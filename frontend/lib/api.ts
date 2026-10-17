@@ -1,8 +1,10 @@
-import type { Alert, ApiError, LightningFlash, ReplayStatus, Site, SiteDetail, StartReplayRequest } from "@shared/types";
+import type { Alert, ApiError, CreateReportRequest, HazardReport, LightningFlash, ReplayStatus, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
 import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
+
+import mockReports from "@shared/mocks/reports.json";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -34,6 +36,7 @@ export async function orNull<T>(promise: Promise<T>): Promise<T | null> {
   }
 }
 
+export const getReports = () => request<HazardReport[]>("/reports");
 export const getSites = () => request<Site[]>("/sites");
 export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
 export const getAlerts = () => request<Alert[]>("/alerts");
@@ -45,9 +48,88 @@ export const stopReplay = () => request<ReplayStatus>("/replay/stop", { method: 
 
 /** shared/mocks, for the explicit "Demo data" mode only. Anything showing these must say so. */
 export const DEMO_DATA = {
+  reports: mockReports as HazardReport[],
   sites: mockSites as Site[],
   alerts: mockAlerts as Alert[],
   lightning: mockLightning as LightningFlash[],
   /** Keyed by site id; only the 6 mock sites have one. */
   siteDetails: mockSiteDetails as Record<string, SiteDetail>,
 };
+
+export function validatePhoto(file: File): string | null {
+  if (!file.type.startsWith("image/")) return "Choose an image file, not a document or video.";
+  if (!["image/jpeg", "image/png", "image/webp", "image/heic"].includes(file.type)) {
+    return "Use a JPEG, PNG, WebP, or HEIC photo.";
+  }
+  if (file.size === 0) return "This photo is empty. Take or choose another photo.";
+  if (file.size > 10 * 1024 * 1024) return "Photo is too large. Choose a photo of 10 MB or less.";
+  return null;
+}
+
+function writeError(status: number, body: string): Error {
+  if (status === 413) return new Error("Photo is too large. Choose a photo of 10 MB or less.");
+  if (status === 415) return new Error("Unsupported photo. Use JPEG, PNG, WebP, or HEIC.");
+  if (status >= 500) return new Error("The reporting service is unavailable. Your report has not been confirmed. Check Reports before trying again.");
+  try {
+    const error: ApiError = JSON.parse(body);
+    if (typeof error.detail === "string") return new Error(error.detail);
+  } catch { /* Use a readable fallback for non-JSON errors. */ }
+  return new Error(`The request was rejected (${status}). Check the photo and report details.`);
+}
+
+/** Raw image upload; XHR exposes real upload progress. Writes never fall back to mocks. */
+export function uploadPhoto(file: File, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<UploadResponse> {
+  const invalid = validatePhoto(file);
+  if (invalid) return Promise.reject(new Error(invalid));
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abort = () => xhr.abort();
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    xhr.open("POST", `${API_URL}/uploads`);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.timeout = 120_000;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round(event.loaded / event.total * 100));
+    };
+    xhr.onload = () => {
+      cleanup();
+      if (xhr.status < 200 || xhr.status >= 300) return reject(writeError(xhr.status, xhr.responseText));
+      try {
+        const result: UploadResponse = JSON.parse(xhr.responseText);
+        if (typeof result.photo_url !== "string" || !result.photo_url) throw new Error();
+        onProgress?.(100);
+        resolve(result);
+      } catch { reject(new Error("The upload returned no photo URL. Please try again.")); }
+    };
+    xhr.onerror = () => { cleanup(); reject(new Error("Network error while uploading. Check your connection and try again.")); };
+    xhr.ontimeout = () => { cleanup(); reject(new Error("Photo upload timed out. Check your connection and try again.")); };
+    xhr.onabort = () => { cleanup(); reject(new DOMException("Upload cancelled", "AbortError")); };
+    if (signal?.aborted) return reject(new DOMException("Upload cancelled", "AbortError"));
+    signal?.addEventListener("abort", abort, { once: true });
+    onProgress?.(0);
+    xhr.send(file);
+  });
+}
+
+export async function createReport(body: CreateReportRequest, signal?: AbortSignal): Promise<HazardReport> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/reports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new Error("Network error: the report could not be confirmed. Check Reports before retrying to avoid a duplicate.");
+  }
+  if (!response.ok) throw writeError(response.status, await response.text());
+  try {
+    const report: HazardReport = await response.json();
+    if (!report.id || !report.photo_url || !Number.isFinite(report.lat) || !Number.isFinite(report.lon)) throw new Error();
+    return report;
+  } catch {
+    throw new Error("The service returned an invalid confirmation. Check Reports before retrying to avoid a duplicate.");
+  }
+}

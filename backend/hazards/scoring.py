@@ -226,6 +226,9 @@ def wildfire(inp: Inputs) -> Hazard:
         reading = f"Fire detected {nearest:.1f} mi away at {_time(detected_at, inp.site)} ({count} within 25 mi in 24 h)"
     else:
         reading = "No fires detected within 25 mi in the last 24 h"
+    hot_spots = int(_value(inp, "wildfire", "plant_hot_spots_ignored") or 0)
+    if hot_spots:
+        reading += f"; {hot_spots} hot spot{'s' if hot_spots != 1 else ''} at the plant ignored (plant heat)"
     if nws_alert:
         reading = f"{_until(nws_alert, inp.site)}. {reading}"
     card.update({"nearest_detection_mi": nearest, "detected_at": detected_at,
@@ -286,6 +289,8 @@ def score_site(inp: Inputs, species_counts: dict[str, int]) -> dict:
              "soil_saturation": soil(inp), "wildfire": wildfire(inp), "wildlife": wildlife(inp, species_counts)}
     today, top, factors = combine({h: (p.today, p.label_today) for h, p in parts.items()},
                                   stop_work=inp.lightning_alert is not None)
-    tomorrow, _, _ = combine({h: (p.tomorrow, p.label_tomorrow) for h, p in parts.items()}, stop_work=False)
+    tomorrow, top_tomorrow, factors_tomorrow = combine(
+        {h: (p.tomorrow, p.label_tomorrow) for h, p in parts.items()}, stop_work=False)
     return {"cards": {h: p.card for h, p in parts.items()}, "hazard_index_today": today,
-            "hazard_index_tomorrow": tomorrow, "top_hazard": top, "top_factors": factors}
+            "hazard_index_tomorrow": tomorrow, "top_hazard": top, "top_factors": factors,
+            "top_hazard_tomorrow": top_tomorrow, "top_factors_tomorrow": factors_tomorrow}

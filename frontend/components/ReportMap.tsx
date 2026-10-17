@@ -1,0 +1,104 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { CreateReportRequest, HazardReport } from "@shared/types";
+import type { Map as LibreMap, Marker } from "maplibre-gl";
+import { REPORT_LABEL } from "@/lib/reports";
+
+type ReportMapProps = {
+  reports: HazardReport[];
+  pin?: Pick<CreateReportRequest, "lat" | "lon"> | null;
+  onPin?: (pin: Pick<CreateReportRequest, "lat" | "lon">) => void;
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
+};
+
+export default function ReportMap({ reports, pin, onPin, selectedId, onSelect }: ReportMapProps) {
+  const container = useRef<HTMLDivElement>(null);
+  const map = useRef<LibreMap | null>(null);
+  const markers = useRef<Marker[]>([]);
+  const callbacks = useRef({ onPin, onSelect });
+  const fitted = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => { callbacks.current = { onPin, onSelect }; }, [onPin, onSelect]);
+
+  useEffect(() => {
+    let disposed = false;
+    let observer: ResizeObserver | undefined;
+    void import("maplibre-gl").then((lib) => {
+      if (disposed || !container.current) return;
+      // Same worker URL and basemap as the dashboard.
+      lib.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
+      const instance = new lib.Map({ container: container.current, style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", center: [-83.5, 28.2], zoom: 5.5, attributionControl: { compact: false } });
+      map.current = instance;
+      instance.addControl(new lib.NavigationControl(), "top-right");
+      instance.on("click", (event) => callbacks.current.onPin?.({ lat: event.lngLat.lat, lon: event.lngLat.wrap().lng }));
+      instance.on("error", () => { if (!disposed) setError(true); });
+      instance.on("load", () => { if (!disposed) setError(false); });
+      observer = new ResizeObserver(() => instance.resize());
+      observer.observe(container.current);
+      setReady(true);
+    }).catch(() => { if (!disposed) setError(true); });
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      markers.current.forEach((marker) => marker.remove());
+      markers.current = [];
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    let disposed = false;
+    void import("maplibre-gl").then(({ Marker, LngLatBounds }) => {
+      if (disposed || !map.current) return;
+      markers.current.forEach((marker) => marker.remove());
+      markers.current = [];
+      const bounds = new LngLatBounds();
+      for (const report of reports) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "report-marker";
+        button.textContent = "!";
+        button.setAttribute("aria-label", `${REPORT_LABEL[report.category]}: ${report.note || "Crew hazard report"}`);
+        button.setAttribute("aria-pressed", String(report.id === selectedId));
+        button.addEventListener("click", (event) => { event.stopPropagation(); callbacks.current.onSelect?.(report.id); });
+        markers.current.push(new Marker({ element: button }).setLngLat([report.lon, report.lat]).addTo(map.current));
+        bounds.extend([report.lon, report.lat]);
+      }
+      if (pin) {
+        const element = document.createElement("div");
+        element.className = "report-marker report-marker--draft";
+        element.textContent = "+";
+        element.setAttribute("role", "img");
+        element.setAttribute("aria-label", "Your hazard location");
+        markers.current.push(new Marker({ element }).setLngLat([pin.lon, pin.lat]).addTo(map.current));
+      }
+      if (!fitted.current && reports.length) {
+        map.current.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
+        fitted.current = true;
+      }
+    });
+    return () => { disposed = true; };
+  }, [ready, reports, pin, selectedId]);
+
+  useEffect(() => {
+    const location = pin ?? reports.find((report) => report.id === selectedId);
+    if (ready && location) map.current?.easeTo({ center: [location.lon, location.lat], zoom: Math.max(map.current.getZoom(), 14), duration: 0 });
+  }, [ready, pin, selectedId, reports]);
+
+  return (
+    <div className="relative">
+      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card border border-border sm:h-96" />
+      {error && <p role="status" className="absolute top-3 left-3 max-w-56 rounded-card border border-border bg-surface p-2 text-sm text-muted">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
+      {onPin && <button type="button" disabled={!ready} onClick={() => {
+        const center = map.current?.getCenter().wrap();
+        if (center) onPin({ lat: center.lat, lon: center.lng });
+      }} className="mt-2 min-h-11 rounded-card border border-border bg-surface px-4 text-sm font-semibold text-brand disabled:opacity-50">Use map center as pin</button>}
+    </div>
+  );
+}

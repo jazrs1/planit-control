@@ -224,16 +224,46 @@ export interface BriefingKeyNumbers {
   wildfire_detections_25mi: number;
 }
 
+/** Headline decision for tomorrow, made by the backend (never by the text writer). */
+export type GoStatus = "go" | "caution" | "no_go";
+
 export interface Briefing {
   site_id: string;
   site_name: string;
   /** Local date the briefing covers (tomorrow), YYYY-MM-DD. */
   for_date: string;
-  /** Sent at 18:00 site-local time the evening before. */
+  /** Sent at 18:00 site-local time the evening before (or when POST /briefing/send-now ran). */
   generated_at: string;
   top_hazard: HazardType;
+  /** The full briefing, under 150 words: headline line, "Top risks:", "Actions:". */
   text: string;
   key_numbers: BriefingKeyNumbers;
+  go_status?: GoStatus | null;
+  headline?: string | null;
+  /** Top 3 risks, most important first, each with when it happens. */
+  risks?: string[] | null;
+  actions?: string[] | null;
+  /** Tomorrow's top contributing factors behind key_numbers.hazard_index. */
+  top_factors?: ContributingFactor[] | null;
+  /** "gemini" when the model wrote it and it passed the grounding check, else "template". */
+  generator?: "gemini" | "template" | null;
+  model?: string | null;
+  /** key_numbers fields with no live data behind them (their value is 0), e.g. wildfire without a FIRMS key. */
+  unavailable?: (keyof BriefingKeyNumbers)[] | null;
+}
+
+// ---------- POST /briefing/send-now ----------
+
+export interface SendBriefingRequest {
+  /** One site, or omit/null for all sites. */
+  site_id?: string | null;
+}
+
+export interface SendBriefingResponse {
+  /** One site: generated right away. */
+  generated: Briefing[];
+  /** All sites: number queued to generate in the background (check GET /briefing/{site_id}). */
+  queued: number;
 }
 
 // ---------- GET /lightning/recent?minutes=15 ----------
