@@ -8,7 +8,7 @@ import SiteCard from "@/components/SiteCard";
 import SiteScoreHistory from "@/components/SiteScoreHistory";
 import InfoButton from "@/components/InfoButton";
 import SiteMap, { LIGHTNING_WINDOW_MIN, type MapLayers } from "@/components/SiteMap";
-import { DEMO_DATA, getFires, getLightningCells, getLightningRecent, getReports, getSites, getWildlife } from "@/lib/api";
+import { DEMO_DATA, getFires, getLightningCells, getLightningCounts, getLightningRecent, getReports, getSites, getWildlife } from "@/lib/api";
 import { cellUnconfirmed } from "@/lib/lightning";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
@@ -47,6 +47,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const [liveFlashes, setLiveFlashes] = useState<LightningFlash[]>([]);
   const [flashesFailed, setFlashesFailed] = useState(false);
   const [liveCells, setLiveCells] = useState<LightningCell[] | null>(null);
+  // Uncapped real and replay counts (#48); null until the server has the endpoint.
+  const [flashCounts, setFlashCounts] = useState<{ real: number; replay: number } | null>(null);
   const [cellsFailed, setCellsFailed] = useState(false);
   // Same alerts as the nav badge and /alerts (AlertsProvider), so the counts always agree.
   const { alerts: knownAlerts, status: alertsStatus, replay, setDemo, refresh: refreshAlerts, connection } = useAlertsState();
@@ -66,7 +68,10 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // During a replay /lightning/recent runs on the simulated clock, so it returns only the replay's
   // flashes, timestamped in the recorded storm. A real flash is never more than minutes old in real
   // time, so a flash hours older than real time can only be a replay one: drawn blue, counted apart.
+  // The API is adding an explicit per-flash replay flag; use it when present, the age rule otherwise.
   const isReplayFlash = useCallback((flash: LightningFlash) => {
+    const flag = (flash as LightningFlash & { replay?: boolean }).replay;
+    if (typeof flag === "boolean") return flag;
     const ts = Date.parse(flash.ts);
     return Number.isFinite(ts) && Date.now() - ts > REPLAY_FLASH_AGE_MS;
   }, []);
@@ -78,6 +83,10 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const lastOnlineNow = useRef<number | null>(null);
   const lightningStale = !demo && (offline || flashesFailed);
   const nowMs = lightningStale && lastOnlineNow.current !== null ? lastOnlineNow.current : serverNow();
+  // Real flashes fade on real time (the server clock is the storm's during a replay); frozen the same way.
+  const lastOnlineReal = useRef<number | null>(null);
+  const realFlashNowMs = lightningStale && lastOnlineReal.current !== null ? lastOnlineReal.current : Date.now();
+  useEffect(() => { if (!lightningStale) lastOnlineReal.current = realFlashNowMs; });
   useEffect(() => { if (!lightningStale) lastOnlineNow.current = nowMs; });
   const cellsUnconfirmed = !demo && (offline || cellsFailed);
   // Each quiet cell is already drawn as unconfirmed; the legend only says so when every cell is.
@@ -112,7 +121,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     }
   }, []);
   const pollLightning = useCallback(async () => {
-    const [flashes, cells] = await Promise.allSettled([getLightningRecent(LIGHTNING_WINDOW_MIN), getLightningCells()]);
+    const [flashes, cells, counts] = await Promise.allSettled([getLightningRecent(LIGHTNING_WINDOW_MIN), getLightningCells(), getLightningCounts(LIGHTNING_WINDOW_MIN)]);
+    // Before #48 is deployed the counts endpoint is missing: fall back to counting the flashes we have.
+    setFlashCounts(counts.status === "fulfilled" ? { real: counts.value.real, replay: counts.value.replay } : null);
     if (flashes.status === "fulfilled") { setLiveFlashes(flashes.value); setFlashesFailed(false); }
     else setFlashesFailed(true);
     if (cells.status === "fulfilled") { setLiveCells(cells.value); setCellsFailed(false); }
@@ -216,8 +227,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const pointsText = (count: number, loaded: boolean, failed: boolean, unit: string) =>
     !loaded ? failed ? "Unavailable · can't load" : "Loading…" : failed ? `${count} ${unit} · last known` : `${count} ${unit}`;
   // Real and replay flashes counted apart, never mixed. During a replay the real ones aren't available.
-  const replayFlashCount = flashes.filter(isReplayFlash).length;
-  const realFlashCount = flashes.length - replayFlashCount;
+  const replayFlashCount = !demo && flashCounts ? flashCounts.replay : flashes.filter(isReplayFlash).length;
+  const realFlashCount = !demo && flashCounts ? flashCounts.real : flashes.length - flashes.filter(isReplayFlash).length;
   const stale = lightningStale ? " · last known" : "";
   const flashText = replaying || replayFlashCount > 0
     ? `${realFlashCount ? `${realFlashCount.toLocaleString()} real` : "real not shown during a replay"} · ${replayFlashCount.toLocaleString()} replay${stale}`
@@ -247,7 +258,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
       ) : (
         <>
           <section ref={map} aria-label="Florida site safety map" className="pc-dash-map relative h-[min(56svh,30rem)] min-h-80 lg:absolute lg:inset-0 lg:h-auto">
-            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} focusKey={focusKey} isReplayFlash={isReplayFlash} callouts />
+            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} focusKey={focusKey} isReplayFlash={isReplayFlash} realFlashNowMs={realFlashNowMs} callouts />
             <details ref={layersPanel} data-map-avoid className="pc-float group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)]">
               <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3">
                 <span className="flex items-center gap-2 text-sm font-semibold">

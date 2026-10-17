@@ -21,11 +21,13 @@ export const LIGHTNING_WINDOW_MIN = 15;
 const TILE_RECOVERY_MS = 3_000;
 
 /** Newest flash: opacity 1 and largest; a flash at the end of the window: faint (0.3) and small, but still findable. */
-function lightningGeoJson(flashes: LightningFlash[], nowMs: number, isReplay: (flash: LightningFlash) => boolean): GeoJSON.FeatureCollection<GeoJSON.Point> {
+/** Replay flashes age on the replay clock (`nowMs`); real ones on real time (`realNowMs`), since the
+ *  server clock is set back to the storm's date during a replay. */
+function lightningGeoJson(flashes: LightningFlash[], nowMs: number, realNowMs: number, isReplay: (flash: LightningFlash) => boolean): GeoJSON.FeatureCollection<GeoJSON.Point> {
   const windowMs = LIGHTNING_WINDOW_MIN * 60_000;
   const features = flashes.map((flash) => {
-    const age = Math.min(1, Math.max(0, (nowMs - Date.parse(flash.ts)) / windowMs));
     const replay = isReplay(flash);
+    const age = Math.min(1, Math.max(0, ((replay ? nowMs : realNowMs) - Date.parse(flash.ts)) / windowMs));
     return {
       type: "Feature" as const,
       geometry: { type: "Point" as const, coordinates: [flash.lon, flash.lat] },
@@ -77,6 +79,8 @@ type SiteMapProps = {
   layers?: MapLayers;
   /** Crew hazard reports to pin on the map (newest first). */
   reports?: HazardReport[];
+  /** Real time for real flashes' fade (frozen like flashNowMs when lightning data is stale). */
+  realFlashNowMs?: number;
   /** Which flashes belong to a storm replay (drawn blue, never as real lightning). */
   isReplayFlash?: (flash: LightningFlash) => boolean;
   /** Satellite fire detections, last 24 h. */
@@ -100,7 +104,7 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0, isReplayFlash = NO_REPLAY }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0, isReplayFlash = NO_REPLAY, realFlashNowMs }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -175,9 +179,10 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     if (!styleLoaded || !instance) return;
     const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo);
     // Paint needs real colors, so resolve them from tokens.css (light or dark).
-    const ink = resolveColor("--pc-risk-amber");
+    const ink: ExpressionSpecification = ["case", ["get", "replay"], resolveColor("--pc-notice"), resolveColor("--pc-risk-amber")];
     const muted = resolveColor("--pc-text-muted");
-    const fill = resolveColor("--pc-risk-amber-solid");
+    const amberFill = resolveColor("--pc-risk-amber-solid");
+    const fill: ExpressionSpecification = ["case", ["get", "replay"], resolveColor("--pc-notice"), amberFill];
     const source = instance.getSource<GeoJSONSource>(CELLS_SOURCE);
     if (source) {
       void source.setData(data);
@@ -213,7 +218,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   useEffect(() => {
     const instance = map.current;
     if (!styleLoaded || !instance) return;
-    const data = lightningGeoJson(flashes, flashNowMs, isReplayFlash);
+    const data = lightningGeoJson(flashes, flashNowMs, realFlashNowMs ?? flashNowMs, isReplayFlash);
     // Replay flashes are blue like every replay mark; real ones keep the lightning yellow.
     const flash: ExpressionSpecification = ["case", ["get", "replay"], resolveColor("--pc-lightning-replay"), resolveColor("--pc-lightning")];
     const ring = resolveColor("--pc-lightning-ring");
@@ -247,7 +252,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         "circle-stroke-opacity": ["*", 0.7, ["get", "opacity"]],
       },
     });
-  }, [styleLoaded, flashes, flashNowMs, isReplayFlash]);
+  }, [styleLoaded, flashes, flashNowMs, realFlashNowMs, isReplayFlash]);
 
   // The layers panel hides whole layers; the data keeps updating underneath.
   useEffect(() => {
