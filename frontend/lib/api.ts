@@ -1,4 +1,4 @@
-import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
@@ -10,7 +10,7 @@ import mockReports from "@shared/mocks/reports.json";
 import { markFailure, markSuccess } from "@/lib/connection";
 import { demoCodeHeaders } from "@/lib/demoCode";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 
 /** The backend answered with an error status (as opposed to being unreachable). */
 export class ApiRequestError extends Error {
@@ -57,6 +57,10 @@ export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encod
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
 export const getLightningCells = () => request<LightningCellsResponse>("/lightning/cells");
+/** Evaluation artifacts, never demo data. Bound the wait so the explanation remains available offline. */
+export const getModelInfo = () => request<ModelInfo>("/model/info", { signal: AbortSignal.timeout(10_000) });
+/** The plot path comes from /model/info and belongs to the API host, not the frontend host. */
+export const modelCalibrationUrl = (path: ModelInfo["calibration"]["plot_url"]) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 /** Latest briefing for every site in one request (cached on the server). */
 export const getBriefings = () => request<BriefingsResponse>("/briefings");
 /** 404 means the site has no briefing yet (see ApiRequestError.status). */
