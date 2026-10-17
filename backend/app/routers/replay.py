@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from psycopg_pool import ConnectionPool
 from pydantic import TypeAdapter
 
+from alerts import approach
 from app.admin import require_admin
 from app.cache import api_cache
 from app.db import get_pool
@@ -53,18 +56,27 @@ def _timeline_or_503(window: str) -> dict:
 
 
 @router.get("/events", response_model=list[ReplayEvent])
-def replay_events():
-    """Every event of the current or most recent replay run's storm, oldest first: stop-work starts,
-    approach starts and all clears, at simulated times. The whole storm is listed as soon as the replay
-    starts (lightning/timeline.py works it out ahead of time with the same rules), so show only events
-    at or before ReplayStatus.simulated_now. Replay only: never live events. [] before any replay."""
+def replay_events(pool: ConnectionPool = Depends(get_pool)):
+    """The current or most recent replay run's events, oldest first, at simulated times. Stop-work starts
+    and all clears cover the whole storm as soon as the replay starts (lightning/timeline.py works them
+    out ahead of time from strike times), so show only events at or before ReplayStatus.simulated_now.
+    Approach starts are the advisories the app actually stored during this run, so they appear as they
+    happen and never include one that wasn't shown. Replay only: never live events. [] before any replay."""
     window = replay.runner.window
     if window is None:
         return Response(b"[]", media_type="application/json")
     found = _timeline_or_503(window)
-    return Response(api_cache.get_or_compute(("replay-events", window),
-                                             lambda: _events.dump_json(_events.validate_python(timeline.events(found)))),
-                    media_type="application/json")
+
+    def compute() -> bytes:
+        with pool.connection() as conn:
+            stored = approach.replay_approach_starts(conn)
+        merged = sorted(timeline.events(found) + stored,
+                        key=lambda e: (e["at"] if isinstance(e["at"], datetime) else datetime.fromisoformat(e["at"]),
+                                       e["kind"], e["site_id"]))
+        return _events.dump_json(_events.validate_python(merged))
+
+    # Advisory changes clear the cache (alerts/approach.py run()), like every alert change.
+    return Response(api_cache.get_or_compute(("replay-events", window), compute), media_type="application/json")
 
 
 @router.get("/series", response_model=ReplaySeries)

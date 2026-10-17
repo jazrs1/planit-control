@@ -430,9 +430,11 @@ export interface ReplayStatus {
 export type ReplayEventKind = "stop_work_start" | "approach_start" | "all_clear" | "flood_start";
 
 /** GET /replay/events: ReplayEvent[], oldest first, for the current or most recent replay run only
- * (never live events). The WHOLE storm is listed as soon as the replay starts (worked out ahead of time
- * with the same rules), so show only events with `at` <= ReplayStatus.simulated_now. 503 with
- * Retry-After for ~30 s the first time a window is used on a server. */
+ * (never live events). Stop-work starts and all clears cover the WHOLE storm as soon as the replay
+ * starts (worked out ahead of time from strike times), so show only events with `at` <=
+ * ReplayStatus.simulated_now. Approach starts are the advisories the app actually issued in this run,
+ * so they appear as they happen. 503 with Retry-After for ~30 s the first time a window is used on a
+ * server. */
 export interface ReplayEvent {
   id: string;
   /** Simulated time: the first strike for stop_work_start (= Alert.started_at), the all-clear time
@@ -440,7 +442,8 @@ export interface ReplayEvent {
   at: string;
   kind: ReplayEventKind;
   site_id: string;
-  /** Strike distance for stop_work_start, leading-edge distance for approach_start; null otherwise. */
+  /** Strike distance for stop_work_start; for approach_start, the leading edge's distance at the
+   * advisory's last update (its distance when issued isn't stored); null otherwise. */
   distance_mi: number | null;
 }
 

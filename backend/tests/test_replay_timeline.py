@@ -4,15 +4,19 @@ the tests don't need the 150 MB replay download."""
 
 import json
 import math
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
+import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from psycopg.rows import dict_row
 
 from alerts import approach, engine
 from app.cache import api_cache
-from app.config import BACKEND_DIR
+from app.config import BACKEND_DIR, get_settings
+from app.db import get_pool
 from app.routers import replay as replay_route
 from app.schemas import LightningApproach, ReplayEvent, ReplaySeries, ReplayStatus
 from lightning import cells as cellmod
@@ -122,14 +126,29 @@ def test_built_once_saved_and_rebuilt_when_files_change(storm):
 
 # ---------- routes ----------
 
+class FakePool:
+    def __init__(self, conn=None):
+        self.conn = conn
+
+    @contextmanager
+    def connection(self, timeout=None):
+        yield self.conn
+
+
+STORED: list[dict] = []   # what approach.replay_approach_starts returns in route tests
+
+
 @pytest.fixture
 def client(monkeypatch):
     api_cache.invalidate()
+    STORED.clear()
     monkeypatch.setattr(runner, "window", None)
     monkeypatch.setattr(runner, "ended_at", None)
     monkeypatch.setattr(runner, "times", None)
+    monkeypatch.setattr(approach, "replay_approach_starts", lambda conn: list(STORED))
     app = FastAPI()
     app.include_router(replay_route.router)
+    app.dependency_overrides[get_pool] = FakePool
     yield TestClient(app)
     api_cache.invalidate()
 
@@ -154,12 +173,58 @@ def test_events_and_series_after_a_run(client, storm, monkeypatch):
     monkeypatch.setattr(runner, "window", WINDOW)
     monkeypatch.setattr(runner, "times", timeline.window_times(WINDOW))
     monkeypatch.setattr(runner, "ended_at", T0 + 12 * MIN)   # stopped early
+    STORED.append({"id": "adv_test1", "at": T0 + 20 * MIN, "kind": "approach_start", "site_id": "test-a",
+                   "distance_mi": 14.2})
     events = [ReplayEvent(**e) for e in client.get("/replay/events").json()]
-    assert [e.kind for e in events] == ["stop_work_start", "all_clear", "stop_work_start", "all_clear"]
+    assert [(e.kind, e.id) for e in events] == [
+        ("stop_work_start", f"{WINDOW}:0"), ("approach_start", "adv_test1"), ("all_clear", f"{WINDOW}:1"),
+        ("stop_work_start", f"{WINDOW}:2"), ("all_clear", f"{WINDOW}:3")]   # merged, oldest first
     series = ReplaySeries(**client.get("/replay/series").json())
     assert [b.start for b in series.bins] == [T0, T0 + 5 * MIN, T0 + 10 * MIN]
     status = ReplayStatus(**client.get("/replay/status").json())
     assert status.window_start == T0 and status.quiet_until == T0 + 71 * MIN
+
+
+def test_precomputed_approach_starts_are_never_served(client, storm, monkeypatch):
+    """The forecast run ahead of time predicts an advisory; the app (STORED) never issued it."""
+    issue_at = T0 + 105 * 20 * SEC + 20 * SEC   # 17:35:20, between the two stop-works
+
+    def arrivals(sites, found, stop_work, now):
+        hit = now == issue_at and "test-a" not in stop_work
+        return {"test-a": cellmod.Arrival("c1", now + 20 * MIN, 20, 250.0, 17.9, 18.0, 70.0, 40) if hit else None}
+    monkeypatch.setattr(approach, "arrivals_for", arrivals)
+    built = timeline.build(WINDOW)
+    assert any(e["kind"] == "approach_start" for e in built["events"])        # it's in the file, for checks
+    monkeypatch.setattr(runner, "window", WINDOW)
+    kinds = [e["kind"] for e in client.get("/replay/events").json()]
+    assert "approach_start" not in kinds and kinds.count("stop_work_start") == 2
+
+
+@pytest.fixture
+def conn():
+    url = get_settings().database_url
+    if not url:
+        pytest.skip("DATABASE_URL not set")
+    with psycopg.connect(url, row_factory=dict_row, connect_timeout=15) as conn:
+        try:
+            yield conn
+        finally:
+            conn.rollback()
+
+
+def test_stored_replay_advisories_become_approach_starts(conn):
+    def add(replay, at, dist):
+        return conn.execute(
+            """INSERT INTO lightning_advisories (site_id, replay, status, started_at, updated_at, arrival_at, first_arrival_at,
+                                                 from_bearing_deg, heading_deg, speed_mph, distance_mi, cell_flashes)
+               VALUES ('big-bend', %s, 'cleared', %s, %s, %s, %s, 250, 70, 18, %s, 40) RETURNING id""",
+            (replay, at, at, at + 20 * MIN, at + 20 * MIN, dist)).fetchone()["id"]
+    replayed, live = add(True, T0, 14.25), add(False, T0, 9.0)
+    starts = {e["id"]: e for e in approach.replay_approach_starts(conn)}
+    assert live not in starts                                  # never live advisories
+    assert starts[replayed] == {"id": replayed, "at": T0, "kind": "approach_start", "site_id": "big-bend",
+                                "distance_mi": 14.2}
+    ReplayEvent(**starts[replayed])
 
 
 # ---------- the replay flag on advisories ----------

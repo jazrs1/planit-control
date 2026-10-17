@@ -252,6 +252,21 @@ def summarize(rows: list[dict]) -> dict:
             "median_lead_min": median}
 
 
+def replay_approach_starts(conn: Connection) -> list[dict]:
+    """GET /replay/events' approach_start events: every advisory the app stored during the replay
+    (replay = true; replay start clears the previous run's). distance_mi is the leading-edge distance at
+    the advisory's last update: the distance when it was issued isn't stored. [] before migration 008."""
+    try:
+        with conn.transaction():   # savepoint, so a missing table can't abort the caller's transaction
+            rows = conn.execute(
+                """SELECT id, started_at, site_id, distance_mi FROM lightning_advisories
+                   WHERE replay ORDER BY started_at, id""").fetchall()
+    except psycopg.errors.UndefinedTable:
+        return []
+    return [{"id": r["id"], "at": r["started_at"], "kind": "approach_start", "site_id": r["site_id"],
+             "distance_mi": round(r["distance_mi"], 1)} for r in rows]
+
+
 def replay_report(conn: Connection) -> dict:
     """Lead times from the last app replay's stored rows (replay alerts and advisories)."""
     stops = conn.execute("SELECT site_id, started_at FROM alerts WHERE replay AND type = %s ORDER BY started_at",

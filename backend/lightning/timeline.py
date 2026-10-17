@@ -4,8 +4,9 @@ A replay window's files never change, and the stop-work engine and the forecast 
 the events a replay will produce can be computed before it plays: same files, same cycles (one per GLM
 file at the file's start + 20 s, then one every 20 s through the 31-minute quiet tail), same rules
 (alerts/engine.py newest_qualifying_strikes + decide, alerts/approach.py plan). That is what lets
-GET /replay/events list the whole storm as soon as a replay starts. The frontend shows only the events
-at or before ReplayStatus.simulated_now.
+GET /replay/events list the whole storm's stop-work starts and all clears as soon as a replay starts (the
+frontend shows only the events at or before ReplayStatus.simulated_now). Approach starts are not served
+from here: the route reads the advisories the app stored (see PRECOMPUTED_KINDS).
 
 It is computed in memory (nothing is written to the database), takes ~30 s of CPU per window, and is
 saved as data/replay/<window>/timeline.json, tagged with a fingerprint of the files and of the rule
@@ -13,8 +14,9 @@ code, so a rule change rebuilds it. The API builds missing timelines in the back
 
 Known difference from a live replay run: the app runs the forecast on a background thread and skips a
 cycle while the previous one is still running (lightning/alert_hook.py), so at high speeds an approach
-advisory can start a cycle or two later in the app, or (rarely) not at all. Stop-work starts and
-all clears come from strike times and match exactly. docs/replay-timeline.md has the staging check.
+advisory can start a cycle or two later in the app, or (rarely) not at all. That's why only stop-work
+starts and all clears (from strike times, an exact match) are served from here. docs/replay-timeline.md
+has the staging check.
 """
 
 import hashlib
@@ -218,8 +220,16 @@ def building(window: str) -> bool:
 
 # ---------- what the API serves ----------
 
+# Served from the precomputed timeline: they come from strike times and matched a stored replay exactly.
+# Approach starts are not: GET /replay/events takes them from the advisories the app stored, because the
+# app's forecast can skip a cycle under load and the precomputed list would then show an advisory that
+# never appeared.
+PRECOMPUTED_KINDS = ("stop_work_start", "all_clear")
+
+
 def events(timeline: dict) -> list[dict]:
-    return timeline["events"]
+    """The precomputed stop-work starts and all clears (approach starts stay in the file for checks)."""
+    return [e for e in timeline["events"] if e["kind"] in PRECOMPUTED_KINDS]
 
 
 def series(timeline: dict, until: datetime) -> list[dict]:

@@ -15,9 +15,13 @@ A replay window's files never change, and the stop-work engine and the forecast 
 
 It records every stop-work start, all clear and approach start, plus flashes per minute and when each stop-work was showing.
 
+**What's served from it, and what isn't:**
+- **Stop-work starts and all clears** come from it. They come from strike times and match a stored replay exactly.
+- **Approach starts don't.** `/replay/events` takes them from the advisories the app actually stored during the run (`lightning_advisories`, `replay = true`; `approach.replay_approach_starts`). The app's forecast can skip a cycle under load, so a precomputed advisory might never have appeared. The precomputed ones stay in `timeline.json` only for checks like the one below.
+
 **Cost and storage.** That takes about 30 s of CPU. The result is saved as `data/replay/<window>/timeline.json` and rebuilt only when the window's files or the rule code change (it keeps a fingerprint of both). The API builds missing timelines on a background thread at startup, and again when a replay starts. Until one is ready, both routes answer **503 with `Retry-After: 5`**.
 
-**Why precompute.** It means `/replay/events` can list the **whole storm the moment a replay starts**. The frontend shows only events at or before `ReplayStatus.simulated_now`. `/replay/series` never shows anything past simulated now: the bin still in progress counts only up to now.
+**Why precompute.** It means `/replay/events` can list the **whole storm's stop-work starts and all clears the moment a replay starts**. The frontend shows only events at or before `ReplayStatus.simulated_now`. Approach starts appear as the app issues them. `/replay/series` never shows anything past simulated now: the bin still in progress counts only up to now.
 
 ## Endpoints
 
@@ -30,7 +34,7 @@ It records every stop-work start, all clear and approach start, plus flashes per
 **What each `at` means:**
 - `stop_work_start`: the first strike, the same as `Alert.started_at`.
 - `all_clear`: the all-clear time.
-- `approach_start`: the cycle the advisory was issued.
+- `approach_start`: the cycle the advisory was issued. Its `distance_mi` is the leading edge's distance at the advisory's last update, because the distance when it was issued isn't stored.
 
 `flood_start` is in the type for later; flood alerts are live-only, so a replay has none.
 
@@ -53,4 +57,4 @@ I replayed the window on the staging database (lightning ingest, pollers and pus
 
 **Why approach starts can differ.** The app runs the forecast on a background thread and skips a cycle while the previous one is still running (`lightning/alert_hook.py`). So under load an advisory can start a cycle later, or (rarely) not at all. This run was slowed by building the timeline at the same time.
 
-**What that means for the UI.** Stop-work and all-clear markers are exact. An approach marker is right to about half a minute, and can occasionally mark an advisory the app never showed. If that matters, the approach markers can come from the stored advisories instead; they only exist once they've happened.
+**What that means for the UI.** This is why approach starts are served from the stored advisories: the timeline marks only advisories that actually appeared, at the time they appeared. On this run, that's 18 approach starts with no Shady Hills. Stop-work and all-clear markers are precomputed and exact.
