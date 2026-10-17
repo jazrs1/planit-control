@@ -6,8 +6,10 @@
 Steps: download the newest EIA-860M workbook -> read the "Operating" sheet ->
 keep Florida generators -> group into one row per plant -> pick 55 plants
 (largest first, with regional minimums, no co-located duplicates) -> add IANA timezone -> write JSON.
+Also writes every Florida plant that burns fuel or makes steam to fl_thermal_plants.json: NASA FIRMS
+detections at those plants are plant heat, not wildfire (hazards/sources/firms.py).
 
-The raw workbook goes to backend/data/raw/ (gitignored). Only sites.json is committed,
+The raw workbook goes to backend/data/raw/ (gitignored). Only the two JSON files are committed,
 so the app never downloads anything at runtime. Needs: pip install -r scripts/requirements.txt
 """
 
@@ -25,6 +27,9 @@ from openpyxl import load_workbook
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = BACKEND_DIR / "data" / "raw"
 OUT_FILE = BACKEND_DIR / "data" / "sites.json"
+THERMAL_FILE = BACKEND_DIR / "data" / "fl_thermal_plants.json"
+# Technologies with no stack or flare: a satellite hot spot there may be a real fire.
+NOT_THERMAL = {"Solar Photovoltaic", "Batteries", "Conventional Hydroelectric", "Onshore Wind Turbine", "Flywheels"}
 
 EIA_BASE = "https://www.eia.gov"
 EIA_PAGE = f"{EIA_BASE}/electricity/data/eia860m/"
@@ -274,6 +279,11 @@ def main() -> None:
     }
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(json.dumps(out, indent=2) + "\n")
+    thermal = sorted((p for p in plants if p["technology"] not in NOT_THERMAL), key=lambda p: p["plant_id"])
+    THERMAL_FILE.write_text(json.dumps({
+        "source": out["source"],
+        "plants": [{k: p[k] for k in ("plant_id", "name", "technology", "lat", "lon")} for p in thermal],
+    }, indent=1) + "\n")
 
     central = sum(s["timezone"] == "America/Chicago" for s in selected)
     regions = Counter(region(s) for s in selected)
@@ -283,7 +293,8 @@ def main() -> None:
     print("By region:             " + ", ".join(f"{r} {regions[r]}" for r in REGION_MINIMUMS))
     for p, near in skipped.values():
         print(f"  skipped co-located {p['name']} ({miles_between(p, near):.2f} mi from {near['name']})")
-    print(f"Wrote {OUT_FILE.relative_to(BACKEND_DIR)}")
+    print(f"Thermal plants:        {len(thermal)} (for FIRMS plant hot spots)")
+    print(f"Wrote {OUT_FILE.relative_to(BACKEND_DIR)} and {THERMAL_FILE.relative_to(BACKEND_DIR)}")
 
 
 if __name__ == "__main__":

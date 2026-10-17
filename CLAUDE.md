@@ -75,7 +75,7 @@ Changing the contract: update `shared/types.ts`, `backend/app/schemas.py`, and t
 - **Time:** in the backend, get the current time from `app.clock.now()`, never `datetime.now()`. During lightning replay it returns the simulated time, which is what makes replay behave like live.
 - **Lightning:** `backend/lightning/glm.py` ingests GOES-19 GLM files into `lightning_flashes` (Florida + 30 mi). Live polling (`live.py`, every 20 s, `LIGHTNING_INGEST_ENABLED`) and replay (`replay.py`) both go through `glm.ingest_cycle()`. The hook `lightning/alert_hook.py` runs the stop-work alert engine (`backend/alerts/engine.py`, explained in `docs/alert-engine.md`) every cycle. Alert changes are logged in `alert_events`; replay alerts are stored with `replay = true` and never mix with live ones.
 - **Tests:** `cd backend && pip install -r requirements-dev.txt && python -m pytest`. Database tests run inside a rolled-back transaction and are skipped without `DATABASE_URL`.
-- **Data downloads** (EIA workbooks, FIRMS CSVs, rasters, etc.) go in a `data/` folder, which is gitignored. Exception: `backend/data/sites.json` is committed so the app never downloads at runtime. Rebuild it with `cd backend && python -m scripts.load_sites`.
+- **Data downloads** (EIA workbooks, FIRMS CSVs, rasters, etc.) go in a `data/` folder, which is gitignored. Exceptions: `backend/data/sites.json` and `backend/data/fl_thermal_plants.json` (every Florida plant that burns fuel or makes steam; FIRMS hot spots within 1 km of one are plant heat, not wildfire) are committed so the app never downloads at runtime. Rebuild both with `cd backend && python -m scripts.load_sites`.
 
 ## Running locally
 

@@ -1,0 +1,789 @@
+{
+ "source": "EIA-860M august_generator2026.xlsx, Operating sheet",
+ "plants": [
+  {
+   "plant_id": 136,
+   "name": "Seminole (FL)",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 29.73306,
+   "lon": -81.63278
+  },
+  {
+   "plant_id": 564,
+   "name": "Stanton Energy Center",
+   "technology": "Conventional Steam Coal",
+   "lat": 28.4822,
+   "lon": -81.1678
+  },
+  {
+   "plant_id": 609,
+   "name": "Cape Canaveral",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.4698,
+   "lon": -80.7644
+  },
+  {
+   "plant_id": 612,
+   "name": "Fort Myers",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 26.6967,
+   "lon": -81.7831
+  },
+  {
+   "plant_id": 613,
+   "name": "Lauderdale",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 26.0686,
+   "lon": -80.1984
+  },
+  {
+   "plant_id": 617,
+   "name": "Port Everglades",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 26.0856,
+   "lon": -80.1253
+  },
+  {
+   "plant_id": 619,
+   "name": "Riviera",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 26.7653,
+   "lon": -80.0525
+  },
+  {
+   "plant_id": 620,
+   "name": "Sanford",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.8419,
+   "lon": -81.3256
+  },
+  {
+   "plant_id": 621,
+   "name": "Turkey Point",
+   "technology": "Nuclear",
+   "lat": 25.4356,
+   "lon": -80.3308
+  },
+  {
+   "plant_id": 627,
+   "name": "Bayboro",
+   "technology": "Petroleum Liquids",
+   "lat": 27.75806,
+   "lon": -82.63528
+  },
+  {
+   "plant_id": 628,
+   "name": "Crystal River",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.9656,
+   "lon": -82.6977
+  },
+  {
+   "plant_id": 634,
+   "name": "P L Bartow",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.85954,
+   "lon": -82.60176
+  },
+  {
+   "plant_id": 638,
+   "name": "Suwannee River",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.37639,
+   "lon": -83.18056
+  },
+  {
+   "plant_id": 641,
+   "name": "Gulf Clean Energy Center",
+   "technology": "Natural Gas Steam Turbine",
+   "lat": 30.5661,
+   "lon": -87.2244
+  },
+  {
+   "plant_id": 643,
+   "name": "Lansing Smith",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 30.2686,
+   "lon": -85.7003
+  },
+  {
+   "plant_id": 645,
+   "name": "Big Bend",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.7944,
+   "lon": -82.4036
+  },
+  {
+   "plant_id": 663,
+   "name": "Deerhaven Generating Station",
+   "technology": "Natural Gas Steam Turbine",
+   "lat": 29.7592,
+   "lon": -82.3878
+  },
+  {
+   "plant_id": 664,
+   "name": "John R Kelly",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 29.6461,
+   "lon": -82.3208
+  },
+  {
+   "plant_id": 665,
+   "name": "G W Ivey",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 25.4756,
+   "lon": -80.47
+  },
+  {
+   "plant_id": 666,
+   "name": "J D Kennedy",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.36482,
+   "lon": -81.62597
+  },
+  {
+   "plant_id": 667,
+   "name": "Northside Generating Station",
+   "technology": "Conventional Steam Coal",
+   "lat": 30.4172,
+   "lon": -81.5525
+  },
+  {
+   "plant_id": 673,
+   "name": "Tom G Smith",
+   "technology": "Petroleum Liquids",
+   "lat": 26.61277,
+   "lon": -80.0677
+  },
+  {
+   "plant_id": 675,
+   "name": "Larsen Memorial",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.0491,
+   "lon": -81.9238
+  },
+  {
+   "plant_id": 676,
+   "name": "C D McIntosh Jr",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.0801,
+   "lon": -81.9229
+  },
+  {
+   "plant_id": 683,
+   "name": "Indian River Plant",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.49323,
+   "lon": -80.78012
+  },
+  {
+   "plant_id": 688,
+   "name": "Arvah B Hopkins",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 30.4522,
+   "lon": -84.4
+  },
+  {
+   "plant_id": 689,
+   "name": "S O Purdom",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 30.1623,
+   "lon": -84.20067
+  },
+  {
+   "plant_id": 6042,
+   "name": "Manatee",
+   "technology": "Natural Gas Steam Turbine",
+   "lat": 27.6058,
+   "lon": -82.3456
+  },
+  {
+   "plant_id": 6043,
+   "name": "Martin",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.0536,
+   "lon": -80.5628
+  },
+  {
+   "plant_id": 6045,
+   "name": "St Lucie",
+   "technology": "Nuclear",
+   "lat": 27.34861,
+   "lon": -80.24639
+  },
+  {
+   "plant_id": 6046,
+   "name": "DeBary",
+   "technology": "Petroleum Liquids",
+   "lat": 28.90386,
+   "lon": -81.33233
+  },
+  {
+   "plant_id": 6584,
+   "name": "Stock Island",
+   "technology": "Petroleum Liquids",
+   "lat": 24.56333,
+   "lon": -81.7342
+  },
+  {
+   "plant_id": 7238,
+   "name": "Cane Island",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.2764,
+   "lon": -81.533
+  },
+  {
+   "plant_id": 7242,
+   "name": "Polk",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.7286,
+   "lon": -81.9897
+  },
+  {
+   "plant_id": 7302,
+   "name": "Hines Energy Complex",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.78822,
+   "lon": -81.86998
+  },
+  {
+   "plant_id": 7345,
+   "name": "University of Florida",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 29.64028,
+   "lon": -82.34861
+  },
+  {
+   "plant_id": 7380,
+   "name": "Midulla Generating Station",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.64167,
+   "lon": -81.9625
+  },
+  {
+   "plant_id": 7699,
+   "name": "Tiger Bay",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.74637,
+   "lon": -81.84945
+  },
+  {
+   "plant_id": 7715,
+   "name": "Pea Ridge",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.59208,
+   "lon": -87.13539
+  },
+  {
+   "plant_id": 7846,
+   "name": "Brandy Branch",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 30.32056,
+   "lon": -81.94722
+  },
+  {
+   "plant_id": 7873,
+   "name": "H L Culbreath Bayside Power Station",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.9072,
+   "lon": -82.4231
+  },
+  {
+   "plant_id": 7954,
+   "name": "Field Street",
+   "technology": "Petroleum Liquids",
+   "lat": 29.0213,
+   "lon": -80.9949
+  },
+  {
+   "plant_id": 7997,
+   "name": "Winston",
+   "technology": "Petroleum Liquids",
+   "lat": 28.0274,
+   "lon": -82.0164
+  },
+  {
+   "plant_id": 8048,
+   "name": "Anclote",
+   "technology": "Natural Gas Steam Turbine",
+   "lat": 28.18444,
+   "lon": -82.78861
+  },
+  {
+   "plant_id": 8049,
+   "name": "Intercession City",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.26278,
+   "lon": -81.54861
+  },
+  {
+   "plant_id": 10004,
+   "name": "Mosaic South Pierce Operations",
+   "technology": "All Other",
+   "lat": 27.76522,
+   "lon": -81.93879
+  },
+  {
+   "plant_id": 10008,
+   "name": "Baptist Medical Center",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.31447,
+   "lon": -81.66271
+  },
+  {
+   "plant_id": 10020,
+   "name": "Cutrale Citrus Juices USA I",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.81183,
+   "lon": -81.86527
+  },
+  {
+   "plant_id": 10188,
+   "name": "Cutrale Citrus Juices USA II",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.05485,
+   "lon": -81.79817
+  },
+  {
+   "plant_id": 10202,
+   "name": "Fernandina Beach Mill",
+   "technology": "Wood/Wood Waste Biomass",
+   "lat": 30.68182,
+   "lon": -81.45541
+  },
+  {
+   "plant_id": 10204,
+   "name": "Mosaic Co Tampa Facility",
+   "technology": "All Other",
+   "lat": 27.8605,
+   "lon": -82.3903
+  },
+  {
+   "plant_id": 10275,
+   "name": "Florida's Natural Growers",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 27.9114,
+   "lon": -81.6006
+  },
+  {
+   "plant_id": 10416,
+   "name": "Pensacola Florida Plant",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.5958,
+   "lon": -87.2525
+  },
+  {
+   "plant_id": 10431,
+   "name": "Anheuser-Busch Jacksonville",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.43424,
+   "lon": -81.64535
+  },
+  {
+   "plant_id": 10434,
+   "name": "Mosaic New Wales Operations",
+   "technology": "All Other",
+   "lat": 27.83364,
+   "lon": -82.05194
+  },
+  {
+   "plant_id": 10562,
+   "name": "Fernandina Plant",
+   "technology": "Wood/Wood Waste Biomass",
+   "lat": 30.6612,
+   "lon": -81.473
+  },
+  {
+   "plant_id": 10611,
+   "name": "Georgia-Pacific Palatka Operations",
+   "technology": "Wood/Wood Waste Biomass",
+   "lat": 29.6807,
+   "lon": -81.6809
+  },
+  {
+   "plant_id": 50071,
+   "name": "Palm Beach Renewable Energy Facility 1",
+   "technology": "Municipal Solid Waste",
+   "lat": 26.77139,
+   "lon": -80.14194
+  },
+  {
+   "plant_id": 50250,
+   "name": "International Paper Pensacola",
+   "technology": "Wood/Wood Waste Biomass",
+   "lat": 30.5966,
+   "lon": -87.3264
+  },
+  {
+   "plant_id": 50310,
+   "name": "Standby Generation Plant",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 30.4736,
+   "lon": -87.2361
+  },
+  {
+   "plant_id": 50474,
+   "name": "Swift Creek Chemical Complex",
+   "technology": "All Other",
+   "lat": 30.4522,
+   "lon": -82.8644
+  },
+  {
+   "plant_id": 50482,
+   "name": "Clewiston Sugar House",
+   "technology": "Other Waste Biomass",
+   "lat": 26.7351,
+   "lon": -80.9377
+  },
+  {
+   "plant_id": 50572,
+   "name": "CSL Gas Recovery",
+   "technology": "Landfill Gas",
+   "lat": 26.28797,
+   "lon": -80.16653
+  },
+  {
+   "plant_id": 50629,
+   "name": "Covanta Lake County Energy",
+   "technology": "Municipal Solid Waste",
+   "lat": 28.74021,
+   "lon": -81.88919
+  },
+  {
+   "plant_id": 50633,
+   "name": "Mosaic Co Bartow Facility",
+   "technology": "All Other",
+   "lat": 27.908,
+   "lon": -81.9185
+  },
+  {
+   "plant_id": 50666,
+   "name": "Pasco Cnty Solid Waste Resource Recovery",
+   "technology": "Municipal Solid Waste",
+   "lat": 28.3681,
+   "lon": -82.5583
+  },
+  {
+   "plant_id": 50803,
+   "name": "Seminole Mill",
+   "technology": "Natural Gas Steam Turbine",
+   "lat": 30.4178,
+   "lon": -81.5978
+  },
+  {
+   "plant_id": 50858,
+   "name": "Hillsborough County Resource Recovery",
+   "technology": "Municipal Solid Waste",
+   "lat": 27.9549,
+   "lon": -82.34047
+  },
+  {
+   "plant_id": 50875,
+   "name": "McKay Bay Facility",
+   "technology": "Municipal Solid Waste",
+   "lat": 27.94953,
+   "lon": -82.42118
+  },
+  {
+   "plant_id": 50884,
+   "name": "Pinellas County Resource Recovery",
+   "technology": "Municipal Solid Waste",
+   "lat": 27.8733,
+   "lon": -82.6741
+  },
+  {
+   "plant_id": 50887,
+   "name": "Wheelabrator South Broward",
+   "technology": "Municipal Solid Waste",
+   "lat": 26.0687,
+   "lon": -80.1986
+  },
+  {
+   "plant_id": 50949,
+   "name": "Hardee Power Station",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.6364,
+   "lon": -81.9636
+  },
+  {
+   "plant_id": 50971,
+   "name": "Tropicana Products Bradenton",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 27.48336,
+   "lon": -82.54834
+  },
+  {
+   "plant_id": 52010,
+   "name": "Lee County Solid Waste Energy",
+   "technology": "Municipal Solid Waste",
+   "lat": 26.63155,
+   "lon": -81.76066
+  },
+  {
+   "plant_id": 54347,
+   "name": "Howard F Curren Advncd Wastewater Plant",
+   "technology": "Other Waste Biomass",
+   "lat": 27.9389,
+   "lon": -82.4389
+  },
+  {
+   "plant_id": 54365,
+   "name": "Orange Cogeneration Facility",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.87082,
+   "lon": -81.82506
+  },
+  {
+   "plant_id": 54426,
+   "name": "Mulberry Cogeneration Facility",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.8489,
+   "lon": -81.8775
+  },
+  {
+   "plant_id": 54466,
+   "name": "Orlando Cogen LP",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.44262,
+   "lon": -81.41234
+  },
+  {
+   "plant_id": 54623,
+   "name": "Central District Wastewater Treat Plant",
+   "technology": "Other Waste Biomass",
+   "lat": 25.74856,
+   "lon": -80.15279
+  },
+  {
+   "plant_id": 54624,
+   "name": "South District Wastewater Treatment Plt",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 25.54983,
+   "lon": -80.33625
+  },
+  {
+   "plant_id": 54627,
+   "name": "Okeelanta Cogeneration",
+   "technology": "Other Waste Biomass",
+   "lat": 26.5769,
+   "lon": -80.7469
+  },
+  {
+   "plant_id": 55192,
+   "name": "Osceola Generating Station (FL)",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.1289,
+   "lon": -81.0978
+  },
+  {
+   "plant_id": 55242,
+   "name": "Santa Rosa Energy Center",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 30.5664,
+   "lon": -87.115
+  },
+  {
+   "plant_id": 55286,
+   "name": "Oleander Power Project LP",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.3661,
+   "lon": -80.7947
+  },
+  {
+   "plant_id": 55318,
+   "name": "Indian River",
+   "technology": "Natural Gas Steam Turbine",
+   "lat": 28.49318,
+   "lon": -80.78025
+  },
+  {
+   "plant_id": 55412,
+   "name": "Osprey Energy Center Power Plant",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.0525,
+   "lon": -81.8083
+  },
+  {
+   "plant_id": 55414,
+   "name": "Shady Hills Generating Station",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 28.3665,
+   "lon": -82.55861
+  },
+  {
+   "plant_id": 55415,
+   "name": "Vandolah Power Station",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 27.52361,
+   "lon": -81.92395
+  },
+  {
+   "plant_id": 55821,
+   "name": "Curtis H Stanton Energy Center",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 28.48825,
+   "lon": -81.16694
+  },
+  {
+   "plant_id": 56400,
+   "name": "Treasure Coast Energy Center",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.38389,
+   "lon": -80.3775
+  },
+  {
+   "plant_id": 56407,
+   "name": "West County Energy Center",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 26.6986,
+   "lon": -80.3747
+  },
+  {
+   "plant_id": 56518,
+   "name": "South Energy Center",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 29.6383,
+   "lon": -82.34
+  },
+  {
+   "plant_id": 56522,
+   "name": "Springhill Gas Recovery Plant",
+   "technology": "Landfill Gas",
+   "lat": 30.92833,
+   "lon": -85.42611
+  },
+  {
+   "plant_id": 56799,
+   "name": "Greenland Energy Center",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.15913,
+   "lon": -81.51842
+  },
+  {
+   "plant_id": 57123,
+   "name": "Trail Ridge Landfill Gas Recovery",
+   "technology": "Landfill Gas",
+   "lat": 30.22795,
+   "lon": -82.04088
+  },
+  {
+   "plant_id": 57128,
+   "name": "G2 Energy Marion LLC",
+   "technology": "Landfill Gas",
+   "lat": 29.12288,
+   "lon": -82.05545
+  },
+  {
+   "plant_id": 57168,
+   "name": "Waste Management Naples LFGTE Project",
+   "technology": "Landfill Gas",
+   "lat": 26.15583,
+   "lon": -81.65806
+  },
+  {
+   "plant_id": 57241,
+   "name": "Deerhaven Renewable",
+   "technology": "Wood/Wood Waste Biomass",
+   "lat": 29.7675,
+   "lon": -82.39639
+  },
+  {
+   "plant_id": 57502,
+   "name": "Perdido",
+   "technology": "Landfill Gas",
+   "lat": 30.57,
+   "lon": -87.39
+  },
+  {
+   "plant_id": 57898,
+   "name": "Palm Beach Renewable Energy Facility 2",
+   "technology": "Municipal Solid Waste",
+   "lat": 26.77244,
+   "lon": -80.14182
+  },
+  {
+   "plant_id": 59240,
+   "name": "Port Charlotte Energy LLC",
+   "technology": "Landfill Gas",
+   "lat": 26.79083,
+   "lon": -81.96528
+  },
+  {
+   "plant_id": 59686,
+   "name": "Sarasota County LFGTE Facility",
+   "technology": "Landfill Gas",
+   "lat": 27.203,
+   "lon": -82.387
+  },
+  {
+   "plant_id": 60025,
+   "name": "Eight Flags Energy",
+   "technology": "Natural Gas Fired Combustion Turbine",
+   "lat": 30.6608,
+   "lon": -81.4706
+  },
+  {
+   "plant_id": 60345,
+   "name": "Okeechobee Clean Energy Center",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 27.63417,
+   "lon": -80.79111
+  },
+  {
+   "plant_id": 60701,
+   "name": "JED Solid Waste Mgmt Renewable Energy",
+   "technology": "Landfill Gas",
+   "lat": 28.06378,
+   "lon": -81.09724
+  },
+  {
+   "plant_id": 61080,
+   "name": "Sub 12",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 30.45981,
+   "lon": -84.26003
+  },
+  {
+   "plant_id": 61694,
+   "name": "Lockheed Martin Solar",
+   "technology": "Petroleum Liquids",
+   "lat": 28.53942,
+   "lon": -81.21637
+  },
+  {
+   "plant_id": 61777,
+   "name": "Brevard",
+   "technology": "Landfill Gas",
+   "lat": 28.39265,
+   "lon": -80.82867
+  },
+  {
+   "plant_id": 61780,
+   "name": "Seminole Energy",
+   "technology": "Landfill Gas",
+   "lat": 28.79019,
+   "lon": -81.08902
+  },
+  {
+   "plant_id": 65978,
+   "name": "Dania Beach 7",
+   "technology": "Natural Gas Fired Combined Cycle",
+   "lat": 26.0686,
+   "lon": -80.1984
+  },
+  {
+   "plant_id": 66392,
+   "name": "Jax LNG",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 30.3943,
+   "lon": -81.55721
+  },
+  {
+   "plant_id": 66920,
+   "name": "South Tampa Resilience Project",
+   "technology": "Natural Gas Internal Combustion Engine",
+   "lat": 27.86335,
+   "lon": -82.51738
+  }
+ ]
+}
