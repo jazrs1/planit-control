@@ -7,8 +7,8 @@ export default function TopNavigation() {
   const alerts = useAlerts();
 
   return (
-    <nav aria-label="Main navigation" className="border-b border-border bg-surface">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-2">
+    <nav aria-label="Main navigation" className="h-(--pc-nav-height) border-b border-border bg-surface">
+      <div className="mx-auto flex h-full max-w-5xl items-center justify-between gap-2 px-4">
         <Link href="/" className="flex min-h-11 items-center font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">
           PlanIT Control
         </Link>

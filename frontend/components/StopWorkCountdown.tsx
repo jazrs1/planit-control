@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Alert } from "@shared/types";
+import { useServerNow } from "@/components/AlertsProvider";
 
 export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_clear_at">) {
   // Start with a placeholder so the server and hydration render agree.
   const [now, setNow] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
+  // Backend clock, so replayed alerts count down in simulated time (and at replay speed).
+  const serverNow = useServerNow();
   const previousTarget = useRef(all_clear_at === null ? null : Date.parse(all_clear_at));
   const target = all_clear_at === null ? null : Date.parse(all_clear_at);
 
@@ -17,18 +20,18 @@ export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_cle
       nextTarget !== null && previous !== null && nextTarget > previous;
     previousTarget.current = nextTarget;
 
-    setNow(Date.now());
+    setNow(serverNow());
     setResetting(extended);
     const flash = extended ? window.setTimeout(() => setResetting(false), 1200) : null;
     const tick = nextTarget !== null && Number.isFinite(nextTarget)
-      ? window.setInterval(() => setNow(Date.now()), 1000)
+      ? window.setInterval(() => setNow(serverNow()), 1000)
       : null;
 
     return () => {
       if (tick !== null) window.clearInterval(tick);
       if (flash !== null) window.clearTimeout(flash);
     };
-  }, [all_clear_at]);
+  }, [all_clear_at, serverNow]);
 
   const seconds = target !== null && Number.isFinite(target) && now !== null
     ? Math.max(0, Math.ceil((target - now) / 1000))

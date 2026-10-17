@@ -26,6 +26,9 @@
   /* Shape */
   --pc-radius-card: 12px;
   --pc-radius-pill: 999px;
+
+  /* Layout */
+  --pc-nav-height: 3.75rem;
   --pc-shadow-card: 0 1px 2px rgb(17 24 39 / 0.06), 0 1px 3px rgb(17 24 39 / 0.1);
 
   /* Type */
