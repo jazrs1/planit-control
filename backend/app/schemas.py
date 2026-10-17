@@ -232,6 +232,13 @@ class LightningFlash(BaseModel):
     ts: datetime
     lat: float
     lon: float
+    replay: bool = False
+
+
+class LightningRecentCounts(BaseModel):
+    minutes: int
+    real: int
+    replay: int
 
 
 class StartReplayRequest(BaseModel):

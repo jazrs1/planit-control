@@ -1,4 +1,4 @@
-import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, FireDetection, HazardReport, ReplayEvent, ReplaySeries, WildlifeSightingPoint, LightningCellsResponse, LightningFlash, ModelInfo, PushEndpointRequest, PushPublicKey, PushSubscribeRequest, PushSubscriptionInfo, PushTestResponse, PushUnsubscribeResponse, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
+import type { Alert, ApiError, LightningRecentCounts, Briefing, BriefingsResponse, CreateReportRequest, FireDetection, HazardReport, ReplayEvent, ReplaySeries, WildlifeSightingPoint, LightningCellsResponse, LightningFlash, ModelInfo, PushEndpointRequest, PushPublicKey, PushSubscribeRequest, PushSubscriptionInfo, PushTestResponse, PushUnsubscribeResponse, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
@@ -75,10 +75,9 @@ export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encod
 export const getScoreHistory = (id: Site["id"]) => request<ScoreHistory>(`/sites/${encodeURIComponent(id)}/score-history`, { signal: AbortSignal.timeout(15_000) });
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
-/** Uncapped real and replay flash counts for the same windows as /lightning/recent (#48). Temporary
- *  local shape matching LightningRecentCounts in #48; switch to the shared type when it merges. A
- *  server without the endpoint answers 404, and the dashboard counts the flashes it has instead. */
-export const getLightningCounts = (minutes = 15) => request<{ minutes: number; real: number; replay: number }>(`/lightning/recent/counts?minutes=${minutes}`);
+/** Uncapped real and replay flash counts for the same windows as /lightning/recent. A server without the
+ *  endpoint answers 404, and the dashboard counts the flashes it has instead. */
+export const getLightningCounts = (minutes = 15) => request<LightningRecentCounts>(`/lightning/recent/counts?minutes=${minutes}`);
 export const getLightningCells = () => request<LightningCellsResponse>("/lightning/cells");
 export const getPushPublicKey = () => request<PushPublicKey>("/push/public-key", { signal: AbortSignal.timeout(15_000) });
 export const subscribePush = (body: PushSubscribeRequest) => request<PushSubscriptionInfo>("/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });

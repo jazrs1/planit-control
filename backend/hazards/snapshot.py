@@ -79,8 +79,11 @@ def load(pool: ConnectionPool, replay: bool | None = None) -> Snapshot:
             [{**a, "replay": False, "view_now": real_now} for a in approach.active_advisories(conn, replay=False)],
             [{**a, "replay": True, "view_now": sim_now} for a in approach.active_advisories(conn, replay=True)]
             if replay else [])
-        # A site in stop-work (either mode) gets no "approaching": the stop-work is the bigger news.
-        approaching = {k: v for k, v in approaching.items() if k not in lightning}
+        # A real stop-work drops the site's advisory (real or replay): the stop-work is the bigger news. A
+        # replay stop-work never drops a real advisory; it drops only a replay one (its own storm's stop-work
+        # superseded it).
+        approaching = {k: v for k, v in approaching.items()
+                       if k not in real_lightning and not (v["replay"] and k in lightning)}
         firms = conn.execute("SELECT detail FROM data_sources WHERE name = 'firms'").fetchone()
         reports = conn.execute(
             """SELECT id, lat, lon, created_at, category, species, reporter_role FROM reports

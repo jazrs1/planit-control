@@ -64,14 +64,13 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const demo = alertsStatus === "demo";
   const replaying = replay?.running ?? false;
   const sites = demo ? DEMO_DATA.sites : liveSites;
+  // /lightning/recent returns real flashes always, plus the replay's while one runs (#48). Both are
+  // drawn: real ones fade on real time, replay ones blue on the replay clock, and they're counted apart.
   const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
-  // During a replay /lightning/recent runs on the simulated clock, so it returns only the replay's
-  // flashes, timestamped in the recorded storm. A real flash is never more than minutes old in real
-  // time, so a flash hours older than real time can only be a replay one: drawn blue, counted apart.
-  // The API is adding an explicit per-flash replay flag; use it when present, the age rule otherwise.
+  // LightningFlash.replay says which; a flash hours older than real time can only be a replay one, the
+  // fallback for a server without the flag.
   const isReplayFlash = useCallback((flash: LightningFlash) => {
-    const flag = (flash as LightningFlash & { replay?: boolean }).replay;
-    if (typeof flag === "boolean") return flag;
+    if (typeof flash.replay === "boolean") return flash.replay;
     const ts = Date.parse(flash.ts);
     return Number.isFinite(ts) && Date.now() - ts > REPLAY_FLASH_AGE_MS;
   }, []);
