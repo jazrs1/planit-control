@@ -219,9 +219,50 @@ def test_live_and_replay_cycles_pass_their_own_mode_to_the_engine(monkeypatch):
     monkeypatch.setattr(engine, "run", lambda flashes, now, replay: seen.append(("engine", now, replay)))
     monkeypatch.setattr(approach, "run", lambda now, replay: seen.append(("approach", now, replay)))
     glm.ingest_cycle(None, [], T0, replay=True)
+    alert_hook.wait_for_forecast()
     alert_hook.on_new_flashes([], T0 + MIN)
+    alert_hook.wait_for_forecast()
     assert seen == [("engine", T0, True), ("approach", T0, True),
                     ("engine", T0 + MIN, False), ("approach", T0 + MIN, False)]
+
+
+def test_ingestion_never_waits_for_the_forecast_and_skips_one_still_running(monkeypatch):
+    import threading
+
+    from alerts import approach
+    from lightning import alert_hook
+    release, started, runs = threading.Event(), threading.Event(), []
+
+    def slow_forecast(now, replay):
+        runs.append(now)
+        started.set()
+        release.wait(5)
+    monkeypatch.setattr(engine, "run", lambda flashes, now, replay: None)
+    monkeypatch.setattr(approach, "run", slow_forecast)
+    alert_hook.on_new_flashes([], T0, replay=True)
+    assert started.wait(5)
+    alert_hook.on_new_flashes([], T0 + MIN, replay=True)      # returns at once; this cycle's forecast is skipped
+    release.set()
+    alert_hook.wait_for_forecast()
+    alert_hook.on_new_flashes([], T0 + 2 * MIN, replay=True)  # free again
+    alert_hook.wait_for_forecast()
+    assert runs == [T0, T0 + 2 * MIN]
+
+
+def test_a_failing_forecast_frees_the_next_cycle(monkeypatch):
+    from alerts import approach
+    from lightning import alert_hook
+    calls = []
+
+    def broken(now, replay):
+        calls.append(now)
+        raise RuntimeError("forecast bug")
+    monkeypatch.setattr(engine, "run", lambda flashes, now, replay: None)
+    monkeypatch.setattr(approach, "run", broken)
+    for i in range(2):
+        alert_hook.on_new_flashes([], T0 + i * MIN, replay=False)
+        alert_hook.wait_for_forecast()
+    assert calls == [T0, T0 + MIN]
 
 
 def test_miles_between_one_degree_of_latitude():
