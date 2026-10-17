@@ -51,7 +51,9 @@ def fetch(key: str) -> list[dict]:
     area = f"{lon0:.2f},{lat0:.2f},{lon1:.2f},{lat1:.2f}"
     detections = []
     for source in SOURCES:
-        text = http.get(f"{API}/{key}/{source}/{area}/1", accept="text/csv", retries=2).decode()
+        # Day range 1 is "today's UTC date" only (empty just after midnight UTC), so ask for 2 days;
+        # poll() keeps the last 24 hours.
+        text = http.get(f"{API}/{key}/{source}/{area}/2", accept="text/csv", retries=2).decode()
         if not text.startswith("latitude"):
             raise ValueError(f"FIRMS {source}: {text[:80]}")  # e.g. "Invalid MAP_KEY."
         detections += parse_csv(text)
