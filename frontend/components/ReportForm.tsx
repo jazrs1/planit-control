@@ -10,7 +10,10 @@ import ReportMap from "@/components/ReportMap";
 import ReportPhoto from "@/components/ReportPhoto";
 
 const NO_REPORTS: HazardReport[] = [];
-const fieldClass = "mt-1 min-h-12 w-full rounded-card border border-border bg-surface px-3 py-2 text-base text-text focus-visible:outline-2 focus-visible:outline-brand";
+const fieldClass = "mbs-1.5 block min-h-12 w-full rounded-card border border-border-strong bg-surface px-3.5 py-2 text-base text-text focus-visible:outline-2 focus-visible:outline-notice";
+/** Field labels: small and grey; the value is what's large. */
+const labelClass = "block text-xs text-muted";
+const stepClass = "pc-panel flex flex-col gap-4 p-6 max-sm:p-5";
 
 export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[] | null; initialSiteId?: string }) {
   const [file, setFile] = useState<File | null>(null);
@@ -122,57 +125,61 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
   }
 
   if (submitted) return (
-    <section className="space-y-4">
-      <div role="status" className="rounded-card border border-border bg-risk-green-bg p-4 text-risk-green">
-        <h2 ref={confirmation} tabIndex={-1} className="text-xl font-bold">Report submitted</h2>
-        <p>Your hazard report has been saved. Its location is pinned below.</p>
+    <section className="flex flex-col gap-6">
+      <div role="status" className="pc-panel flex items-start gap-3 p-6 max-sm:p-5">
+        <span aria-hidden="true" className="pc-shape pc-shape--green mbs-2" />
+        <div><h2 ref={confirmation} tabIndex={-1} className="text-xl font-semibold">Report submitted</h2>
+        <p className="text-muted">Your hazard report has been saved. Its location is pinned below.</p></div>
       </div>
       <ReportMap reports={[submitted]} selectedId={submitted.id} />
       <ReportPhoto key={submitted.photo_url} src={submitted.photo_url} alt="Submitted hazard" className="h-48 w-full" />
-      {submitted.note && <p className="break-words whitespace-pre-wrap">{submitted.note}</p>}
-      <div className="flex flex-wrap gap-3">
+      {submitted.note && <p className="max-w-[68ch] break-words whitespace-pre-wrap">{submitted.note}</p>}
+      <div className="flex flex-wrap items-center gap-6">
         <Link href="/reports" className="pc-btn pc-btn--primary">View reports</Link>
         <button type="button" onClick={() => {
           setSubmitted(null); setFile(null); setCategory(""); setNote(""); uploaded.current = null; setProgress(0);
-        }} className="min-h-12 rounded-card border border-border bg-surface px-4 font-semibold text-brand">Report another hazard</button>
+        }} className="pc-link">Report another hazard</button>
       </div>
     </section>
   );
 
   return (
-    <form onSubmit={submit} className="space-y-5" aria-busy={busy}>
-      <fieldset disabled={busy} className="min-w-0 space-y-5 disabled:opacity-70">
+    <form onSubmit={submit} className="flex flex-col gap-6" aria-busy={busy}>
+      <fieldset disabled={busy} className="flex min-w-0 flex-col gap-6 disabled:opacity-70">
         <legend className="sr-only">Hazard details</legend>
-        <div className="rounded-card border border-border bg-surface p-4">
-          <label htmlFor="photo" className="block font-semibold">1. Take or choose a photo</label>
-          <p id="photo-help" className="mbs-1 text-sm text-muted">JPEG, PNG, WebP, or HEIC. Up to 10 MB.</p>
-          <input id="photo" type="file" accept="image/*" capture="environment" required aria-describedby="photo-help photo-error" aria-invalid={!!photoError} className="mbs-3 block min-h-12 w-full min-w-0 text-sm file:me-3 file:min-h-12 file:rounded-card file:border-0 file:bg-brand file:px-3 file:font-semibold file:text-on-brand" onChange={(event) => {
+        <div className={stepClass}>
+          <label htmlFor="photo"><span className="block text-xs text-muted">Step 1 of 3</span><span className="block text-xl font-semibold">Take or choose a photo</span></label>
+          <div className="flex flex-col gap-2 rounded-card border-[1.5px] border-dashed border-border-strong p-6 max-sm:p-4">
+          <input id="photo" type="file" accept="image/*" capture="environment" required aria-describedby="photo-help photo-error" aria-invalid={!!photoError} className="block min-h-11 w-full min-w-0 text-sm text-muted file:me-3 file:min-h-11 file:cursor-pointer file:rounded-card file:border file:border-border-strong file:bg-surface file:px-4 file:font-semibold file:text-text" onChange={(event) => {
             const next = event.target.files?.[0] ?? null;
             const invalid = next ? validatePhoto(next) : "";
             setPhotoError(invalid || ""); setFile(invalid ? null : next); uploaded.current = null; setError("");
             if (invalid) event.currentTarget.value = "";
           }} />
-          <p id="photo-error" role="alert" className="mbs-2 text-sm font-medium text-risk-red">{photoError}</p>
-          {preview && <ReportPhoto key={preview} src={preview} alt="Selected hazard photo" className="mbs-3 h-48 w-full" />}
+          <p id="photo-help" className="text-xs text-muted">JPEG, PNG, WebP, or HEIC. Up to 10 MB.</p>
+          <p id="photo-error" role="alert" className="font-semibold text-risk-red">{photoError}</p>
+          </div>
+          {preview && <ReportPhoto key={preview} src={preview} alt="Selected hazard photo" className="h-48 w-full" />}
         </div>
 
-        <div className="space-y-4 rounded-card border border-border bg-surface p-4">
-          <label className="block font-semibold" htmlFor="category">2. What did you see?
+        <div className={stepClass}>
+          <p><span className="block text-xs text-muted">Step 2 of 3</span><span className="block text-xl font-semibold">What did you see?</span></p>
+          <label className={labelClass} htmlFor="category">Hazard
             <select id="category" required value={category} onChange={(event) => setCategory(event.target.value)} className={fieldClass}>
               <option value="">Choose a hazard</option>
               {REPORT_OPTIONS.map((option) => <option key={option.label} value={option.label}>{option.label}</option>)}
             </select>
           </label>
-          <label htmlFor="note" className="block text-sm font-medium">Note (optional)
+          <label htmlFor="note" className={labelClass}>Note (optional)
             <textarea id="note" rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="What should the next crew know?" className={fieldClass} />
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label htmlFor="role" className="block text-sm font-medium">Your role
+            <label htmlFor="role" className={labelClass}>Your role
               <select id="role" value={role} onChange={(event) => setRole(event.target.value as ReporterRole)} className={fieldClass}>
                 {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
-            <label htmlFor="site" className="block text-sm font-medium">Site (optional)
+            <label htmlFor="site" className={labelClass}>Site (optional)
               <select id="site" disabled={sites === null} value={validSiteId} onChange={(event) => setSiteId(event.target.value)} className={fieldClass}>
                 <option value="">Away from a site / unknown</option>
                 {/* Alphabetical: 55 plants in capacity order are hard to find on a phone. */}
@@ -183,20 +190,22 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
           </div>
         </div>
 
-        <section aria-labelledby="location-heading" className="space-y-3 rounded-card border border-border bg-surface p-4">
-          <h2 id="location-heading" className="font-semibold">3. Pin the hazard location</h2>
-          <p className="text-sm text-muted">Tap the map where you saw the hazard. Adjust the pin if it is away from your current location.</p>
-          <button type="button" disabled={locating} onClick={() => locate()} className="min-h-12 rounded-card border border-border px-4 font-semibold text-brand disabled:opacity-50">{locating ? "Finding location…" : "Use my location"}</button>
-          <p role="status" className="text-sm text-muted">{locationMessage}</p>
+        <section aria-labelledby="location-heading" className={stepClass}>
+          <h2 id="location-heading"><span className="block text-xs text-muted">Step 3 of 3</span><span className="block text-xl font-semibold">Pin the hazard location</span></h2>
+          <p className="max-w-[68ch] text-muted">Tap the map where you saw the hazard. Adjust the pin if it is away from your current location.</p>
+          <div className="flex flex-wrap items-center gap-x-4">
+            <button type="button" disabled={locating} onClick={() => locate()} className="pc-link disabled:opacity-50">{locating ? "Finding location…" : "Use my location"}</button>
+            <p role="status" className="text-xs text-muted">{locationMessage}</p>
+          </div>
           <ReportMap reports={NO_REPORTS} pin={pin} onPin={busy ? undefined : choosePin} />
-          <p className="text-sm text-muted">{pin ? `Pin: ${pin.lat.toFixed(6)}, ${pin.lon.toFixed(6)}` : "No pin selected yet."}</p>
-          <details>
-            <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-brand">Enter coordinates manually</summary>
-            <div className="grid grid-cols-2 gap-3">
-              <label htmlFor="latitude" className="text-sm">Latitude<input id="latitude" inputMode="decimal" value={coordinates.lat} onChange={(event) => setCoordinates({ ...coordinates, lat: event.target.value })} className={fieldClass} /></label>
-              <label htmlFor="longitude" className="text-sm">Longitude<input id="longitude" inputMode="decimal" value={coordinates.lon} onChange={(event) => setCoordinates({ ...coordinates, lon: event.target.value })} className={fieldClass} /></label>
+          <p className="text-xs text-muted">{pin ? `Pin: ${pin.lat.toFixed(6)}, ${pin.lon.toFixed(6)}` : "No pin selected yet."}</p>
+          <details className="group">
+            <summary className="pc-link list-none">Enter coordinates manually</summary>
+            <div className="grid grid-cols-2 gap-4 pbs-2">
+              <label htmlFor="latitude" className={labelClass}>Latitude<input id="latitude" inputMode="decimal" value={coordinates.lat} onChange={(event) => setCoordinates({ ...coordinates, lat: event.target.value })} className={fieldClass} /></label>
+              <label htmlFor="longitude" className={labelClass}>Longitude<input id="longitude" inputMode="decimal" value={coordinates.lon} onChange={(event) => setCoordinates({ ...coordinates, lon: event.target.value })} className={fieldClass} /></label>
             </div>
-            <button type="button" className="pc-btn pc-btn--quiet mbs-2" onClick={() => {
+            <button type="button" className="pc-btn pc-btn--quiet mbs-4" onClick={() => {
               const lat = Number(coordinates.lat), lon = Number(coordinates.lon);
               if (!coordinates.lat.trim() || !coordinates.lon.trim() || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
                 setLocationMessage("Enter latitude from -90 to 90 and longitude from -180 to 180."); return;
@@ -206,12 +215,12 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
           </details>
         </section>
       </fieldset>
-      {busy && <div role="status" className="rounded-card border border-border bg-surface p-4">
-        <p className="font-medium">{phase === "uploading" ? `Uploading photo… ${progress}%` : "Photo uploaded. Saving report…"}</p>
+      {busy && <div role="status" className="pc-panel p-6 max-sm:p-5">
+        <p className="font-semibold">{phase === "uploading" ? `Uploading photo… ${progress}%` : "Photo uploaded. Saving report…"}</p>
         <progress max={100} value={phase === "saving" ? 100 : progress} aria-label="Photo upload progress" className="mbs-2 h-3 w-full accent-brand" />
       </div>}
-      {error && <div role="alert" className="rounded-card bg-risk-red-bg p-4 text-risk-red"><p>{error}</p><Link href="/reports" className="mbs-2 inline-flex min-h-11 items-center font-semibold underline">Check reports</Link></div>}
-      <button type="submit" disabled={busy} className="pc-btn pc-btn--primary min-h-14 w-full text-lg">{busy ? "Submitting…" : "Submit hazard report"}</button>
+      {error && <div role="alert" className="rounded-card bg-risk-red-bg px-6 py-4 text-risk-red"><p>{error}</p><Link href="/reports" className="pc-link text-risk-red">Check reports</Link></div>}
+      <button type="submit" disabled={busy} className="pc-btn pc-btn--primary min-h-14 w-full text-sm">{busy ? "Submitting…" : "Submit hazard report"}</button>
     </form>
   );
 }
