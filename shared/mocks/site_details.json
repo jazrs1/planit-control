@@ -36,6 +36,8 @@
         "rain_past_24h_in": 0.1,
         "rain_past_72h_in": 1.4,
         "rain_next_24h_in": 0.0,
+
+        "rain_next_24h_nws_in": 0.9,
         "fema_flood_zone": "X",
         "in_special_flood_hazard_area": false,
         "near_river": true,
@@ -125,6 +127,8 @@
         "rain_past_24h_in": 1.6,
         "rain_past_72h_in": 3.1,
         "rain_next_24h_in": 0.8,
+
+        "rain_next_24h_nws_in": null,
         "fema_flood_zone": "X",
         "in_special_flood_hazard_area": false,
         "near_river": false,

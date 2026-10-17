@@ -58,7 +58,13 @@ Return JSON with:
 Crew reports in "crew_reports_last_48_h_within_2_mi" are what crews saw on site: always mention a
 downed line or heat illness among the risks, with how long ago it was reported, and give the
 matching action (stay clear of the line and treat it as energized; check on the crew, water, shade
-and rest). If there is little risk, say so plainly instead of inventing risks. The whole briefing must be
+and rest). The go / caution / no-go word is decided for you from "hard_stops" (named reasons to stop
+work during "work_hours"): if "hard_stops" is not empty, the headline must name the first one with its
+time, e.g. "Flood Warning 7 AM-3 PM". Lead with the main hazard during work hours; for a hazard outside
+work hours (e.g. rain mostly after work), give a plan-ahead action, not a stop. If
+"rain_forecasts_disagree" is set (our forecast and NWS differ a lot), say "Forecasts disagree:" with that
+range and never state the higher figure as the forecast; use only the JSON's rain figures. If there is little risk,
+say so plainly instead of inventing risks. The whole briefing must be
 under {MAX_WORDS} words, so aim for about 110: the headline and each risk and action under 20 words."""
 
 # Gemini's schema dialect (upper-case types).
@@ -146,13 +152,64 @@ def unsupported_claims(text: str, inputs: dict) -> list[str]:
     if ("downed line" in lowered or "line down" in lowered) and "Downed line" not in crew:
         claims.append("'downed line' (no crew report of one)")
     band = ((inputs.get("heat") or {}).get("osha_risk_band") or "")
-    if ("very high" in lowered or "extreme" in lowered) and band != "very high":
+    if ("very high" in lowered or "extreme" in lowered) and band != "very high" and not any("extreme" in e for e in events):
         claims.append(f"'very high'/'extreme' heat (OSHA band is {band or 'unknown'})")
     return claims
 
 
+_TIME = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s?(AM|PM)\b")
+_RAIN_AMOUNT = re.compile(r"(\d+(?:\.\d+)?)\s?in(?:ches)? of rain(?! in the past)")
+
+
+def _times(text: str) -> list[str]:
+    """Clock times with AM/PM, normalized: '6:49 AM', '2 PM' -> '2:00 PM'."""
+    return [f"{int(h)}:{m or '00'} {ap}" for h, m, ap in _TIME.findall(text)]
+
+
+def impossible_times(text: str, inputs: dict) -> list[str]:
+    """Times that aren't in the input JSON with that AM/PM (e.g. 'sunset at 6:49 AM' when sunset is 6:49 PM),
+    and sunrise/sunset given a time that isn't the real one."""
+    known = set(_times(json.dumps(inputs)))
+    bad = [t for t in _times(text) if t not in known]
+    day = inputs.get("daylight") or {}
+    for event in ("sunrise", "sunset"):
+        real = _times(day.get(event) or "")
+        for m in re.finditer(rf"{event}\D{{0,12}}?(\d{{1,2}}(?::\d{{2}})?\s?(?:AM|PM))", text, re.I):
+            if real and _times(m.group(1)) != real:
+                bad.append(f"{event} {m.group(1)} (it is {day[event]})")
+    return bad
+
+
+def rain_figure_problems(text: str, inputs: dict) -> list[str]:
+    """Rain amounts must be the briefing's own figures; when the forecasts disagree, the higher one is never
+    stated as the forecast on its own."""
+    issues = []
+    disagree = inputs.get("rain_forecasts_disagree")
+    allowed = {str(v) for v in [inputs.get("rain_total_in"), inputs.get("rain_work_hours_in"),
+                                *(p["rain_in"] for p in inputs.get("periods") or []),
+                                *((inputs.get("rain_nws") or {}).values())] if v is not None}
+    allowed |= {x.rstrip("0").rstrip(".") for x in list(allowed) if "." in x}
+    rest = text.replace(disagree, "") if disagree else text
+    for amount in _RAIN_AMOUNT.findall(rest):
+        if amount not in allowed and amount.rstrip("0").rstrip(".") not in allowed:
+            issues.append(f"rain amount {amount} in isn't one of the briefing's rain figures")
+    if disagree:
+        hi = disagree.split("-")[1].split(" ")[0]
+        if re.search(rf"(?<![\d.-]){re.escape(hi)}\s?in", rest):
+            issues.append(f"the forecasts disagree ({disagree}): don't state {hi} in as the forecast")
+        if "rain" in text.lower() and disagree not in text:
+            issues.append(f"say the forecasts disagree: {disagree}")
+    return issues
+
+
 def problems(text: str, inputs: dict) -> list[str]:
     issues = []
+    if (bad := impossible_times(text, inputs)):
+        issues.append(f"impossible time: {', '.join(bad)} (use the times exactly as in the JSON)")
+    issues += rain_figure_problems(text, inputs)
+    stops = inputs.get("hard_stops") or []
+    if stops and stops[0]["name"].lower() not in text.lower():
+        issues.append(f"a NO-GO must name its hard stop in the headline: {stops[0]['text']}")
     if (bad := ungrounded_numbers(text, inputs)):
         issues.append(f"these numbers are not in the JSON: {', '.join(bad)}")
     if (claims := unsupported_claims(text, inputs)):
@@ -175,6 +232,10 @@ SEVERE_WEATHER_ACTION = "Check radar before starting and be ready to stop work."
 THUNDERSTORM_ACTION = ("Thunderstorms are likely during work hours. Plan shelter in a vehicle or building and "
                        "schedule exposed work early.")
 LOCATION_LABEL = "Area with frequent past severe-weather reports"
+UNCONFIRMED_FIRE_ACTION = "Verify the fire report before staging; keep an exit route clear."
+RAIN_DISAGREE_ACTION = "Check the morning forecast before staging and plan for wet, soft ground."
+RAIN_PLAN_AHEAD = ("Most of the rain falls outside work hours: secure tools and materials before you leave, "
+                   "and expect soft ground and standing water the next morning.")
 NO_RISKS = {True: "No significant weather or site hazards in the forecast.",    # GO
             False: "No reading crosses a hazard threshold on its own."}         # CAUTION / NO-GO from the model
 NWS_ACTION = {   # an NWS alert with no reading of its own gets its hazard's usual action
@@ -209,8 +270,9 @@ class Risk:
     check: str            # the threshold check behind the line (RISK_CHECKS)
     hazard: str | None    # HazardType it answers for (matched against the index's factors)
     text: str             # the risk line
-    short: str            # the same fact as a main-factor phrase
+    short: str            # the same fact as a short headline phrase ("heat peaks at 94°F around 1 PM")
     action: str | None
+    work_hours: bool = True   # False: the hazard falls outside work hours (plan ahead, not a stop)
 
 
 def _crew_category(report: dict) -> str:
@@ -236,9 +298,26 @@ def threshold_risks(inputs: dict) -> list[Risk]:
         t, pct = inputs["thunderstorms_likely_from"], inputs["thunderstorm_chance_work_hours_pct"]
         hazards.append(Risk("thunderstorms", "storm", f"Thunderstorms likely from {t} ({pct}% chance during work hours).",
                             f"thunderstorms likely from {t}", THUNDERSTORM_ACTION))
+    disagree = inputs.get("rain_forecasts_disagree")
+    if disagree:
+        # Our forecast and NWS disagree: give the range, never the higher figure as the forecast.
+        nws_work = (inputs.get("rain_nws") or {}).get("work_hours_in", 0)
+        hazards.append(Risk("rain", "flood", f"Forecasts disagree: {disagree} of rain tomorrow.",
+                            f"forecasts disagree: {disagree} of rain", RAIN_DISAGREE_ACTION,
+                            work_hours=max(inputs.get("rain_work_hours_in", 0), nws_work) >= RAIN_THRESHOLD_IN))
+    elif inputs["rain_total_in"] >= RAIN_THRESHOLD_IN:
+        wettest = max(inputs["periods"], key=lambda p: p["rain_in"])
+        # Mostly outside work hours (e.g. 6 PM-12 AM): plan ahead, it isn't a work-hours hazard.
+        outside = inputs.get("rain_work_hours_in", inputs["rain_total_in"]) < RAIN_THRESHOLD_IN
+        hazards.append(Risk("rain", "flood", f"{inputs['rain_total_in']} in of rain expected, most in the {wettest['period']} "
+                                             f"({wettest['hours']}, {wettest['rain_chance_pct']}% chance).",
+                            f"{inputs['rain_total_in']} in of rain, mostly {wettest['hours']}",
+                            RAIN_PLAN_AHEAD if outside else
+                            "Stay off low ground and out of standing water; don't drive through flooded roads.",
+                            work_hours=not outside))
     if wind and wind["max_gust_mph"] >= GUST_THRESHOLD_MPH:
         hazards.append(Risk("gusts", "storm", f"Wind gusts up to {wind['max_gust_mph']} mph around {wind['peak_time']}.",
-                            f"wind gusts up to {wind['max_gust_mph']} mph",
+                            f"gusts to {wind['max_gust_mph']} mph around {wind['peak_time']}",
                             "Stop aerial lift and bucket work if gusts exceed the equipment's rated limit; secure loose materials."))
     if heat and heat["osha_risk_band"] != "lower":
         window = heat["heat_index_91_or_higher"]
@@ -247,23 +326,22 @@ def threshold_risks(inputs: dict) -> list[Risk]:
                   if window and (inputs.get("daylight") or {}).get("sunrise") else "Schedule water and shade breaks through the afternoon.")
         hazards.append(Risk("heat", "heat", f"Heat index peaks at {heat['peak_heat_index_f']}°F around {heat['peak_time']} "
                                             f"(OSHA {heat['osha_risk_band']} risk), 91°F or higher {when}.",
-                            f"heat index up to {heat['peak_heat_index_f']}°F (OSHA {heat['osha_risk_band']} risk)", action))
-    if inputs["rain_total_in"] >= RAIN_THRESHOLD_IN:
-        wettest = max(inputs["periods"], key=lambda p: p["rain_in"])
-        hazards.append(Risk("rain", "flood", f"{inputs['rain_total_in']} in of rain expected, most in the {wettest['period']} "
-                                             f"({wettest['hours']}, {wettest['rain_chance_pct']}% chance).",
-                            f"{inputs['rain_total_in']} in of rain expected",
-                            "Stay off low ground and out of standing water; don't drive through flooded roads."))
+                            f"heat peaks at {heat['peak_heat_index_f']}°F around {heat['peak_time']}", action))
     if soil and soil["level"] in ("moist", "saturated"):
         hazards.append(Risk("soil", "soil_saturation", f"{soil['crew_note']} (soil moisture {soil['moisture_pct']}%).",
-                            f"{soil['level']} ground (soil moisture {soil['moisture_pct']}%)",
+                            "saturated ground" if soil["level"] == "saturated" else "soft, wet ground",
                             "Bring mats for vehicles and stay on pavement or gravel where you can."))
     fires = (inputs.get("wildfire") or {}).get("detections_within_25_mi")
     if isinstance(fires, int) and fires > 0:
-        near = next((f["label"] for f in inputs["top_factors"] if f["label"].startswith("Fire detected")), None)
+        near_mi = (inputs.get("wildfire") or {}).get("nearest_detection_mi")
+        near = f"Fire detected {near_mi} mi away" if near_mi is not None else \
+            next((f["label"] for f in inputs["top_factors"] if f["label"].startswith("Fire detected")), None)
         text = f"{near}; {fires} fire detection(s) within 25 mi in the last day." if near else \
             f"{fires} fire detection(s) within 25 mi in the last day."
+        wildfire = inputs.get("wildfire") or {}
+        unconfirmed = near_mi is not None and near_mi <= 5 and wildfire.get("confirmed_within_5_mi") is False
         hazards.append(Risk("fire", "wildfire", text, near[0].lower() + near[1:] if near else f"{fires} fire detection(s) within 25 mi",
+                            UNCONFIRMED_FIRE_ACTION if unconfirmed else
                             "Check where the fire is and which way the smoke is moving before staging; keep an escape route "
                             "clear and stop work if smoke or flames reach the site."))
     if wild["sightings_last_30_days"] or wild["crew_reports_within_2_mi_last_30_days"]:
@@ -286,20 +364,46 @@ def threshold_risks(inputs: dict) -> list[Risk]:
     return first + [r for urgent, r in crew if not urgent] + hazards
 
 
+def _hard_stop_risk(stop: dict, risks: list[Risk]) -> Risk:
+    """The risk line behind a hard stop, with the hard stop as its headline phrase."""
+    kind, name = stop["kind"], stop["name"]
+    if kind == "heat":
+        match = next((r for r in risks if r.check.startswith("heat")), None)
+    elif kind == "rain":
+        match = next((r for r in risks if r.check.startswith("rain")), None)
+    elif kind == "fire":
+        match = next((r for r in risks if r.check == "fire"), None)
+    elif kind == "crew":
+        what = "a downed line" if name == "downed line" else "flooding"
+        match = next((r for r in risks if r.check == "crew" and what in r.short), None)
+    else:
+        match = next((r for r in risks if "nws" in r.check and r.hazard == nws_hazard(name)), None)
+    if match is None:
+        return Risk("hardstop", None, f"{stop['text']}.", stop["text"], SEVERE_WEATHER_ACTION)
+    return Risk(match.check, match.hazard, match.text, stop["text"], match.action)
+
+
 def verdict_lead(inputs: dict, risks: list[Risk]) -> Risk | None:
-    """The risk behind the go / caution / no-go decision (same rules as briefing/inputs.go_status), or a
-    model-only risk when the model's score set a CAUTION or NO-GO and no reading crosses a threshold.
-    None on a GO with no risks."""
+    """The risk behind the go / caution / no-go decision (briefing/inputs.go_status). NO-GO: the first hard
+    stop, named. CAUTION: what raised it (heat illness report, NWS watch or warning, likely thunderstorms),
+    else the index's own drivers, preferring a work-hours hazard over one outside work hours, else a
+    model-only risk. None on a GO with no risks."""
     go = inputs["go_status"]
-    if go != "go" and _band(inputs["hazard_index"]) != go:     # a green index raised to caution
+    if go == "no_go" and inputs.get("hard_stops"):
+        return _hard_stop_risk(inputs["hard_stops"][0], risks)
+    if go != "go" and _band(inputs["hazard_index"]) == "go":   # a green index raised to caution
         for r in risks:
-            if r.check == "crew" and r.action:                 # a downed line or heat illness
+            if r.check == "crew" and r.short.startswith("crew reported heat illness"):
                 return r
         for alert in inputs["nws_alerts"]:
             if "Watch" in alert["event"] or "Warning" in alert["event"]:
                 return next(r for r in risks if r.hazard == nws_hazard(alert["event"]) and "nws" in r.check)
         if inputs.get("thunderstorms_likely_from"):
             return next(r for r in risks if r.check == "thunderstorms")
+        fire = next((r for r in risks if r.check == "fire" and r.action == UNCONFIRMED_FIRE_ACTION), None)
+        if fire:                                               # a fire within 5 mi seen on one pass
+            return fire
+    matches = []
     for f in inputs["top_factors"]:                            # the index's own drivers, in order
         label = f["label"]
         if label == LOCATION_LABEL or label.startswith(("Peak storm season", "Time of year")):
@@ -312,10 +416,12 @@ def verdict_lead(inputs: dict, risks: list[Risk]) -> Risk | None:
         else:
             match = next((r for r in risks if r.hazard == f["hazard"] and r.check != "crew"), None)
         if match:
-            return match
+            matches.append(match)
+    if matches:
+        return next((m for m in matches if m.work_hours), matches[0])
     if go != "go":
         return Risk("model", None, f"{SEVERE_WEATHER}.", SEVERE_WEATHER, SEVERE_WEATHER_ACTION)
-    return risks[0] if risks else None
+    return next((r for r in risks if r.work_hours), risks[0] if risks else None)
 
 
 def template(inputs: dict) -> Written:
@@ -331,8 +437,12 @@ def template(inputs: dict) -> Written:
     lead = verdict_lead(inputs, risks)
     crew = [r for r in risks if r.check == "crew"]
     urgent = [r for r in crew if r.action]
-    order = urgent + ([lead] if lead and lead.check != "model" and lead not in urgent else []) + \
-        [r for r in crew if r not in urgent and r is not lead] + [r for r in risks if r.check != "crew" and r is not lead]
+    def same(a: Risk, b: Risk | None) -> bool:
+        return b is not None and a.text == b.text
+    rest = [r for r in risks if r.check != "crew" and not same(r, lead)]
+    order = urgent + ([lead] if lead and lead.check != "model" and not any(same(u, lead) for u in urgent) else []) + \
+        [r for r in crew if r not in urgent and not same(r, lead)] + \
+        [r for r in rest if r.work_hours] + [r for r in rest if not r.work_hours]
     shown = order[:max(3, len(crew) + (1 if lead and lead.check != "crew" else 0))]
     if lead and lead.check == "model" and len(shown) > 2 and not crew:
         shown = shown[:2]                                     # room for the severe-weather context
@@ -346,10 +456,15 @@ def template(inputs: dict) -> Written:
         actions = (["Normal operations; hold the standard tailboard safety briefing."] if go == "go"
                    else [SEVERE_WEATHER_ACTION])
 
-    if lead:
-        headline = f"hazard index {inputs['hazard_index']} of 10; main factor: {lead.short}."
-    else:
-        headline = f"hazard index {inputs['hazard_index']} of 10; low overall risk."
+    # A plain sentence that leads with the main work-hours hazard: "Heat peaks at 94°F around 1 PM; 2.3 in of
+    # rain, mostly 6 PM-12 AM." NO-GO leads with its hard stop ("Flood Warning 7 AM-3 PM; ...").
+    phrases = [lead.short] if lead else []
+    second = next((r for r in shown if not same(r, lead) and not r.work_hours), None) or \
+        next((r for r in shown if not same(r, lead)), None)
+    if second and lead and lead.check != "model":
+        phrases.append(second.short)
+    sentence = "; ".join(phrases) if phrases else "low risk, no significant hazards in the forecast"
+    headline = f"{sentence[0].upper()}{sentence[1:]}."
     if any(f["label"] == LOCATION_LABEL for f in inputs["top_factors"]):
         headline += " This area has frequent past severe-weather reports."
     top = [r.text for r in shown] or [NO_RISKS[go == "go"]]
@@ -402,7 +517,8 @@ def _checked(inputs: dict, out: dict, generator: str, model: str) -> tuple[Writt
     text = compose(inputs["go_status"], inputs["day"], headline, risks, actions)
     issues = problems(text, inputs)
     if issues:
-        return None, "; ".join(issues), False
+        # An impossible time is a garbled answer: after the retry it goes to the template, like a review flag.
+        return None, "; ".join(issues), any(i.startswith("impossible time") for i in issues)
     if (flags := review(inputs, text)):
         return None, f"a reviewer found these statements wrong or garbled: {'; '.join(flags)}", True
     return Written(headline, risks, actions, text, generator, model), None, False

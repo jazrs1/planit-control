@@ -71,6 +71,7 @@ class FloodConditions(HazardCard):
     rain_past_24h_in: float | None = None
     rain_past_72h_in: float | None = None
     rain_next_24h_in: float | None = None
+    rain_next_24h_nws_in: float | None = None   # NWS gridpoint forecast (api.weather.gov), from the 6 PM briefing run
     fema_flood_zone: str | None = None
     in_special_flood_hazard_area: bool | None = None
     near_river: bool | None = None

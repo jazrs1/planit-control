@@ -163,3 +163,55 @@ def test_heat_reading_after_the_peak_leads_with_the_rest_of_today():
     readings[("heat", "peak_at_epoch")] = (NOW + timedelta(hours=2)).timestamp()
     readings[("heat", "rest_of_day_peak_heat_index_f")] = 96.0
     assert "today peaks at 96°F at 4:00 PM (OSHA moderate risk)" in score_site(inputs(readings), {})["cards"]["heat"]["reading"]
+
+
+# ---------- rain forecasts in text: one rule for our model vs NWS ----------
+
+def _rain(next24=8.0, tomorrow=6.5, nws=None, nws_age=timedelta(hours=1)):
+    readings = {("flood", "rain_past_12h_in"): 0.2, ("flood", "rain_past_24h_in"): 0.4, ("flood", "rain_past_72h_in"): 0.4,
+                ("flood", "rain_next_24h_in"): next24, ("flood", "rain_tomorrow_in"): tomorrow}
+    inp = inputs(readings, now=NOW)
+    if nws:
+        for metric, value in nws.items():
+            inp.readings[("flood", metric)] = (value, NOW - nws_age)
+    return inp
+
+
+def test_flood_card_says_forecasts_disagree_with_a_range():
+    from hazards.scoring import flood
+    card = flood(_rain(nws={"rain_next_24h_nws_in": 0.9})).card
+    assert "0.9-8.0 in expected next 24 h (forecasts disagree)" in card["reading"]
+    assert "8.0 in expected" not in card["reading"].replace("0.9-8.0 in expected", "")
+    assert card["rain_next_24h_in"] == 8.0 and card["rain_next_24h_nws_in"] == 0.9     # raw numbers unchanged
+
+
+def test_flood_card_keeps_our_value_when_forecasts_agree_or_nws_is_missing_or_old():
+    from hazards.scoring import flood
+    assert "8.0 in expected next 24 h." in flood(_rain(nws={"rain_next_24h_nws_in": 6.5})).card["reading"]   # within 2x
+    assert "1.4 in expected next 24 h." in flood(_rain(next24=1.4, nws={"rain_next_24h_nws_in": 0.5})).card["reading"]  # < 1 in apart
+    assert "8.0 in expected next 24 h." in flood(_rain()).card["reading"]                                        # no NWS
+    old = _rain(nws={"rain_next_24h_nws_in": 0.9}, nws_age=timedelta(hours=7))                                    # stale window
+    assert "8.0 in expected next 24 h." in flood(old).card["reading"]
+
+
+def test_tomorrow_rain_label_uses_the_nws_value_for_the_same_day():
+    from hazards.scoring import flood
+    # Stored today (NOW) for tomorrow: applies to tomorrow's label.
+    h = flood(_rain(nws={"rain_tomorrow_nws_in": 0.8}))
+    assert h.label_tomorrow == "0.8-6.5 in of rain forecast tomorrow (forecasts disagree)"
+    assert flood(_rain(nws={"rain_tomorrow_nws_in": 5.0})).label_tomorrow == "6.5 in of rain forecast tomorrow"
+    # Stored yesterday for "tomorrow" is today's figure, not tomorrow's.
+    assert flood(_rain(nws={"rain_tomorrow_nws_in": 0.8}, nws_age=timedelta(days=1))).label_tomorrow == \
+        "6.5 in of rain forecast tomorrow"
+
+
+def test_model_rain_factor_label_follows_the_same_rule():
+    model = {"2026-07-15": {"probability": 0.2, "score": 7.5, "factors": [
+        {"factor": "rain_in", "hazard": "flood", "label": "9.6 in of rain forecast", "weight": 0.6},
+        {"factor": "gust_max_mph", "hazard": "storm", "label": "Wind gusts to 35 mph", "weight": 0.4}]}}
+    inp = inputs(now=NOW, model=model)
+    inp.readings[("flood", "rain_today_nws_in")] = (0.9, NOW)
+    labels = [f["label"] for f in predict(inp, {})["top_factors"]]
+    assert labels[0] == "0.9-9.6 in of rain forecast (forecasts disagree)" and "Wind gusts to 35 mph" in labels
+    inp.readings[("flood", "rain_today_nws_in")] = (7.0, NOW)
+    assert predict(inp, {})["top_factors"][0]["label"] == "9.6 in of rain forecast"
