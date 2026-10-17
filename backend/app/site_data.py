@@ -101,6 +101,7 @@ def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -
             "wildfire": cards["wildfire"],
             "wildlife": snap.sightings[site["id"]] if detail else [],
             "wildlife_summary": cards["wildlife"],
+            "crew_hazards": cards["crew_hazards"],
         },
         # TEMPORARY rule-based score (hazards/scoring.py) until the ML model exists.
         "hazard_index": scored["hazard_index_today"],

@@ -2,8 +2,9 @@
 
   1. Gemini (GEMINI_MODEL, default gemini-3.8-flash) writes a headline, the top 3 risks with times,
      and concrete actions, as structured JSON, from the input JSON only.
-  2. The result is checked: every number in it must appear in the input JSON, and the whole
-     briefing must be under 150 words. One retry with the problems listed; then
+  2. The result is checked: every number in it must appear in the input JSON, hazard words must
+     match it (no "saturated" soil that is only moist, no NWS alert that isn't in effect, no
+     thunderstorms at 0% chance), and the whole briefing must be under 150 words. One retry with the problems listed; then
   3. a template built from the same JSON (always grounded by construction) is used instead.
      The template is also used when GEMINI_API_KEY is missing or Gemini fails.
 
@@ -13,6 +14,7 @@ The go / caution / no-go decision is never the writer's: it comes from the input
 import json
 import logging
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -37,7 +39,10 @@ Return JSON with:
 - "actions": 2 to 4 concrete, plain-language actions tied to those risks, e.g. when to start and
   finish heavy work, expecting lightning stops (use the rules in the JSON), bringing mats for
   vehicles on wet ground, checking for snakes or alligators before staging.
-If there is little risk, say so plainly instead of inventing risks. The whole briefing must be
+Crew reports in "crew_reports_last_48_h_within_2_mi" are what crews saw on site: always mention a
+downed line or heat illness among the risks, with how long ago it was reported, and give the
+matching action (stay clear of the line and treat it as energized; check on the crew, water, shade
+and rest). If there is little risk, say so plainly instead of inventing risks. The whole briefing must be
 under {MAX_WORDS} words."""
 
 SCHEMA = {
@@ -87,10 +92,41 @@ def compose(go_status: str, day: str, headline: str, risks: list[str], actions: 
     return "\n".join(lines)
 
 
+NWS_EVENT_WORDS = ["flood warning", "flash flood warning", "flood watch", "flash flood watch", "flood advisory",
+                   "heat advisory", "excessive heat warning", "extreme heat warning", "red flag warning",
+                   "fire weather watch", "severe thunderstorm warning", "severe thunderstorm watch", "tornado warning"]
+
+
+def unsupported_claims(text: str, inputs: dict) -> list[str]:
+    """Hazard words the input doesn't support (numbers are checked separately). Catches e.g.
+    "saturated soil" when the soil is only moist, or a Flood Warning that isn't in effect."""
+    lowered = text.lower()
+    claims = []
+    soil = (inputs.get("soil") or {}).get("level")
+    if "saturated" in lowered and soil != "saturated":
+        claims.append(f"'saturated' (soil is {soil or 'unknown'})")
+    events = {a["event"].lower() for a in inputs.get("nws_alerts") or []}
+    for phrase in NWS_EVENT_WORDS:
+        if phrase in lowered and phrase not in events and not any(phrase in e for e in events):
+            claims.append(f"'{phrase}' (no such NWS alert)")
+    storm_chance = max([p.get("thunderstorm_chance_pct") or 0 for p in inputs.get("periods", [])] + [0])
+    if "thunderstorm" in lowered and storm_chance == 0 and not any("thunderstorm" in e for e in events):
+        claims.append("'thunderstorm' (0% thunderstorm chance)")
+    crew = {r["category"] for r in inputs.get("crew_reports_last_48_h_within_2_mi") or []}
+    if ("downed line" in lowered or "line down" in lowered) and "Downed line" not in crew:
+        claims.append("'downed line' (no crew report of one)")
+    band = ((inputs.get("heat") or {}).get("osha_risk_band") or "")
+    if ("very high" in lowered or "extreme" in lowered) and band != "very high":
+        claims.append(f"'very high'/'extreme' heat (OSHA band is {band or 'unknown'})")
+    return claims
+
+
 def problems(text: str, inputs: dict) -> list[str]:
     issues = []
     if (bad := ungrounded_numbers(text, inputs)):
         issues.append(f"these numbers are not in the JSON: {', '.join(bad)}")
+    if (claims := unsupported_claims(text, inputs)):
+        issues.append(f"these hazards are not in the JSON: {'; '.join(claims)}")
     if (words := len(text.split())) >= MAX_WORDS:
         issues.append(f"{words} words; must be under {MAX_WORDS}")
     return issues
@@ -139,6 +175,17 @@ def template(inputs: dict) -> Written:
         risks.append((priority.get("wildlife", 7), text.strip()))
         actions.append("Walk the work area before staging and watch for snakes and alligators near water and brush.")
 
+    for report in inputs.get("crew_reports_last_48_h_within_2_mi") or []:
+        where = f"{report['distance_mi']} mi away, reported {report['reported']}"
+        if report["category"] == "Downed line":
+            risks.append((-2, f"Crew reported a downed line {where}."))
+            actions.insert(0, "Stay clear of the reported downed line and treat it as energized until it is confirmed safe.")
+        elif report["category"] == "Heat illness":
+            risks.append((-2, f"Crew reported heat illness {where}."))
+            actions.insert(0, "Check on every crew member; enforce water, shade and rest breaks from the start of the shift.")
+        else:
+            risks.append((3, f"Crew report: {report['category']}, {where}."))
+
     risks.sort(key=lambda r: r[0])
     top = [r for _, r in risks[:3]]
     if not top:
@@ -160,13 +207,15 @@ def _call_gemini(inputs: dict, key: str, model: str, feedback: str | None) -> di
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        # thinkingLevel "low" is the lowest gemini-3.8-flash accepts (verified: invalid values get a 400).
         "generationConfig": {"responseMimeType": "application/json", "responseSchema": SCHEMA,
-                             "temperature": 0.2, "maxOutputTokens": 4096},
+                             "temperature": 0.2, "maxOutputTokens": 4096,
+                             "thinkingConfig": {"thinkingLevel": "low"}},
     }
     request = urllib.request.Request(
         API.format(model=model), data=json.dumps(body).encode(), method="POST",
         headers={"Content-Type": "application/json", "x-goog-api-key": key})
-    with urllib.request.urlopen(request, timeout=60) as resp:
+    with urllib.request.urlopen(request, timeout=GEMINI_TIMEOUT_SECONDS) as resp:
         data = json.load(resp)
     candidate = (data.get("candidates") or [{}])[0]
     if candidate.get("finishReason") not in (None, "STOP"):
@@ -176,28 +225,78 @@ def _call_gemini(inputs: dict, key: str, model: str, feedback: str | None) -> di
 
 
 _last_call = 0.0
+_rate_lock = threading.Lock()
+# A 429 asking us to wait longer than this means a quota is used up (the free tier's limit is per
+# day): skip Gemini until then instead of failing every remaining site one by one.
+QUOTA_PAUSE_AFTER_SECONDS = 60
+_paused_until = 0.0   # time.monotonic()
+
+
+def _retry_delay_seconds(err: urllib.error.HTTPError) -> float | None:
+    """How long Gemini asks us to wait, from RetryInfo.retryDelay ("72675s") or the message
+    ("Please retry in 20h11m15s"). None if it doesn't say."""
+    try:
+        error = json.loads(err.read() or b"{}").get("error", {})
+    except (ValueError, OSError):
+        return None
+    for detail in error.get("details", []):
+        if detail.get("@type", "").endswith("RetryInfo") and str(detail.get("retryDelay", "")).endswith("s"):
+            try:
+                return float(detail["retryDelay"][:-1])
+            except ValueError:
+                pass
+    m = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", error.get("message", ""))
+    if m and any(m.groups()):
+        h, mi, s = (float(g) if g else 0.0 for g in m.groups())
+        return h * 3600 + mi * 60 + s
+    return None
+
+
+def gemini_paused_seconds() -> float:
+    """Seconds until Gemini is tried again after a used-up quota (0 when it isn't paused)."""
+    return max(0.0, _paused_until - time.monotonic())
+GEMINI_TIMEOUT_SECONDS = 150   # calls took 12-90 s in testing
+
+
+def _wait_turn(min_interval: float) -> None:
+    """Space out call starts (thread-safe: briefings are written concurrently)."""
+    global _last_call
+    with _rate_lock:
+        wait = min_interval - (time.monotonic() - _last_call)
+        if wait > 0:
+            time.sleep(wait)
+        _last_call = time.monotonic()
 
 
 def write(inputs: dict) -> Written:
     """Gemini if configured and grounded, else the template. Never raises."""
     settings = get_settings()
-    if not settings.gemini_api_key:
+    if not settings.gemini_api_key or gemini_paused_seconds() > 0:
         return template(inputs)
-    global _last_call
     feedback = None
     for attempt in range(2):
-        wait = settings.gemini_min_interval_seconds - (time.monotonic() - _last_call)
-        if wait > 0:
-            time.sleep(wait)  # stay under the API's per-minute rate limit
-        _last_call = time.monotonic()
+        _wait_turn(settings.gemini_min_interval_seconds)  # stay under the per-minute rate limit
         try:
             out = _call_gemini(inputs, settings.gemini_api_key, settings.gemini_model, feedback)
             headline, risks, actions = out["headline"], list(out["risks"])[:3], list(out["actions"])[:4]
         except urllib.error.HTTPError as err:
+            if err.code == 429:
+                delay = _retry_delay_seconds(err)
+                if delay is not None and delay > QUOTA_PAUSE_AFTER_SECONDS:
+                    global _paused_until
+                    _paused_until = max(_paused_until, time.monotonic() + delay)
+                    log.warning("Gemini quota used up; using the template for the next %.1f h", delay / 3600)
+                    return template(inputs)
+                if attempt == 0:
+                    time.sleep(delay if delay is not None else 10)   # short rate limit: wait it out once
+                    continue
             log.warning("Gemini HTTP %s for %s; using template", err.code, inputs["site"]["name"])
-            if err.code == 429 and attempt == 0:
-                time.sleep(10)
+            return template(inputs)
+        except TimeoutError:
+            if attempt == 0:
+                log.info("Gemini timed out for %s; retrying once", inputs["site"]["name"])
                 continue
+            log.warning("Gemini timed out twice for %s; using template", inputs["site"]["name"])
             return template(inputs)
         except Exception as err:  # noqa: BLE001 - network, bad JSON, blocked output: fall back
             log.warning("Gemini failed for %s (%s); using template", inputs["site"]["name"], type(err).__name__)

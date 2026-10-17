@@ -1,17 +1,33 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from psycopg_pool import ConnectionPool
+from pydantic import TypeAdapter
 
 from app import mocks, site_data
+from app.cache import api_cache
 from app.db import get_pool, get_pool_optional
 from app.schemas import Briefing, SendBriefingRequest, SendBriefingResponse
 from briefing import service
 
 router = APIRouter(prefix="/briefing", tags=["briefing"])
+list_router = APIRouter(tags=["briefing"])
 log = logging.getLogger(__name__)
+_briefings = TypeAdapter(list[Briefing])
+
+
+@list_router.get("/briefings", response_model=list[Briefing])
+def list_briefings(pool: ConnectionPool = Depends(get_pool)):
+    """The latest briefing for every site in one response (largest plant first). Cached for
+    API_CACHE_SECONDS; generating briefings clears the cache. 503 without a database: briefings
+    are never shown from samples."""
+    def compute() -> bytes:
+        rows = [service.to_response(r) for r in service.latest_all(pool)]
+        return _briefings.dump_json(_briefings.validate_python(rows))
+
+    return Response(api_cache.get_or_compute(("briefings",), compute), media_type="application/json")
 
 
 @router.get("/{site_id}", response_model=Briefing)
