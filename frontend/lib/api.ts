@@ -1,11 +1,20 @@
-import type { Alert, ApiError, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, StartReplayRequest } from "@shared/types";
+import type { Alert, ApiError, Briefing, CreateReportRequest, HazardReport, UploadResponse, LightningFlash, ReplayStatus, Site, SendBriefingRequest, SendBriefingResponse, SiteDetail, StartReplayRequest } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
+import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
+import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
 
 import mockReports from "@shared/mocks/reports.json";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+/** The backend answered with an error status (as opposed to being unreachable). */
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
 
 /** Request the backend and throw if it's unreachable or returns an error. Never falls back to mocks:
  *  safety data the UI can't verify must show as unknown, not as sample values. */
@@ -13,7 +22,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null;
-    throw new Error(body?.detail ?? `${res.status} ${res.statusText}`);
+    throw new ApiRequestError(body?.detail ?? `${res.status} ${res.statusText}`, res.status);
   }
   return (await res.json()) as T;
 }
@@ -30,8 +39,14 @@ export async function orNull<T>(promise: Promise<T>): Promise<T | null> {
 
 export const getReports = () => request<HazardReport[]>("/reports");
 export const getSites = () => request<Site[]>("/sites");
+export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
+/** 404 means the site has no briefing yet (see ApiRequestError.status). */
+export const getBriefing = (siteId: string) => request<Briefing>(`/briefing/${encodeURIComponent(siteId)}`);
+/** One site: generated right away. All sites (no site_id): queued in the background. */
+export const sendBriefingNow = (body: SendBriefingRequest = {}) =>
+  request<SendBriefingResponse>("/briefing/send-now", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const getReplayStatus = () => request<ReplayStatus>("/replay/status");
 export const startReplay = (body: StartReplayRequest = {}) =>
   request<ReplayStatus>("/replay/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -43,6 +58,10 @@ export const DEMO_DATA = {
   sites: mockSites as Site[],
   alerts: mockAlerts as Alert[],
   lightning: mockLightning as LightningFlash[],
+  /** Keyed by site id; only the 6 mock sites have one. */
+  siteDetails: mockSiteDetails as Record<string, SiteDetail>,
+  /** Keyed by site id; only the 6 mock sites have one. */
+  briefings: mockBriefings as Record<string, Briefing>,
 };
 
 export function validatePhoto(file: File): string | null {

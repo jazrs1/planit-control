@@ -1,6 +1,8 @@
+import Link from "next/link";
 import type { Alert, Site } from "@shared/types";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
+import { formatSiteTime, timeZoneAbbr } from "@/lib/time";
 
 // Reference component: copy this structure for new cards.
 // - Props are shared/types shapes, not ad-hoc objects.
@@ -20,21 +22,6 @@ type SiteCardProps = {
   selected?: boolean;
   onSelect?: () => void;
 };
-
-function formatLocalTime(iso: string, timeZone: string) {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    timeZone,
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-}
-
-/** "ET" / "CT". The panhandle sites run on Central time. */
-function timeZoneAbbr(timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "shortGeneric" }).formatToParts();
-  return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
-}
 
 export default function SiteCard({ site, lightningAlert, selected, onSelect }: SiteCardProps) {
   const risk = RISK_STYLES[riskLevel(site.hazard_index)];
@@ -62,6 +49,10 @@ export default function SiteCard({ site, lightningAlert, selected, onSelect }: S
         <span className="font-medium">{HAZARD_LABEL[site.top_hazard]}</span>
       </p>
 
+      <Link href={`/sites/${site.id}`} className="rounded-card border border-border px-3 py-2 text-sm font-medium text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">
+        Site details →
+      </Link>
+
       {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className="rounded-card border border-border px-3 py-2 text-left text-sm text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">{selected ? "Selected on map" : "Show on map"}</button>}
 
       {lightningAlert && (
@@ -75,7 +66,7 @@ export default function SiteCard({ site, lightningAlert, selected, onSelect }: S
           <StopWorkCountdown all_clear_at={lightningAlert.all_clear_at} />
           {lightningAlert.all_clear_at && (
             <p className="font-normal">
-              All clear at {formatLocalTime(lightningAlert.all_clear_at, site.timezone)} if no new strikes
+              All clear at {formatSiteTime(lightningAlert.all_clear_at, site.timezone)} if no new strikes
             </p>
           )}
         </div>

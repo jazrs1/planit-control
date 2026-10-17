@@ -25,10 +25,11 @@ export default function TopNavigation() {
           <span className="sm:hidden">PlanIT</span><span className="hidden sm:inline">PlanIT Control</span>
         </Link>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-        <Link href="/reports" className="flex min-h-11 items-center px-2 text-sm font-semibold text-brand">Reports</Link>
+        <Link href="/briefings" aria-current={pathname === "/briefings" ? "page" : undefined} className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Briefings</Link>
+        <Link href="/reports" className="flex min-h-11 items-center px-1.5 text-sm font-semibold text-brand sm:px-2">Reports</Link>
         <Link
           href="/alerts"
-          className="flex min-h-11 flex-wrap items-center justify-center gap-x-1 rounded-pill px-2 text-sm font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand"
+          className="flex min-h-11 flex-wrap items-center justify-center gap-x-1 rounded-pill px-1.5 text-sm font-semibold text-text sm:px-2 focus-visible:outline-2 focus-visible:outline-brand"
           aria-label={badge.label}
         >
           Alerts
