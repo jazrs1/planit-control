@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     briefing_hour: int = 18
     # Briefing writers, in order: Claude, then Gemini, then the template (briefing/writer.py).
     claude_model: str = "claude-sonnet-5-5"
+    # Rereads each model-written briefing against its input JSON (empty: no review).
+    claude_review_model: str = "claude-haiku-5-5"
     gemini_model: str = "gemini-3.8-flash"
     gemini_min_interval_seconds: float = 4.0   # ~15 requests/minute
     briefing_concurrency: int = 4              # briefings written at once (model calls are slow)
