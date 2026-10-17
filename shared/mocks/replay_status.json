@@ -5,5 +5,8 @@
   "simulated_now": "2025-08-14T19:24:40Z",
   "files_total": 180,
   "files_done": 74,
-  "flashes_ingested": 1286
+  "flashes_ingested": 1286,
+  "window_start": "2025-08-14T19:00:00Z",
+  "window_end": "2025-08-14T20:00:00Z",
+  "quiet_until": "2025-08-14T20:31:00Z"
 }

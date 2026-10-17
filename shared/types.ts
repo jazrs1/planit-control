@@ -43,6 +43,9 @@ export interface LightningApproach {
   distance_mi: number;
   issued_at: string;
   updated_at: string;
+  /** True for a replay advisory (issued on the replay clock), like Alert.replay. During a replay a
+   * site can show a replay advisory; keep those off real counts. */
+  replay: boolean;
 }
 
 export interface Site {
@@ -413,6 +416,51 @@ export interface ReplayStatus {
   files_total: number;
   files_done: number;
   flashes_ingested: number;
+  /** Simulated time of the first GLM file of the current or most recent run; null before any replay. */
+  window_start: string | null;
+  /** Simulated end of the storm data (last file's end); the quiet period follows. */
+  window_end: string | null;
+  /** window_end + the 31-minute quiet period: when the replay stops by itself. */
+  quiet_until: string | null;
+}
+
+// ---------- GET /replay/events ----------
+
+/** flood_start is reserved: flood alerts are live-only, so a replay has none today. */
+export type ReplayEventKind = "stop_work_start" | "approach_start" | "all_clear" | "flood_start";
+
+/** GET /replay/events: ReplayEvent[], oldest first, for the current or most recent replay run only
+ * (never live events). The WHOLE storm is listed as soon as the replay starts (worked out ahead of time
+ * with the same rules), so show only events with `at` <= ReplayStatus.simulated_now. 503 with
+ * Retry-After for ~30 s the first time a window is used on a server. */
+export interface ReplayEvent {
+  id: string;
+  /** Simulated time: the first strike for stop_work_start (= Alert.started_at), the all-clear time
+   * for all_clear, and when the advisory was issued for approach_start. */
+  at: string;
+  kind: ReplayEventKind;
+  site_id: string;
+  /** Strike distance for stop_work_start, leading-edge distance for approach_start; null otherwise. */
+  distance_mi: number | null;
+}
+
+// ---------- GET /replay/series ----------
+
+export interface ReplaySeriesBin {
+  /** Start of the 5-minute bin, simulated time. */
+  start: string;
+  /** Flashes in the bin (Florida + 30 mi); a bin still in progress counts up to simulated now. */
+  flashes: number;
+  /** Sites in a replay stop-work at the end of the bin (at simulated now for the bin in progress). */
+  sites_in_stop_work: number;
+}
+
+/** GET /replay/series, for the current or most recent replay run. */
+export interface ReplaySeries {
+  bin_minutes: 5;
+  /** Bins from window_start up to simulated now (or where the last run ended); the frontend draws
+   * later bins as empty. [] before any replay. */
+  bins: ReplaySeriesBin[];
 }
 
 // ---------- GET /sites/{id}/score-history ----------

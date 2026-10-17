@@ -1,0 +1,23 @@
+[
+  {
+    "id": "2025-08-04_2200-2300:6",
+    "at": "2025-08-04T22:00:09.750898+00:00",
+    "kind": "stop_work_start",
+    "site_id": "okeechobee-clean-energy-center",
+    "distance_mi": 6.58
+  },
+  {
+    "id": "2025-08-04_2200-2300:9",
+    "at": "2025-08-04T22:10:20+00:00",
+    "kind": "approach_start",
+    "site_id": "vandolah-power-station",
+    "distance_mi": 11.3
+  },
+  {
+    "id": "2025-08-04_2200-2300:57",
+    "at": "2025-08-04T23:29:36.959642+00:00",
+    "kind": "all_clear",
+    "site_id": "okeechobee-clean-energy-center",
+    "distance_mi": null
+  }
+]

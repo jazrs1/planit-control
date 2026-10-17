@@ -116,6 +116,7 @@ Other commands: `npm run typecheck`, `npm run build`.
 | POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`, at most once a minute per site) or all (at most once per 15 min). Needs `X-Admin-Token` |
 | GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
 | GET | `/sites/{id}/beacon` | Tiny alarm state: stop / unknown / approaching / flood / clear, with countdowns |
+| GET | `/replay/events`, `/replay/series` | The replay storm's events and 5-minute charts for the timeline ([`docs/replay-timeline.md`](docs/replay-timeline.md)) |
 | GET | `/push/public-key` | VAPID public key for web push |
 | POST | `/push/subscribe`, `/push/unsubscribe`, `/push/test` | Web push subscriptions (sites or all, crew or supervisor) and a test notification; see [`docs/push-notifications.md`](docs/push-notifications.md) |
 

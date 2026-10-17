@@ -188,7 +188,8 @@ def view(adv: dict | None, now: datetime) -> dict | None:
             "minutes_to_arrival": max(0, math.ceil((adv["arrival_at"] - now).total_seconds() / 60)),
             "from_direction": cellmod.compass(adv["from_bearing_deg"]), "from_bearing_deg": adv["from_bearing_deg"],
             "heading_deg": adv["heading_deg"], "speed_mph": adv["speed_mph"], "distance_mi": adv["distance_mi"],
-            "issued_at": adv["started_at"], "updated_at": adv["updated_at"]}
+            "issued_at": adv["started_at"], "updated_at": adv["updated_at"],
+            "replay": bool(adv.get("replay", False))}
 
 
 def beacon(site_id: str, alerts: list[dict], advisory: dict | None, now: datetime, current: bool = True) -> dict:

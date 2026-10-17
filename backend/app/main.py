@@ -14,6 +14,7 @@ from briefing import service as briefing_service
 from hazards import scheduler as hazard_scheduler
 from lightning import live
 from lightning import replay as replay_runner
+from lightning import timeline as replay_timeline
 from push import notify as push_notify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
@@ -30,6 +31,8 @@ async def lifespan(app: FastAPI):
         tasks += hazard_scheduler.start(db.get_pool())
     if settings.briefing_enabled and settings.database_url:
         tasks.append(asyncio.create_task(briefing_service.run_loop(db.get_pool())))
+    for window in replay_runner.available_windows():
+        replay_timeline.ensure(window)   # GET /replay/events: the whole storm, built once per window (~30 s)
     if settings.push_enabled and settings.push_configured and settings.database_url:
         tasks.append(asyncio.create_task(push_notify.run_sweep_loop()))
     yield
