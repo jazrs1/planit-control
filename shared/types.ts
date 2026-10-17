@@ -179,6 +179,37 @@ export interface Briefing {
   key_numbers: BriefingKeyNumbers;
 }
 
+// ---------- GET /lightning/recent?minutes=15 ----------
+
+/** One GOES-19 GLM flash over Florida (+30 mi). */
+export interface LightningFlash {
+  ts: string;
+  lat: number;
+  lon: number;
+}
+
+export type LightningRecentResponse = LightningFlash[];
+
+// ---------- POST /replay/start, POST /replay/stop, GET /replay/status ----------
+
+export interface StartReplayRequest {
+  /** Folder name under backend/data/replay/; defaults to the newest one. */
+  window?: string | null;
+  /** Simulated seconds per real second. Default 30. */
+  speed?: number;
+}
+
+export interface ReplayStatus {
+  running: boolean;
+  window: string | null;
+  speed: number | null;
+  /** The app's simulated "now" while running; null otherwise. */
+  simulated_now: string | null;
+  files_total: number;
+  files_done: number;
+  flashes_ingested: number;
+}
+
 // ---------- Errors ----------
 
 export interface ApiError {

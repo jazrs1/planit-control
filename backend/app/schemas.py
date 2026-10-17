@@ -128,3 +128,24 @@ class Briefing(BaseModel):
     top_hazard: HazardType
     text: str
     key_numbers: BriefingKeyNumbers
+
+
+class LightningFlash(BaseModel):
+    ts: datetime
+    lat: float
+    lon: float
+
+
+class StartReplayRequest(BaseModel):
+    window: str | None = None
+    speed: float = Field(30, gt=0, le=3600)
+
+
+class ReplayStatus(BaseModel):
+    running: bool
+    window: str | None
+    speed: float | None
+    simulated_now: datetime | None
+    files_total: int
+    files_done: int
+    flashes_ingested: int
