@@ -106,14 +106,14 @@ test("a real stop-work wins over a replay one for the same site, in the row and 
   const Card = load("components/SiteCard.tsx").default;
   const replayed = { ...lightning, id: "replay-1", replay: true, all_clear_at: "2025-08-04T22:40:00Z" };
   // /alerts lists replay alerts first.
-  const html = render(Card, { site, alerts: [replayed, lightning] });
+  const html = render(Card, { site, alerts: [replayed, lightning], nowMs: Date.parse("2025-08-04T22:20:00Z") });
   assert.match(html, /pc-chip--stop/);
   assert.match(html, /bg-risk-red-bg/);
-  assert.doesNotMatch(html, /pc-chip--replay-stop|REPLAY/);
+  assert.ok(html.indexOf("pc-chip--stop") < html.indexOf("REPLAY"), "the real state leads; the replay is a secondary tag");
   assert.equal(helpers.siteAlert([replayed, lightning], site.id, "lightning").id, lightning.id);
   assert.equal(helpers.siteAlert([replayed], site.id, "lightning").id, "replay-1");
   // A replay-only stop-work stays blue and dashed, never the real red.
-  const replayOnly = render(Card, { site, alerts: [replayed] });
+  const replayOnly = render(Card, { site, alerts: [replayed], nowMs: Date.parse("2025-08-04T22:20:00Z") });
   assert.match(replayOnly, /REPLAY/);
   assert.match(replayOnly, /pc-chip--replay-stop/);
   assert.doesNotMatch(replayOnly, /bg-risk-red-bg|pc-chip--stop"/);
@@ -138,6 +138,21 @@ test("navigation breaks down alert types and chooses amber for flood-only alerts
   assert.match(nav([flood], "stale"), /0\? stop work · 1\? flood risk/);
   assert.doesNotMatch(nav([flood], "stale"), /bg-risk-amber/);
   assert.match(nav([flood], "demo"), /Demo data/);
+});
+
+test("a replay stop-work never hides a real advisory or flood alert, and reads 'cleared' once it ends", () => {
+  const Card = load("components/SiteCard.tsx").default;
+  const replayed = { ...lightning, id: "replay-1", replay: true, all_clear_at: "2025-08-04T22:40:00Z" };
+  const approach = { arrival_at: "2025-08-04T22:30:00Z", minutes_to_arrival: 20, from_direction: "W", from_bearing_deg: 270, heading_deg: 90, speed_mph: 18, distance_mi: 14, issued_at: "2025-08-04T22:00:00Z", updated_at: "2025-08-04T22:10:00Z", replay: false };
+  const during = Date.parse("2025-08-04T22:20:00Z");
+  const withAdvisory = render(Card, { site: { ...site, lightning_approach: approach }, alerts: [replayed], nowMs: during });
+  assert.match(withAdvisory, /Lightning possible/);
+  assert.ok(withAdvisory.indexOf("Lightning possible") < withAdvisory.indexOf("REPLAY"));
+  const withFlood = render(Card, { site, alerts: [replayed, flood], nowMs: during });
+  assert.ok(withFlood.indexOf("Flood risk") >= 0 && withFlood.indexOf("Flood risk") < withFlood.indexOf("REPLAY"));
+  const after = render(Card, { site, alerts: [replayed], nowMs: Date.parse("2025-08-04T22:41:00Z") });
+  assert.match(after, /Replay · cleared/);
+  assert.doesNotMatch(after, /Stop work|STOP WORK|All clear/);
 });
 
 test("navigation counts never include replay alerts", () => {

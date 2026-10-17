@@ -230,6 +230,8 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
     getSites: async () => [site],
     getLightningRecent: async () => { if (failFlashes) throw Error("offline flashes"); return [{ lat: 28, lon: -82, ts: approach.updated_at }]; },
     getLightningCells: async () => { cellReads++; if (failCells) throw Error("offline cells"); return [cell]; },
+    // A server without #48's counts endpoint: the dashboard counts the flashes it has.
+    getLightningCounts: async () => { throw Error("404 Not Found"); },
   });
   const Dashboard = load("components/SupervisorDashboard.tsx", overrides).default;
   const draw = () => { polls = []; return driver.render(Dashboard, { initialSites: [site] }); };

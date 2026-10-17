@@ -13,6 +13,8 @@ export type ReplayTimelineData = {
   failed: boolean;
   /** The server is still preparing this window's timeline (503) and nothing has arrived yet. */
   preparing: boolean;
+  /** Ask again now (after a failure). */
+  retry?: () => void;
 };
 
 const EMPTY: ReplayTimelineData = { events: null, series: null, failed: false, preparing: false };
@@ -43,5 +45,5 @@ export function useReplayTimeline(window: string | null, ms: number | null): Rep
     });
   }, []);
   usePolling(poll, ms);
-  return data;
+  return { ...data, retry: () => { void poll(); } };
 }

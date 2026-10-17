@@ -25,6 +25,20 @@ export function siteAlert(alerts: Alert[] | null | undefined, siteId: string, ty
   return mine.find((alert) => !alert.replay) ?? mine[0];
 }
 
+/** A replay stop-work whose countdown has ended on the replay clock: it's over, never "stop work". */
+export function replayCleared(alert: Alert | undefined, nowMs: number | null): boolean {
+  if (!alert?.replay || alert.type !== "lightning" || !alert.all_clear_at || nowMs === null) return false;
+  const end = Date.parse(alert.all_clear_at);
+  return Number.isFinite(end) && end <= nowMs;
+}
+
+/** "Replay · cleared 6:55 PM": a finished replay stop-work, in the site's zone. */
+export function replayClearedLabel(alert: Alert, timezone?: Site["timezone"]): string {
+  const end = alert.all_clear_at ? new Date(alert.all_clear_at) : null;
+  const time = end && Number.isFinite(end.getTime()) ? end.toLocaleTimeString("en-US", { timeZone: timezone ?? "UTC", hour: "numeric", minute: "2-digit" }) : null;
+  return time ? `Replay · cleared ${time}` : "Replay · cleared";
+}
+
 export function countAlerts(alerts: Alert[]) {
   const lightning = alerts.filter((alert) => alert.type === "lightning").length;
   const flood = alerts.filter((alert) => alert.type === "flood").length;
