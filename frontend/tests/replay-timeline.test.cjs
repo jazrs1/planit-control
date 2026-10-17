@@ -71,6 +71,14 @@ test("before the timeline is ready (503s retried quietly) the panel says so, nev
   for (const html of [loading, preparing]) assert.doesNotMatch(html, /Needs data/);
 });
 
+test("a failed timeline (not a 503) says it couldn't load and offers a retry, never 'Loading…' forever", () => {
+  const failed = render({ timeline: { events: null, series: null, failed: true, preparing: false, retry: () => {} } });
+  assert.match(failed, /Couldn’t load the storm’s events\./);
+  assert.match(failed, /<button[^>]*>Retry<\/button>/);
+  assert.doesNotMatch(failed, /Loading the storm/);
+  assert.match(failed, /<span class="font-mono">…<\/span>/, "the events count stays unknown, not 0");
+});
+
 test("event times use each site's own timezone, naming it when it isn't Eastern", () => {
   const html = render();
   assert.match(html, /6:05 PM</, "an Eastern site's stop-work at 22:05 UTC");

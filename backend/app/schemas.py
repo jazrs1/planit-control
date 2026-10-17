@@ -232,6 +232,13 @@ class LightningFlash(BaseModel):
     ts: datetime
     lat: float
     lon: float
+    replay: bool = False
+
+
+class LightningRecentCounts(BaseModel):
+    minutes: int
+    real: int
+    replay: int
 
 
 class StartReplayRequest(BaseModel):
@@ -380,6 +387,7 @@ class LightningCell(BaseModel):
     heading_deg: float | None
     moving_toward: str | None
     last_flash_at: datetime
+    replay: bool = False
 
 
 # ---------- GET /sites/{id}/beacon ----------

@@ -5,10 +5,10 @@
 | Real time after **Replay storm** | Simulated | What happens |
 |---|---|---|
 | 0:00 | 6:00 PM | **Okeechobee** goes to stop-work (strike 6.6 mi away) |
-| ≈ 0:21 | 6:10 PM | **Vandolah: lightning possible.** Beacon **yellow**, `STORM NEARBY`, 3 beeps (LCD text pending A's REPLAY label) |
-| ≈ 1:09 | 6:34 PM | **Vandolah: stop-work.** Beacon **red**, `STOP WORK 30:00` counting down at 30×, 3 beeps (LCD text pending A's REPLAY label) |
+| ≈ 0:21 | 6:10 PM | **Vandolah: lightning possible.** Beacon **yellow**, `REPLAY Vandolah` / `STORM NEARBY`, 3 beeps |
+| ≈ 1:09 | 6:34 PM | **Vandolah: stop-work.** Beacon **red**, `REPLAY Vandolah` / `STOP WORK 30:00` counting down at 30×, 3 beeps |
 | 2:00 | 7:00 PM | Last satellite file. Quiet period; countdowns finish |
-| ≈ 2:49 | 7:24 PM | Vandolah all clear: beacon **green** |
+| ≈ 2:49 | 7:24 PM | Vandolah all clear: beacon **green**, `Vandolah Power S` / `ALL CLEAR` |
 | ≈ 2:59 | 7:29:36 PM | **Okeechobee clears**, exactly 30 min after its last strike |
 | ≈ 3:02 | 7:31 PM | Replay ends; the app is back on live data by itself |
 
@@ -18,7 +18,7 @@
 - **Counts:** **High risk**, **Stop work** and the nav badge count real alerts only. The replay's counts are on the dark replay panel.
 - **Index:** the score shown is the live one (`hazard_index_live`). A replay-raised score gets a dashed blue outline, never a real red.
 
-**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** _(Pending A's change: until the beacon firmware adds the REPLAY label, its LCD shows the same text as for a real alert.)_ The beacon shows the site's combined state, and a real stop-work always wins.
+**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** On the beacon, a replay stop-work or approach puts `REPLAY` before the site name on line 1 (`REPLAY Vandolah`); a real alert shows the plain site name. **Any real alert always beats a replay on the beacon:** a real stop-work, storm warning, flood alert or unknown always shows over the replay. The replay's state shows only when the real state is clear.
 
 ## 1. Preflight (15 minutes before)
 
@@ -44,20 +44,20 @@
 
 **0:05. The storm comes in.**
 - **Watch:** flashes fill the map, and Okeechobee is already in stop-work.
-- **Say:** "This is the real satellite record of a real storm, going through the same code as live. Replay alerts are blue on screen and labeled REPLAY on the beacon, so nobody mistakes them for a real one." _(Beacon label pending A's change.)_
+- **Say:** "This is the real satellite record of a real storm, going through the same code as live. Replay alerts are blue on screen and labeled REPLAY on the beacon, so nobody mistakes them for a real one."
 
 **≈ 0:21. Vandolah: yellow.**
-- **Beacon:** yellow, `STORM NEARBY`, three beeps.
+- **Beacon:** yellow, line 1 `REPLAY Vandolah`, line 2 `STORM NEARBY`, three beeps.
 - **Screen:** Vandolah's row shows **REPLAY · LIGHTNING POSSIBLE WITHIN THE HOUR**.
 - **Say:** "Our storm-cell forecast tracked this cell about 24 simulated minutes before it arrived. We don't show minutes, because arrival estimates ran late."
 
 **≈ 1:09. Vandolah: red.**
-- **Beacon:** red, `STOP WORK 30:00`, counting down.
+- **Beacon:** red, line 1 `REPLAY Vandolah`, line 2 `STOP WORK mm:ss` counting down at replay speed (30×) from `30:00`.
 - **Screen:** Vandolah gets a blue **Stop work** chip with a countdown, and a dashed blue ring on the map.
 - **Say:** "A strike within 10 miles stops work. All clear is 30 minutes after the last strike."
 - Press the beacon button to silence the beeps.
 
-**1:20. Okeechobee's countdown.** Click its row in **Sites by risk** (replay stop-work sites sort right after any real ones). Optionally, hold the beacon button 2 s to switch it to Okeechobee.
+**1:20. Okeechobee's countdown.** Click its row in **Sites by risk** (replay stop-work sites sort right after any real ones). Optionally, hold the beacon button 2 s to switch it to Okeechobee: `REPLAY Okeechobe` / `STOP WORK mm:ss` (line 1 is cut to 16 characters).
 - **Say:** "Every new strike within 10 miles resets the 30 minutes. Okeechobee reset 177 times in this storm, and it clears exactly 30 minutes after its final strike, even if satellite files arrive late."
 
 **1:40. Replay panel.**
