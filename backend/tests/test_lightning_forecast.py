@@ -152,15 +152,41 @@ def arr(minutes=20.0):
     return cells.Arrival("c", NOW + timedelta(minutes=minutes), minutes, 270.0, 20.0, 30.0, 90.0, 200)
 
 
-def adv(site, updated_ago_min=0.5):
-    return approach.Advisory(f"adv-{site}", site, NOW - timedelta(minutes=10), NOW - timedelta(minutes=updated_ago_min),
-                             NOW + timedelta(minutes=10), NOW + timedelta(minutes=12))
+def adv(site, updated_ago_min=0.5, arrival_in_min=10.0):
+    return approach.Advisory(f"adv-{site}", site, NOW - timedelta(minutes=40), NOW - timedelta(minutes=updated_ago_min),
+                             NOW + timedelta(minutes=arrival_in_min), NOW + timedelta(minutes=12))
 
 
-def test_plan_creates_updates_and_clears_with_grace():
-    actions = approach.plan({"a": arr(), "b": arr(), "c": None, "d": None},
-                            stop_work=set(), active={"b": adv("b"), "c": adv("c", 3), "d": adv("d", 1)}, now=NOW)
-    assert {(x.kind, x.site_id) for x in actions} == {("create", "a"), ("update", "b"), ("clear", "c")}  # d: in grace
+def test_plan_creates_updates_and_clears_after_the_hold():
+    actions = approach.plan(
+        {"a": arr(), "b": arr(), "c": None, "d": None, "e": None},
+        stop_work=set(),
+        active={"b": adv("b"),
+                "c": adv("c", updated_ago_min=16, arrival_in_min=-20),   # 16 min unsupported, arrival long past
+                "d": adv("d", updated_ago_min=14, arrival_in_min=-20),   # unsupported for 14 min: held
+                "e": adv("e", updated_ago_min=20, arrival_in_min=-10)},  # arrival only 10 min ago: held
+        now=NOW)
+    assert {(x.kind, x.site_id) for x in actions} == {("create", "a"), ("update", "b"), ("clear", "c")}
+
+
+def test_an_advisory_is_held_until_15_min_after_its_arrival_estimate():
+    # Vandolah, Aug 4 2025: last supported 22:14, estimated arrival 22:23, stop-work 22:34. A hold of 15 min
+    # past the last valid cycle alone would have shown "clear" from 22:29 to 22:34.
+    held = adv("v", updated_ago_min=15, arrival_in_min=-6)
+    assert approach.plan({"v": None}, stop_work=set(), active={"v": held}, now=NOW) == []
+    gone = adv("v", updated_ago_min=21, arrival_in_min=-15)
+    assert [x.kind for x in approach.plan({"v": None}, stop_work=set(), active={"v": gone}, now=NOW)] == ["clear"]
+
+
+def test_aug_4_replay_has_no_green_gap_before_any_stop_work():
+    from lightning.replay import available_windows
+    from scripts import evaluate_lightning_forecast as ev
+    if "2025-08-04_2200-2300" not in available_windows():
+        pytest.skip("replay files not downloaded (python -m scripts.find_replay_window)")
+    report = ev.simulate("2025-08-04_2200-2300")        # in memory; writes nothing
+    assert report["green_gaps"] == []
+    vandolah = [r for r in report["per_stop_work"] if r["site_id"] == "vandolah-power-station"]
+    assert vandolah and vandolah[0]["lead_min"] is not None
 
 
 def test_plan_never_advises_a_site_in_stop_work_and_supersedes_its_advisory():

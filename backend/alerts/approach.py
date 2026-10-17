@@ -11,7 +11,12 @@ Safety rules:
     alerts; it has no code path that writes them, so it can't shorten, extend or clear one.
   - A site in stop-work gets no advisory; an open one is marked 'superseded' when the stop-work starts.
   - "Now" is the hook's `now` (simulated during replay); replay advisories are stored with replay = true.
-  - An advisory survives GRACE without a supporting projection, so one noisy cycle doesn't flicker it.
+  - Once raised, an advisory is held until HOLD after the later of the last cycle that supported it
+    and its estimated arrival (unless a stop-work supersedes it). Storm tracks come and go as cells
+    merge, split or weaken, and arrival estimates are rough, so a site must not flip to "clear" in the
+    minutes before lightning actually arrives. In the Aug 4, 2025 replay a 2-minute grace left 6 sites
+    "clear" for 1-18 min right before their stop-work; holding 15 min past the last valid cycle alone
+    still left Vandolah clear for 5 min (scripts/evaluate_lightning_forecast.py reports these gaps).
 Docs: docs/lightning-forecast.md.
 """
 
@@ -28,7 +33,7 @@ from lightning import cells as cellmod
 
 log = logging.getLogger(__name__)
 
-GRACE = timedelta(minutes=2)
+HOLD = timedelta(minutes=15)   # keep an advisory this long after it was last valid and after its arrival
 _warned_missing_table = False
 
 
@@ -63,7 +68,7 @@ def plan(arrivals: dict[str, cellmod.Arrival | None], stop_work: set[str],
         adv = active.get(site_id)
         if arr is not None:
             actions.append(Action("update" if adv else "create", site_id, arr, adv.id if adv else None))
-        elif adv is not None and now - adv.updated_at >= GRACE:
+        elif adv is not None and now - max(adv.updated_at, adv.arrival_at) >= HOLD:
             actions.append(Action("clear", site_id, advisory_id=adv.id))
     return actions
 
