@@ -74,9 +74,9 @@ def _store(pool: ConnectionPool, site_id: str, inputs: dict, factors: list[dict]
 def generate(pool: ConnectionPool, site_ids: list[str] | None = None, now: datetime | None = None) -> list[str]:
     """Build inputs, write, and store briefings for tomorrow. Returns the site ids done.
 
-    Gemini calls are slow (up to ~90 s each), so GEMINI_CONCURRENCY are written at once (the writer
-    spaces their starts), and each briefing is stored as soon as it's written, so they appear one
-    by one instead of all at the end.
+    Model calls are slow (Gemini took up to ~90 s), so BRIEFING_CONCURRENCY are written at once,
+    and each briefing is stored as soon as it's written, so they appear one by one instead of all
+    at the end.
     """
     now = now or datetime.now(timezone.utc)
     built = briefing_inputs.build_all(pool, site_ids, now)
@@ -86,7 +86,7 @@ def generate(pool: ConnectionPool, site_ids: list[str] | None = None, now: datet
         _store(pool, site_id, inputs, factors, write(inputs), now)
         return site_id
 
-    with ThreadPoolExecutor(max_workers=get_settings().gemini_concurrency) as workers:
+    with ThreadPoolExecutor(max_workers=get_settings().briefing_concurrency) as workers:
         done = list(workers.map(write_and_store, built.items()))
     log.info("Briefings generated for %d sites", len(done))
     return done
