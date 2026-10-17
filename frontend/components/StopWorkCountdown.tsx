@@ -59,7 +59,7 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
   // A compact list row: just the time (or its unknown state), same reset flash.
   if (inline) {
     return (
-      <span className={`whitespace-nowrap px-1 font-mono text-sm font-bold ${unconfirmed ? "text-muted" : cleared ? "text-risk-green" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+      <span className={`whitespace-nowrap px-1 font-mono text-sm font-bold ${unconfirmed ? "text-muted" : cleared ? "text-risk-green" : replay ? "text-notice" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
         <span role="timer" aria-live="off">{label}</span>
         <span role="status" className="sr-only">{resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : cleared ? "All clear" : ""}</span>
       </span>

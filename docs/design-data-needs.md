@@ -2,7 +2,9 @@
 
 The Signal redesign (`john/design-system`) adds a replay timeline, timeline charts and a map layers panel to the dashboard. The frontend builds only what today's API can back. This file lists the data the rest needs. The frontend change does not touch the backend, `shared/types.ts` or `shared/mocks/`. Each item below is a contract change: update `shared/types.ts`, `backend/app/schemas.py` and the matching mock in one PR.
 
-Until an item ships, its part of the UI is either left out or shown as "Needs data". It never shows invented values.
+Until an item ships, its part of the UI is left out. It never shows invented values.
+
+**Status (Oct 17):** items 1, 2, 3, 6 and the fires and wildlife layers from 5 shipped in #38 and are wired up in the dashboard. Still open: 4 (pause) and flood zones (5). Item 7 shipped in #36.
 
 ## What the frontend already gets from the API
 

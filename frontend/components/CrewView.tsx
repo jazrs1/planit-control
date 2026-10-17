@@ -11,8 +11,8 @@ import CrewBriefing from "@/components/CrewBriefing";
 import PushSettings from "@/components/PushSettings";
 import { DEMO_DATA, getSites } from "@/lib/api";
 import { chooseCrewSite, hasReading, rememberedSite, rememberSite } from "@/lib/crew";
-import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
-import { formatAlertTime } from "@/lib/alerts";
+import { HAZARD_LABEL, liveHazardIndex, riskLevel } from "@/lib/risk";
+import { formatAlertTime, siteAlert } from "@/lib/alerts";
 import { timeZoneName } from "@/lib/time";
 import { useCrewSiteData } from "@/lib/useCrewSiteData";
 import { usePolling } from "@/lib/usePolling";
@@ -28,18 +28,21 @@ function CrewSite({ site }: { site: Site }) {
   const { alerts, status, replay, connection } = useAlertsState();
   const serverNow = useServerNow();
   const { detail, briefing, detailFailed, briefingFailed, loading } = useCrewSiteData(site.id);
-  const lightning = alerts?.find((alert) => alert.site_id === site.id && alert.type === "lightning");
-  const flood = alerts?.find((alert) => alert.site_id === site.id && alert.type === "flood");
+  // The real alert wins over a replay one for the same site.
+  const lightning = siteAlert(alerts, site.id, "lightning");
+  const flood = siteAlert(alerts, site.id, "flood");
   const alertsUnknown = alerts === null || status === "stale";
-  const scoreKnown = detail && Number.isFinite(detail.hazard_index_today) &&
+  // The live index (no replay overrides) once the backend sends hazard_index_live; until then today's.
+  const todayIndex = detail ? (liveHazardIndex(detail) !== detail.hazard_index ? liveHazardIndex(detail) : detail.hazard_index_today) : NaN;
+  const scoreKnown = detail && Number.isFinite(todayIndex) &&
     [detail.conditions.heat, detail.conditions.flood, detail.conditions.soil, detail.conditions.wildlife_summary].some(hasReading);
-  const risk = scoreKnown ? RISK[riskLevel(detail.hazard_index_today)] : null;
+  const risk = scoreKnown ? RISK[riskLevel(todayIndex)] : null;
 
   return <div className="space-y-5">
     {replay?.running && <p role="status" className="flex items-center gap-2 font-semibold text-muted"><span className="pc-chip pc-chip--replay">REPLAY</span>Storm replay running · Refreshes every 3 seconds</p>}
     <section aria-label="Selected site safety status" className="space-y-3">
       {lightning && <AlertBanner alert={lightning} site={site} compact prominent unconfirmed={alertsUnknown} />}
-      <LightningApproachChip approach={detail?.lightning_approach} stopWork={!!lightning} unconfirmed={detailFailed || alertsUnknown || connection.level !== "online"} nowMs={serverNow()} demo={status === "demo"} />
+      <LightningApproachChip approach={detail?.lightning_approach} stopWork={!!lightning} unconfirmed={detailFailed || alertsUnknown || connection.level !== "online"} nowMs={detail?.lightning_approach?.replay || !replay?.running ? serverNow() : Date.now()} demo={status === "demo"} />
       {flood && <AlertBanner alert={flood} site={site} compact prominent flood={detailFailed ? undefined : detail?.conditions.flood} unconfirmed={alertsUnknown} />}
       {!lightning && !flood && (alertsUnknown ? <div role="status" className="pc-panel pc-panel--heavy pc-panel--unknown p-5">
         <h2 className="pc-title pc-title--sign">Safety status unknown</h2>
@@ -47,10 +50,10 @@ function CrewSite({ site }: { site: Site }) {
       </div> : <div className={`pc-panel pc-panel--heavy ${detailFailed || !risk ? "pc-panel--unknown grayscale" : ""}`}>
         <h2 className={`flex h-10 items-center justify-between gap-3 px-4 ${detailFailed || !risk ? "border-be-2 border-dashed border-muted" : risk.band}`}>
           <span className="pc-label text-sm">Hazard index · now</span>
-          {scoreKnown && risk && !detailFailed && <span aria-hidden="true" className={`pc-shape pc-shape--${riskLevel(detail.hazard_index_today)} text-lg [--pc-shape:currentColor]`} />}
+          {scoreKnown && risk && !detailFailed && <span aria-hidden="true" className={`pc-shape pc-shape--${riskLevel(todayIndex)} text-lg [--pc-shape:currentColor]`} />}
         </h2>
         <div className="p-4">
-          <p className="font-mono text-7xl font-bold leading-none tabular-nums">{scoreKnown ? detail.hazard_index_today.toFixed(1) : "—"}{detailFailed && scoreKnown ? " ?" : ""}<span className="font-sans text-xl text-muted"> / 10</span></p>
+          <p className="font-mono text-7xl font-bold leading-none tabular-nums">{scoreKnown ? todayIndex.toFixed(1) : "—"}{detailFailed && scoreKnown ? " ?" : ""}<span className="font-sans text-xl text-muted"> / 10</span></p>
           <p className="mbs-3 text-xl font-extrabold">{detailFailed ? "Not confirmed" : risk ? `${risk.label} risk` : loading ? "Loading conditions…" : "No data"}</p>
           {scoreKnown && <p className="mbs-1 font-semibold">Top hazard: {HAZARD_LABEL[detail.top_hazard]}</p>}
           {scoreKnown && <p className="mbs-2 text-sm text-muted">Live score from current conditions · updated {formatAlertTime(detail.updated_at, site.timezone)}</p>}

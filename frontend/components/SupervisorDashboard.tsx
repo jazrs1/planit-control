@@ -1,18 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { HazardReport, LightningCell, LightningFlash, Site } from "@shared/types";
+import type { FireDetection, HazardReport, LightningCell, LightningFlash, Site, WildlifeSightingPoint } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import ReplayTimeline from "@/components/ReplayTimeline";
 import SiteCard from "@/components/SiteCard";
 import SiteScoreHistory from "@/components/SiteScoreHistory";
 import SiteMap, { LIGHTNING_WINDOW_MIN, type MapLayers } from "@/components/SiteMap";
-import { DEMO_DATA, getLightningCells, getLightningRecent, getReports, getSites } from "@/lib/api";
+import { DEMO_DATA, getFires, getLightningCells, getLightningRecent, getReports, getSites, getWildlife } from "@/lib/api";
 import { cellUnconfirmed } from "@/lib/lightning";
-import { riskLevel } from "@/lib/risk";
+import { liveHazardIndex, replayRaised, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
 import { countAlerts, realAlerts } from "@/lib/alerts";
-import { useReplayLog } from "@/lib/useReplayLog";
+import { useReplayTimeline } from "@/lib/useReplayTimeline";
 import { useFloodConditions } from "@/lib/useFloodConditions";
 
 // Refresh cadence. Alerts follow the same replay/live split in AlertsProvider.
@@ -21,6 +21,9 @@ const SITES_MS = 30_000;
 const LIGHTNING_MS = 10_000;
 const RETRY_MS = 5_000;
 const REPORTS_MS = 60_000;
+/** FIRMS is polled every 30 min on the server and iNaturalist every 6 h: no need to ask more often. */
+const FIRES_MS = 5 * 60_000;
+const WILDLIFE_MS = 30 * 60_000;
 /** On a phone the list starts with the top sites; "Show all" reveals the rest. */
 const PHONE_SITES = 10;
 
@@ -50,6 +53,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const lastGood = useRef(new Date());
   const [updatedAt, setUpdatedAt] = useState<Date | null>(initialSites === null ? null : new Date());
   const [liveReports, setLiveReports] = useState<HazardReport[]>([]);
+  const [liveFires, setLiveFires] = useState<FireDetection[]>([]);
+  const [liveWildlife, setLiveWildlife] = useState<WildlifeSightingPoint[]>([]);
 
   const demo = alertsStatus === "demo";
   const replaying = replay?.running ?? false;
@@ -105,21 +110,40 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   }, []);
   usePolling(pollReports, demo || liveSites === null ? null : REPORTS_MS);
   const reports = (demo ? DEMO_DATA.reports : liveReports) ?? [];
+  // Fires and wildlife: polled only while their layer is on. A failed refresh keeps the last points.
+  const pollFires = useCallback(async () => { try { setLiveFires(await getFires()); } catch { /* keep the last fires */ } }, []);
+  const pollWildlife = useCallback(async () => { try { setLiveWildlife(await getWildlife()); } catch { /* keep the last sightings */ } }, []);
+  const fires = (demo ? DEMO_DATA.fires : liveFires) ?? [];
+  const wildlife = (demo ? DEMO_DATA.wildlife : liveWildlife) ?? [];
 
   const lightning = useMemo(() => new Map(alerts.filter((a) => a.type === "lightning").map((a) => [a.site_id, a])), [alerts]);
   // Active stop-work sites first: the hazard index doesn't reflect alerts yet.
-  const sorted = useMemo(() => [...(sites ?? [])].sort((a, b) => Number(lightning.has(b.id)) - Number(lightning.has(a.id)) || b.hazard_index - a.hazard_index || a.name.localeCompare(b.name)), [sites, lightning]);
-  const highRisk = (sites ?? []).filter((s) => riskLevel(s.hazard_index) === "red").length;
+  const alertsBySite = useMemo(() => {
+    const map = new Map<string, typeof alerts>();
+    for (const alert of alerts) map.set(alert.site_id, [...(map.get(alert.site_id) ?? []), alert]);
+    return map;
+  }, [alerts]);
+  const realStops = useMemo(() => new Set(real.filter((a) => a.type === "lightning").map((a) => a.site_id)), [real]);
+  // Real stop-work first, then replay stop-work, then the live index (without replay overrides).
+  const sorted = useMemo(() => [...(sites ?? [])].sort((a, b) =>
+    Number(realStops.has(b.id)) - Number(realStops.has(a.id)) || Number(lightning.has(b.id)) - Number(lightning.has(a.id))
+    || liveHazardIndex(b) - liveHazardIndex(a) || a.name.localeCompare(b.name)), [sites, lightning, realStops]);
+  // Real only, like every count here: a replay-raised index is never real high risk.
+  const highRisk = (sites ?? []).filter((s) => riskLevel(liveHazardIndex(s)) === "red" && !replayRaised(s, alertsBySite.get(s.id) ?? [])).length;
   const stopWork = new Set(real.filter((a) => a.type === "lightning").map((a) => a.site_id)).size;
-  const [layers, setLayers] = useState<MapLayers>({ lightning: true, cells: true, sites: true, reports: true });
+  const [layers, setLayers] = useState<MapLayers>({ lightning: true, cells: true, sites: true, reports: true, fires: true, wildlife: false });
   const [focusKey, setFocusKey] = useState(0);
+  usePolling(pollFires, demo || liveSites === null || !layers.fires ? null : FIRES_MS);
+  usePolling(pollWildlife, demo || liveSites === null || !layers.wildlife ? null : WILDLIFE_MS);
   const map = useRef<HTMLElement>(null);
   const [showAll, setShowAll] = useState(false);
-  const replayLog = useReplayLog(replay, knownAlerts, demo ? null : liveSites);
+  const replayTimeline = useReplayTimeline(replay?.window ?? null, !demo && replaying ? REPLAY_MS : null);
   const layersPanel = useRef<HTMLDetailsElement>(null);
   // Layers start open on a wide screen and collapsed on a phone.
   useEffect(() => { if (layersPanel.current && window.matchMedia("(min-width: 64rem)").matches) layersPanel.current.open = true; }, [sites === null]);
   const selectFromMap = useCallback((id: string) => {
+    // On a phone the row may be past the top 10: show them all so the row can scroll into view.
+    setShowAll(true);
     setSelectedId(id);
     rows.current.get(id)?.scrollIntoView({ block: "nearest" });
   }, []);
@@ -181,7 +205,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
       ) : (
         <>
           <section ref={map} aria-label="Florida site safety map" className="pc-dash-map relative h-[min(56svh,30rem)] min-h-80 lg:absolute lg:inset-0 lg:h-auto">
-            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} focusKey={focusKey} callouts />
+            <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} focusKey={focusKey} callouts />
             <details ref={layersPanel} data-map-avoid className="pc-float group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)]">
               <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3">
                 <span className="flex items-center gap-2 text-[0.8125rem] font-bold">
@@ -195,6 +219,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {layerRow("cells", "Storm cells", cellsText, "rounded-pill border border-risk-amber-solid bg-risk-amber-solid/25")}
                 {layerRow("sites", "Sites", `${sites.length} sites`, "rounded-pill bg-muted")}
                 {layerRow("reports", "Crew reports", `${reports.length} ${reports.length === 1 ? "report" : "reports"}`, "rounded-pill bg-brand ring-2 ring-surface outline outline-border")}
+                {layerRow("fires", "Fires", `${fires.length} detections · last 24 h`, "rounded-pill bg-risk-red-solid ring-2 ring-surface outline outline-border")}
+                {layerRow("wildlife", "Wildlife", layers.wildlife ? `${wildlife.length} sightings · last 30 days` : "Alligators and venomous snakes", "rounded-pill border-2 border-text bg-surface")}
               </ul>
             </details>
           </section>
@@ -206,13 +232,16 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--red" />High ≥ 7</span>
               <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--stop" />Lightning stop work</span>
               {layers.reports && reports.length > 0 && <span className="flex items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2.5 rounded-pill bg-brand ring-2 ring-surface outline outline-border" />Crew report</span>}
+              {layers.fires && fires.length > 0 && <span className="flex items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2.5 rounded-pill bg-risk-red-solid" />Fire, last 24 h · faint = one satellite pass</span>}
+              {layers.wildlife && wildlife.length > 0 && <span className="flex items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2.5 rounded-pill border-2 border-text bg-surface" />Wildlife sighting, 30 days</span>}
+              {replaying && <span className="flex items-center gap-1.5"><span className="pc-shape pc-shape--stop [--pc-shape:var(--pc-notice)]" />Replay stop work</span>}
               <span className={`flex items-center gap-1.5 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning shadow-[0_0_5px_var(--pc-lightning)]" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{lightningStale ? "?" : ""}) · {lightningStale ? "last known, fade paused" : "newest brightest"}</span>
               <span role="status" className={`text-muted ${cells === null || cellsUnconfirmed || oldCells ? "" : ""}`}>
                 {demo && "Demo data · "}Storm cells: {cellsText} · circle = cell extent, arrow = motion direction; no arrow = stationary or untracked
               </span>
             </div>
             <div className="w-full max-lg:order-3">
-              <ReplayTimeline replay={replay} alerts={alerts} sites={sites} log={replayLog} stale={!demo && (offline || alertsStale)} />
+              <ReplayTimeline replay={replay} alerts={alerts} sites={sites} timeline={replayTimeline} nowMs={serverNow()} stale={!demo && (offline || alertsStale)} />
             </div>
           </div>
 
@@ -237,13 +266,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {stat("Flood risk", counts.flood, "bg-risk-amber-solid text-on-risk-amber")}
               </dl>
               {alertsStale && <p role="status" className="text-xs font-semibold text-muted">? = last known before the connection was lost</p>}
+              {replaying && alerts.length > real.length && <p className="flex items-center gap-2 text-xs text-muted"><span className="pc-chip pc-chip--replay">REPLAY</span>Real alerts only here. Replay counts are on the replay panel.</p>}
               <p className="pc-caption">Stop-work sites first, then highest risk · select a site for details</p>
             </div>
             {/* relative: contains the cards' absolutely positioned screen-reader text, which otherwise escapes
                 the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
             <ul className="relative divide-y divide-border lg:overflow-y-auto lg:overscroll-contain">
               {sorted.map((site, index) => <li key={site.id} className={!showAll && index >= PHONE_SITES ? "max-lg:hidden" : ""} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }}>
-                <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
+                <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} realNowMs={replaying ? Date.now() : serverNow()} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
                   onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />
               </li>)}
             </ul>

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Alert, HazardReport, LightningCell, LightningFlash, Site } from "@shared/types";
+import type { Alert, FireDetection, HazardReport, LightningCell, LightningFlash, Site, WildlifeSightingPoint } from "@shared/types";
 import type { GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
-import { riskLevel } from "@/lib/risk";
+import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 import { formatStrikeDistance } from "@/lib/alerts";
 import { paintBasemap } from "@/lib/mapStyle";
@@ -12,6 +12,8 @@ import { resolveColor } from "@/lib/themeColor";
 const LIGHTNING_SOURCE = "recent-lightning";
 const CELLS_SOURCE = "storm-cells";
 const REPORTS_SOURCE = "crew-reports";
+const FIRES_SOURCE = "fires";
+const WILDLIFE_SOURCE = "wildlife";
 /** Flashes older than this are gone; matches the /lightning/recent window the dashboard asks for. */
 export const LIGHTNING_WINDOW_MIN = 15;
 /** A tile that loads this long after the last error means the tile server has recovered. */
@@ -34,8 +36,8 @@ function lightningGeoJson(flashes: LightningFlash[], nowMs: number): GeoJSON.Fea
 }
 
 /** Map layers the dashboard's layers panel can hide. */
-export type MapLayers = { lightning: boolean; cells: boolean; sites: boolean; reports: boolean };
-const ALL_LAYERS: MapLayers = { lightning: true, cells: true, sites: true, reports: true };
+export type MapLayers = { lightning: boolean; cells: boolean; sites: boolean; reports: boolean; fires: boolean; wildlife: boolean };
+const ALL_LAYERS: MapLayers = { lightning: true, cells: true, sites: true, reports: true, fires: true, wildlife: false };
 
 type SiteMapProps = {
   sites: Site[];
@@ -55,6 +57,10 @@ type SiteMapProps = {
   layers?: MapLayers;
   /** Crew hazard reports to pin on the map (newest first). */
   reports?: HazardReport[];
+  /** Satellite fire detections, last 24 h. */
+  fires?: FireDetection[];
+  /** Alligator and venomous-snake sightings and crew wildlife reports, last 30 days. */
+  wildlife?: WildlifeSightingPoint[];
   /** Changes when "Show on map" asks to center on the selected site again. */
   focusKey?: number;
   /** Label stop-work and flood sites on the map. Labels never cover [data-map-avoid] panels or leave the map. */
@@ -72,7 +78,7 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], focusKey = 0 }: SiteMapProps) {
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false, reports = [], fires = [], wildlife = [], focusKey = 0 }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
@@ -116,7 +122,9 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       if (disposed || !map.current) return;
       markers.current.forEach((marker) => marker.remove());
       markers.current.clear();
-      const lightning = new Map(alerts.filter((a) => a.type === "lightning").map((a) => [a.site_id, a]));
+      // One stop-work per site, the real one when a site has both (a real stop-work never looks like a replay).
+      const lightning = new Map<string, Alert>();
+      for (const a of alerts) if (a.type === "lightning" && (!lightning.has(a.site_id) || !a.replay)) lightning.set(a.site_id, a);
       for (const site of sites) {
         const stop = lightning.get(site.id);
         const button = document.createElement("button");
@@ -125,9 +133,9 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         // A replay stop-work gets a dashed blue ring, never the real red halo.
         button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}`;
         const shape = document.createElement("span");
-        shape.className = `pc-shape pc-shape--${stop ? "stop" : riskLevel(site.hazard_index)}`;
+        shape.className = `pc-shape pc-shape--${stop ? "stop" : riskLevel(liveHazardIndex(site))}`;
         button.append(shape);
-        button.title = `${site.name}: ${site.hazard_index.toFixed(1)} / 10${stop ? stop.replay ? " · REPLAY lightning stop work" : " · Lightning stop work" : ""}`;
+        button.title = `${site.name}: ${liveHazardIndex(site).toFixed(1)} / 10${stop ? stop.replay ? " · REPLAY lightning stop work" : " · Lightning stop work" : ""}`;
         button.setAttribute("aria-label", button.title);
         button.setAttribute("aria-pressed", String(site.id === selectedId));
         button.addEventListener("click", () => onSelect(site.id));
@@ -228,8 +236,10 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     show(LIGHTNING_SOURCE, layers.lightning);
     show(`${LIGHTNING_SOURCE}-glow`, layers.lightning);
     show(REPORTS_SOURCE, layers.reports);
+    show(FIRES_SOURCE, layers.fires);
+    show(WILDLIFE_SOURCE, layers.wildlife);
     for (const part of ["fill", "outline", "arrows"]) show(`${CELLS_SOURCE}-${part}`, layers.cells);
-  }, [styleLoaded, layers.lightning, layers.cells, layers.reports, flashes, cells, reports]);
+  }, [styleLoaded, layers.lightning, layers.cells, layers.reports, layers.fires, layers.wildlife, flashes, cells, reports, fires, wildlife]);
 
   // Frame every site once, clear of the panels laid over the map (layers top-left, legend at the bottom).
   useEffect(() => {
@@ -333,6 +343,51 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       paint: { "circle-color": resolveColor("--pc-ink"), "circle-radius": 5, "circle-stroke-color": resolveColor("--pc-surface"), "circle-stroke-width": 2 },
     });
   }, [styleLoaded, reports]);
+
+  // Fires: red dots; seen on 2+ passes or high confidence (what the wildfire card calls confirmed) is
+  // larger and solid, a single pass is smaller and faint (it can be a flare or a hot roof).
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    const data: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+      type: "FeatureCollection",
+      features: fires.filter((fire) => Number.isFinite(fire.lat) && Number.isFinite(fire.lon)).map((fire) => ({
+        type: "Feature", geometry: { type: "Point", coordinates: [fire.lon, fire.lat] },
+        properties: { confirmed: fire.passes_24h >= 2 || fire.confidence === "high" },
+      })),
+    };
+    const source = instance.getSource<GeoJSONSource>(FIRES_SOURCE);
+    if (source) { void source.setData(data); return; }
+    instance.addSource(FIRES_SOURCE, { type: "geojson", data });
+    instance.addLayer({
+      id: FIRES_SOURCE, type: "circle", source: FIRES_SOURCE,
+      paint: {
+        "circle-color": resolveColor("--pc-risk-red-solid"),
+        "circle-radius": ["case", ["get", "confirmed"], 5, 3.5],
+        "circle-opacity": ["case", ["get", "confirmed"], 0.95, 0.55],
+        "circle-stroke-color": resolveColor("--pc-surface"),
+        "circle-stroke-width": 1.5,
+      },
+    });
+  }, [styleLoaded, fires]);
+
+  // Wildlife: hollow rings, so they never read as a risk color.
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    const data: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+      type: "FeatureCollection",
+      features: wildlife.filter((w) => Number.isFinite(w.lat) && Number.isFinite(w.lon))
+        .map((w) => ({ type: "Feature", geometry: { type: "Point", coordinates: [w.lon, w.lat] }, properties: { species: w.species ?? "Unnamed" } })),
+    };
+    const source = instance.getSource<GeoJSONSource>(WILDLIFE_SOURCE);
+    if (source) { void source.setData(data); return; }
+    instance.addSource(WILDLIFE_SOURCE, { type: "geojson", data });
+    instance.addLayer({
+      id: WILDLIFE_SOURCE, type: "circle", source: WILDLIFE_SOURCE,
+      paint: { "circle-color": resolveColor("--pc-surface"), "circle-radius": 4, "circle-stroke-color": resolveColor("--pc-text"), "circle-stroke-width": 2 },
+    });
+  }, [styleLoaded, wildlife]);
 
   return <><div ref={container} className="h-full w-full" />
     <ul className="sr-only" aria-label="Storm cell motion">

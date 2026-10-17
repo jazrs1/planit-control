@@ -18,7 +18,7 @@ const LINKS = [
 ];
 
 export default function TopNavigation() {
-  const { alerts: allAlerts, status } = useAlertsState();
+  const { alerts: allAlerts, status, replay } = useAlertsState();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const nav = useRef<HTMLElement>(null);
@@ -40,7 +40,10 @@ export default function TopNavigation() {
   const alerts = allAlerts === null ? null : realAlerts(allAlerts);
   const counts = countAlerts(alerts ?? []);
   const count = (value: number) => alerts === null ? "—" : `${value}${status === "stale" ? "?" : ""}`;
+  // Replay alerts are counted on the dashboard's replay panel; say so, so "0 stop work" isn't confusing.
+  const replayCount = (allAlerts ?? []).length - (alerts ?? []).length;
   const breakdown = `${count(counts.lightning)} stop work · ${count(counts.flood)} flood risk${counts.other ? ` · ${count(counts.other)} other` : ""}`;
+  const replayNote = replay?.running && replayCount > 0;
   // Unknown is not zero: never show a quiet "0" before real alerts have loaded. Solid color only for
   // something to act on: red for a stop-work, amber for flood risk alone.
   const badge = alerts === null
@@ -70,7 +73,7 @@ export default function TopNavigation() {
           onClick={() => setOpen(false)}
           aria-current={pathname === "/alerts" ? "page" : undefined}
           className={`flex min-h-12 min-w-0 max-w-48 flex-col justify-center px-2 focus-visible:outline-2 focus-visible:outline-offset-2 ${pathname === "/alerts" ? "shadow-[inset_0_-2px_0_currentColor]" : ""}`}
-          aria-label={`${badge.label}, ${breakdown}`}
+          aria-label={`${badge.label}, ${breakdown}${replayNote ? ", replay alerts counted separately" : ""}`}
         >
           <span className="flex flex-wrap items-center gap-x-1.5">
           <span className="text-[0.8125rem] font-bold">Alerts</span>
@@ -83,6 +86,7 @@ export default function TopNavigation() {
             </span>
           )}
           {status === "demo" && <span aria-hidden="true" className="pc-chip pc-chip--unknown">Demo data</span>}
+          {replayNote && <span aria-hidden="true" title="Replay alerts are counted on the dashboard's replay panel" className="pc-chip pc-chip--replay max-sm:hidden">+ replay</span>}
           </span>
           <span aria-hidden="true" className="text-[0.6875rem] text-muted">{breakdown}</span>
         </Link>

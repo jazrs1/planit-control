@@ -148,6 +148,13 @@
   .pc-chip--flood { background: var(--pc-risk-amber-solid); color: var(--pc-on-risk-amber); }
   .pc-chip--clear { background: var(--pc-risk-green-solid); color: var(--pc-on-risk-green); }
   .pc-chip--replay { background: var(--pc-notice); color: var(--pc-on-notice); }
+  /* A replay stop-work: blue dashed, never the real solid red. */
+  .pc-chip--replay-stop {
+    background: var(--pc-surface);
+    color: var(--pc-notice);
+    outline: 1.5px dashed var(--pc-notice);
+    outline-offset: -1.5px;
+  }
   /* A heads-up, not an order: amber dashed outline on white. */
   .pc-chip--approach {
     background: var(--pc-surface);
@@ -267,6 +274,7 @@
   border-radius: var(--pc-radius-pill);
   pointer-events: none;
 }
+.site-marker--replay .pc-shape { --pc-shape: var(--pc-notice); }
 .site-marker[hidden] { display: none; }
 
 /* Three brief flashes make a new lightning strike visible without constant motion. */

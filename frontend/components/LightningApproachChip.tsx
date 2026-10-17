@@ -19,6 +19,7 @@ export default function LightningApproachChip({ approach, stopWork, unconfirmed,
 
   return <div role="status" className={`space-y-1.5 border-2 border-dashed p-3 ${uncertain ? "border-muted bg-bg text-muted" : "border-risk-amber-solid bg-risk-amber-bg text-text"}`}>
     <p>
+      {approach.replay && <span className="pc-chip pc-chip--replay me-2 align-middle" title="From a storm replay, not a real advisory">REPLAY</span>}
       <span className={`pc-chip ${uncertain ? "pc-chip--unknown" : "pc-chip--approach"}`}>LIGHTNING POSSIBLE WITHIN THE HOUR</span>
       {uncertain && <span className="pc-label ms-2 align-middle">Unconfirmed</span>}
     </p>

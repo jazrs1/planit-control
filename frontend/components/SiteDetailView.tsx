@@ -294,7 +294,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         <HazardPanel
           title="Lightning" card={c.lightning} freshness={{ kind: "live" }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           rows={[
-            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : formatMiles(c.lightning.nearest_strike_mi) },
+            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : formatStrikeDistance(c.lightning.nearest_strike_mi) },
             { label: "Strike time", value: c.lightning.nearest_strike_at && formatSiteTime(c.lightning.nearest_strike_at, tz) },
             { label: "Strikes, last 30 min", value: String(c.lightning.strikes_last_30_min) },
           ]}

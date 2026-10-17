@@ -18,6 +18,13 @@ export function realAlerts(alerts: Alert[]) {
   return alerts.filter((alert) => !alert.replay);
 }
 
+/** A site's alert of one type, preferring the real one: when a site has a real and a replay stop-work,
+ *  the real one wins (real look, red, real countdown). /alerts lists replay alerts first. */
+export function siteAlert(alerts: Alert[] | null | undefined, siteId: string, type: Alert["type"]): Alert | undefined {
+  const mine = (alerts ?? []).filter((alert) => alert.site_id === siteId && alert.type === type);
+  return mine.find((alert) => !alert.replay) ?? mine[0];
+}
+
 export function countAlerts(alerts: Alert[]) {
   const lightning = alerts.filter((alert) => alert.type === "lightning").length;
   const flood = alerts.filter((alert) => alert.type === "flood").length;

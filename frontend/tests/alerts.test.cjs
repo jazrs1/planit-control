@@ -37,7 +37,7 @@ const conditions = { status: "warning", source: "NWS Flood Warning", hazard_stat
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 
 test("strike distances floor to one decimal, including the ten-mile boundary", () => {
-  for (const [input, expected] of [[9.996, "9.9 mi"], [9.999999999, "9.9 mi"], [9.9, "9.9 mi"], [2.49, "2.4 mi"], [2, "2.0 mi"], [0.099, "0.0 mi"], [0, "0.0 mi"], [10, "10 mi"], [12.9, "12 mi"]]) {
+  for (const [input, expected] of [[9.996, "9.9 mi"], [9.999999999, "9.9 mi"], [9.9, "9.9 mi"], [2.49, "2.4 mi"], [2, "2.0 mi"], [0.099, "0.0 mi"], [0, "0.0 mi"], [9.96, "9.9 mi"], [10, "10 mi"], [12.9, "12 mi"]]) {
     assert.equal(helpers.formatStrikeDistance(input), expected);
   }
   for (const missing of [null, NaN, Infinity, -1]) assert.equal(helpers.formatStrikeDistance(missing), null);
@@ -95,8 +95,28 @@ test("dashboard cards show simultaneous flood and lightning alerts separately", 
   assert.match(html, /Heavy rain near the river/);
   assert.match(html, /9\.9 mi/);
   assert.equal((html.match(/data-countdown/g) || []).length, 1);
-  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true, selected: true }), /Not confirmed/);
-  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true }), /pc-chip--unknown/);
+  assert.match(render(Card, { site, alerts: [flood], alertsUnconfirmed: true, selected: true }), /Last known · connection lost/);
+  const lastKnown = render(Card, { site, alerts: [flood], alertsUnconfirmed: true });
+  assert.match(lastKnown, /pc-chip--unknown/);
+  assert.match(lastKnown, /Last known/);
+  assert.doesNotMatch(lastKnown, /\?/);
+});
+
+test("a real stop-work wins over a replay one for the same site, in the row and on the crew view helper", () => {
+  const Card = load("components/SiteCard.tsx").default;
+  const replayed = { ...lightning, id: "replay-1", replay: true, all_clear_at: "2025-08-04T22:40:00Z" };
+  // /alerts lists replay alerts first.
+  const html = render(Card, { site, alerts: [replayed, lightning] });
+  assert.match(html, /pc-chip--stop/);
+  assert.match(html, /bg-risk-red-bg/);
+  assert.doesNotMatch(html, /pc-chip--replay-stop|REPLAY/);
+  assert.equal(helpers.siteAlert([replayed, lightning], site.id, "lightning").id, lightning.id);
+  assert.equal(helpers.siteAlert([replayed], site.id, "lightning").id, "replay-1");
+  // A replay-only stop-work stays blue and dashed, never the real red.
+  const replayOnly = render(Card, { site, alerts: [replayed] });
+  assert.match(replayOnly, /REPLAY/);
+  assert.match(replayOnly, /pc-chip--replay-stop/);
+  assert.doesNotMatch(replayOnly, /bg-risk-red-bg|pc-chip--stop"/);
 });
 
 function nav(alerts, status = "live") {

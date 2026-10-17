@@ -235,7 +235,8 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   const draw = () => { polls = []; return driver.render(Dashboard, { initialSites: [site] }); };
   const map = tree => elements(tree, el => el.type === Map)[0].props;
   let tree = draw();
-  assert.deepEqual(polls.map(p => p.ms), [30_000, 10_000, 60_000]);
+  // sites, lightning, crew reports, fires (on by default), wildlife (off by default), replay timeline (no replay)
+  assert.deepEqual(polls.map(p => p.ms), [30_000, 10_000, 60_000, 300_000, null, null]);
   assert.match(renderToStaticMarkup(tree), /Storm cells: loading/);
   failCells = true;
   await polls[1].poll(); tree = draw();
@@ -256,13 +257,13 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   assert.equal(map(tree).cellsUnconfirmed, false);
   assert.match(renderToStaticMarkup(tree), /last known, fade paused/);
   state.replay = { running: true }; draw();
-  assert.deepEqual(polls.map(p => p.ms), [3_000, 3_000, 60_000]);
+  assert.deepEqual(polls.map(p => p.ms), [3_000, 3_000, 60_000, 300_000, null, 3_000]);
   state.alerts = [lightning];
   tree = draw();
   assert.equal(elements(tree, el => el.type === Card)[0].props.alerts[0].type, "lightning");
   const previousReads = cellReads;
   state.status = "demo"; tree = draw();
-  assert.deepEqual(polls.map(p => p.ms), [null, null, null]);
+  assert.deepEqual(polls.map(p => p.ms), [null, null, null, null, null, null]);
   assert.equal(cellReads, previousReads);
   assert.equal(map(tree).demo, true);
   assert.equal(map(tree).cells, overrides["@/lib/api"].DEMO_DATA.lightningCells);

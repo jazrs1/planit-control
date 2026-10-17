@@ -53,7 +53,7 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
             <p className="text-sign font-black leading-none tracking-[0.02em]">
               {alert.replay && <ReplayTag />}{label}
             </p>
-            {unconfirmed && <p className="pc-label mbs-2">Not confirmed</p>}
+            {unconfirmed && <p className="pc-label mbs-2">Last known · connection lost</p>}
             {lightning && distance !== null && <p className="pc-label mbs-2 text-base">Lightning {distance} away</p>}
           </div>
         </header>
@@ -73,14 +73,14 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
   const style = unconfirmed ? "border-dashed border-muted bg-bg text-muted grayscale"
     : alert.replay ? "border-dashed border-notice bg-surface text-text"
     : lightning ? "border-risk-red bg-risk-red-bg text-text" : "border-risk-amber bg-risk-amber-bg text-text";
-  const tag = unconfirmed ? "pc-chip--unknown" : lightning ? "pc-chip--stop" : "pc-chip--flood";
+  const tag = unconfirmed ? "pc-chip--unknown" : lightning ? alert.replay ? "pc-chip--replay-stop" : "pc-chip--stop" : "pc-chip--flood";
   return (
     <article className={`flex flex-col gap-3 border-2 border-s-[6px] p-3 ${style} ${compact ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {alert.replay && <ReplayTag />}
           <span className={`pc-chip ${tag} text-xs`}>{label}</span>
-          {unconfirmed && <span className="pc-label">Not confirmed</span>}
+          {unconfirmed && <span className="pc-label">Last known · connection lost</span>}
         </p>
         {!compact && <h2 className="mbs-1.5 break-words text-lg font-extrabold">{site?.name ?? alert.site_id}</h2>}
         <p className="mbs-1.5 text-sm">{detail}</p>
