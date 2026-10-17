@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     lightning_ingest_enabled: bool = True
     lightning_poll_seconds: float = 20.0
+    hazard_polling_enabled: bool = True
+    # Contact info sent in the User-Agent to NWS, FEMA, iNaturalist, etc. (NWS requires one).
+    nws_contact: str = "https://github.com/jazrs1/planit-control"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,0 +1,92 @@
+"""Everything /sites and /sites/{id} need, for all sites, in a handful of queries.
+
+Both routes score from the same snapshot, so a site's hazard_index is identical in the list
+and in its detail view.
+"""
+
+import math
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+
+from psycopg_pool import ConnectionPool
+
+from alerts import engine
+from app import clock
+from hazards.scoring import Inputs
+
+WILDLIFE_RADIUS_MI = 5 / 1.609344   # iNaturalist query radius: 5 km
+CREW_REPORT_RADIUS_MI = 2.0
+WILDLIFE_DAYS = 30
+
+
+def miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    h = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    return 2 * 3958.8 * math.asin(math.sqrt(h))
+
+
+@dataclass
+class Snapshot:
+    sites: list[dict]
+    inputs: dict[str, Inputs]
+    species_counts: dict[str, dict[str, int]]                       # site -> {species: n}
+    sightings: dict[str, list[dict]] = field(default_factory=dict)  # site -> WildlifeSighting dicts
+
+
+def load(pool: ConnectionPool) -> Snapshot:
+    real_now = datetime.now(timezone.utc)   # live sources
+    clock_now = clock.now()                 # lightning (simulated during replay)
+    since = real_now - timedelta(days=WILDLIFE_DAYS)
+    with pool.connection() as conn:
+        sites = conn.execute(
+            """SELECT id, name, lat, lon, county, timezone, fema_flood_zone, fema_sfha, near_river, river_name
+               FROM sites ORDER BY capacity_mw DESC, id""").fetchall()
+        readings = conn.execute(
+            """SELECT DISTINCT ON (site_id, hazard, metric) site_id, hazard, metric, value, ts
+               FROM conditions WHERE ts > %s ORDER BY site_id, hazard, metric, ts DESC""",
+            (real_now - timedelta(days=7),)).fetchall()
+        nws = conn.execute(
+            """SELECT sa.site_id, a.event, a.headline, a.severity, a.ends_at
+               FROM site_nws_alerts sa JOIN nws_alerts a ON a.id = sa.alert_id
+               WHERE a.ends_at IS NULL OR a.ends_at > %s""", (real_now,)).fetchall()
+        lightning = {a["site_id"]: a for a in engine.active_alerts(conn, clock_now, replay=clock.is_simulated())
+                     if a["type"] == engine.ALERT_TYPE}
+        flood_alerts = {a["site_id"]: a for a in engine.active_alerts(conn, real_now, replay=False)
+                        if a["type"] == "flood"}
+        firms = conn.execute("SELECT detail FROM data_sources WHERE name = 'firms'").fetchone()
+        reports = conn.execute(
+            """SELECT lat, lon, created_at, reporter_role FROM reports
+               WHERE category = 'wildlife' AND created_at > %s""", (since,)).fetchall()
+        observations = conn.execute(
+            """SELECT species, venomous, observed_at, lat, lon, quality_grade FROM wildlife_observations
+               WHERE observed_at > %s ORDER BY observed_at DESC""", (since,)).fetchall()
+
+    by_site: dict[str, dict] = {s["id"]: {} for s in sites}
+    for r in readings:
+        if r["site_id"] in by_site:
+            by_site[r["site_id"]][(r["hazard"], r["metric"])] = (r["value"], r["ts"])
+
+    snap = Snapshot(sites=sites, inputs={}, species_counts={})
+    for s in sites:
+        near_obs = [(miles(s["lat"], s["lon"], o["lat"], o["lon"]), o) for o in observations]
+        near_obs = [(d, o) for d, o in near_obs if d <= WILDLIFE_RADIUS_MI]
+        near_reports = [(miles(s["lat"], s["lon"], r["lat"], r["lon"]), r) for r in reports]
+        near_reports = [(d, r) for d, r in near_reports if d <= CREW_REPORT_RADIUS_MI]
+        counts: dict[str, int] = {}
+        for _, o in near_obs:
+            counts[o["species"]] = counts.get(o["species"], 0) + 1
+        snap.species_counts[s["id"]] = counts
+        snap.sightings[s["id"]] = sorted(
+            [{"species": o["species"], "distance_mi": round(d, 1), "seen_at": o["observed_at"],
+              "source": "iNaturalist (research grade)" if o["quality_grade"] == "research" else "iNaturalist (needs ID)"}
+             for d, o in near_obs]
+            + [{"species": "Wildlife (crew report)", "distance_mi": round(d, 1), "seen_at": r["created_at"],
+                "source": "Crew report"} for d, r in near_reports],
+            key=lambda x: x["seen_at"], reverse=True)[:10]
+        snap.inputs[s["id"]] = Inputs(
+            site=s, readings=by_site[s["id"]],
+            nws=[a for a in nws if a["site_id"] == s["id"]],
+            lightning_alert=lightning.get(s["id"]), flood_alert=flood_alerts.get(s["id"]),
+            crew_wildlife_reports=len(near_reports), firms_detail=firms["detail"] if firms else None,
+        )
+    return snap

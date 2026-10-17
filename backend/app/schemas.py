@@ -20,32 +20,52 @@ class Site(BaseModel):
     top_hazard: HazardType
 
 
-class HeatConditions(BaseModel):
+class HazardCard(BaseModel):
+    """Optional fields every hazard card has (additive; absent in older mocks)."""
+    hazard_status: Literal["ok", "watch", "danger"] | None = None
+    reading: str | None = None
+    as_of: datetime | None = None
+
+
+class HeatConditions(HazardCard):
     heat_index_f: float
     air_temp_f: float
     humidity_pct: float
+    risk_band: Literal["lower", "moderate", "high", "very_high"] | None = None
+    peak_heat_index_f: float | None = None
+    peak_at: datetime | None = None
 
 
-class LightningConditions(BaseModel):
+class LightningConditions(HazardCard):
     nearest_strike_mi: float | None
     nearest_strike_at: datetime | None
     strikes_last_30_min: int
 
 
-class FloodConditions(BaseModel):
+class FloodConditions(HazardCard):
     status: Literal["none", "advisory", "watch", "warning"]
     source: str | None
+    rain_past_12h_in: float | None = None
+    rain_past_24h_in: float | None = None
+    rain_past_72h_in: float | None = None
+    rain_next_24h_in: float | None = None
+    fema_flood_zone: str | None = None
+    in_special_flood_hazard_area: bool | None = None
+    near_river: bool | None = None
 
 
-class SoilConditions(BaseModel):
+class SoilConditions(HazardCard):
     moisture_pct: float
     saturated: bool
+    level: Literal["dry", "moist", "saturated"] | None = None
 
 
-class WildfireConditions(BaseModel):
+class WildfireConditions(HazardCard):
     nearest_detection_mi: float | None
     detected_at: datetime | None
     confidence: Literal["low", "nominal", "high"] | None
+    detections_25mi: int | None = None
+    red_flag_warning: bool | None = None
 
 
 class WildlifeSighting(BaseModel):
@@ -55,6 +75,12 @@ class WildlifeSighting(BaseModel):
     source: str
 
 
+class WildlifeSummary(HazardCard):
+    observations_30d: int
+    venomous_30d: int
+    crew_reports_2mi: int
+
+
 class SiteConditions(BaseModel):
     heat: HeatConditions
     lightning: LightningConditions
@@ -62,6 +88,14 @@ class SiteConditions(BaseModel):
     soil: SoilConditions
     wildfire: WildfireConditions
     wildlife: list[WildlifeSighting]
+    wildlife_summary: WildlifeSummary | None = None
+
+
+class NwsAlert(BaseModel):
+    event: str
+    severity: str | None
+    headline: str | None
+    ends_at: datetime | None
 
 
 class ContributingFactor(BaseModel):
@@ -76,6 +110,7 @@ class SiteDetail(Site):
     hazard_index_tomorrow: HazardIndex
     top_factors: list[ContributingFactor]
     updated_at: datetime
+    nws_alerts: list[NwsAlert] | None = None
 
 
 class Alert(BaseModel):

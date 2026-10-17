@@ -34,13 +34,34 @@ export type SitesResponse = Site[];
 
 // ---------- GET /sites/{id} ----------
 
-export interface HeatConditions {
+/** Card status, aligned with the risk bands: ok < 4, watch 4 to < 7, danger >= 7. */
+export type HazardStatus = "ok" | "watch" | "danger";
+
+/** Optional on every hazard card (added for live data; absent in older mocks). */
+export interface HazardCard {
+  /** Missing when the card's source has no data yet. */
+  hazard_status?: HazardStatus | null;
+  /** One plain-language line for crews, e.g. "Saturated ground: vehicles may get stuck off pavement". */
+  reading?: string | null;
+  /** When the source last produced this reading; null when there is no live data yet. */
+  as_of?: string | null;
+}
+
+/** OSHA heat index risk level: < 91 lower, 91–103 moderate, 103–115 high, > 115 very high. */
+export type OshaHeatRisk = "lower" | "moderate" | "high" | "very_high";
+
+export interface HeatConditions extends HazardCard {
   heat_index_f: number;
   air_temp_f: number;
   humidity_pct: number;
+  /** OSHA band for today's peak heat index. */
+  risk_band?: OshaHeatRisk | null;
+  /** Today's (site-local) peak NWS heat index and when it occurs. */
+  peak_heat_index_f?: number | null;
+  peak_at?: string | null;
 }
 
-export interface LightningConditions {
+export interface LightningConditions extends HazardCard {
   /** null when no strikes in the lookback window. */
   nearest_strike_mi: number | null;
   nearest_strike_at: string | null;
@@ -49,23 +70,40 @@ export interface LightningConditions {
 
 export type FloodStatus = "none" | "advisory" | "watch" | "warning";
 
-export interface FloodConditions {
+export interface FloodConditions extends HazardCard {
+  /** NWS-style level ("warning" also when a flood-risk alert is active). Card color: hazard_status. */
   status: FloodStatus;
   /** Human-readable source, e.g. "NWS Flood Watch" or "USGS gauge 02323500". */
   source: string | null;
+  rain_past_12h_in?: number | null;
+  rain_past_24h_in?: number | null;
+  rain_past_72h_in?: number | null;
+  rain_next_24h_in?: number | null;
+  /** FEMA NFHL zone, e.g. "AE", "VE", "X"; "unmapped" where FEMA has no map. */
+  fema_flood_zone?: string | null;
+  /** In FEMA's Special Flood Hazard Area (1%-annual-chance floodplain). */
+  in_special_flood_hazard_area?: boolean | null;
+  /** A named river within 1 mile (USGS NHD). */
+  near_river?: boolean | null;
 }
 
-export interface SoilConditions {
+export type SoilLevel = "dry" | "moist" | "saturated";
+
+export interface SoilConditions extends HazardCard {
   /** Volumetric soil moisture, 0–100. */
   moisture_pct: number;
   saturated: boolean;
+  level?: SoilLevel | null;
 }
 
-export interface WildfireConditions {
+export interface WildfireConditions extends HazardCard {
   /** Nearest NASA FIRMS detection; null when none in range. */
   nearest_detection_mi: number | null;
   detected_at: string | null;
   confidence: "low" | "nominal" | "high" | null;
+  /** VIIRS detections within 25 mi in the last 24 h. */
+  detections_25mi?: number | null;
+  red_flag_warning?: boolean | null;
 }
 
 export interface WildlifeSighting {
@@ -75,6 +113,15 @@ export interface WildlifeSighting {
   source: string;
 }
 
+/** The wildlife card (wildlife itself is a list of sightings, so the card lives here). */
+export interface WildlifeSummary extends HazardCard {
+  /** iNaturalist alligator + venomous snake sightings within 5 km, last 30 days. */
+  observations_30d: number;
+  venomous_30d: number;
+  /** Crew reports with category "wildlife" within 2 miles, last 30 days. */
+  crew_reports_2mi: number;
+}
+
 export interface SiteConditions {
   heat: HeatConditions;
   lightning: LightningConditions;
@@ -82,6 +129,15 @@ export interface SiteConditions {
   soil: SoilConditions;
   wildfire: WildfireConditions;
   wildlife: WildlifeSighting[];
+  wildlife_summary?: WildlifeSummary | null;
+}
+
+/** An active National Weather Service alert covering the site. */
+export interface NwsAlert {
+  event: string;
+  severity: string | null;
+  headline: string | null;
+  ends_at: string | null;
 }
 
 export interface ContributingFactor {
@@ -97,6 +153,7 @@ export interface SiteDetail extends Site {
   hazard_index_tomorrow: HazardIndex;
   top_factors: ContributingFactor[];
   updated_at: string;
+  nws_alerts?: NwsAlert[] | null;
 }
 
 // ---------- GET /alerts ----------

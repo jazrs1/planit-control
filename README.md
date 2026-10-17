@@ -34,6 +34,20 @@ uvicorn app.main:app --reload --port 8000
 
 `/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json`; their hazard values are still placeholders (see the `TODO(...)` markers in `app/site_data.py`). Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts and briefings still come from `shared/mocks/`. Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
 
+### Hazard data sources
+
+With `DATABASE_URL` set, the API polls these in the background (`HAZARD_POLLING_ENABLED=false` turns it off):
+
+| Source | What | Every |
+|---|---|---|
+| Open-Meteo | heat index (NWS formula) + OSHA band, rain past 12/24/72 h and next 24 h, soil moisture | 15 min |
+| api.weather.gov | active NWS alerts at each site (heat, flood, severe storm, red flag) | 5 min |
+| NASA FIRMS | VIIRS fire detections over Florida, last 24 h. **Needs `FIRMS_MAP_KEY`** (free at firms.modaps.eosdis.nasa.gov/api/map_key); skipped without it | 30 min |
+| iNaturalist | alligator and venomous snake sightings within 5 km, last 30 days | 6 h |
+| FEMA NFHL, USGS NHD, NWS points | flood zone, river within 1 mile, NWS zones | once per site |
+
+A flood-risk alert opens when 2+ inches of rain fell in the past 12 hours at a site in a FEMA flood zone or near a river, or when NWS has a flood warning there. Set `NWS_CONTACT` in `.env` to a URL or email NWS can reach you at.
+
 ### Lightning (GOES-19 GLM)
 
 With `DATABASE_URL` set, the API polls NOAA's public GOES-19 bucket every 20 s and stores flashes over Florida (+30 mi) in `lightning_flashes`. Set `LIGHTNING_INGEST_ENABLED=false` in `.env` to turn that off. `GET /lightning/recent?minutes=15` returns them for the map.

@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app import db
 from app.config import get_settings
 from app.routers import alerts, briefing, lightning, replay, reports, sites, uploads
+from hazards import scheduler as hazard_scheduler
 from lightning import live
 from lightning import replay as replay_runner
 
@@ -20,13 +21,15 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(m
 async def lifespan(app: FastAPI):
     db.open_pool()
     settings = get_settings()
-    live_task = None
+    tasks = []
     if settings.lightning_ingest_enabled and settings.database_url:
-        live_task = asyncio.create_task(live.run_live_loop(db.get_pool(), settings.lightning_poll_seconds))
+        tasks.append(asyncio.create_task(live.run_live_loop(db.get_pool(), settings.lightning_poll_seconds)))
+    if settings.hazard_polling_enabled and settings.database_url:
+        tasks += hazard_scheduler.start(db.get_pool())
     yield
     await replay_runner.runner.stop()
-    if live_task:
-        live_task.cancel()
+    for task in tasks:
+        task.cancel()
     db.close_pool()
 
 
