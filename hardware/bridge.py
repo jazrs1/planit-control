@@ -1,18 +1,24 @@
 """Bridge between the PlanIT Control backend and the Arduino stop-work beacon.
 
 Polls GET {url}/sites/{site_id}/beacon (and GET {url}/replay/status, for the
-countdown speed) every 3 seconds and writes one line to the Arduino over USB serial (see beacon/beacon.ino for the line formats). Any network
-or parsing error sends UNKNOWN, so the beacon never shows green when unsure.
+countdown speed) every 3 seconds and writes one line to the Arduino over USB
+serial (see beacon/beacon.ino for the line formats). Any network or parsing
+error sends UNKNOWN, so the beacon never shows green when unsure. Only public
+GET endpoints are used: the bridge needs no token or other secret.
 
-    python bridge.py http://localhost:8000 okeechobee-clean-energy-center
+    python bridge.py https://api.stormsafecrews.us --site vandolah-power-station
+    python bridge.py http://localhost:8000 --site vandolah-power-station --site okeechobee-clean-energy-center
     python bridge.py --demo            # no backend: CLEAR -> APPR -> STOP 60 s -> CLEAR
 
-Needs only pyserial (pip install pyserial) and the standard library.
+With more than one --site, holding the beacon's button for 2 seconds switches
+to the next one. Needs only pyserial (pip install pyserial, or apt install
+python3-serial) and the standard library.
 """
 
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import sys
 import time
@@ -28,14 +34,24 @@ POLL_SECONDS = 3.0
 HTTP_TIMEOUT_SECONDS = 5.0
 # USB vendor ids: Arduino (ATmega16U2), WCH CH340 (Elegoo and most clones), FTDI, Silicon Labs.
 ARDUINO_VIDS = {0x2341, 0x2A03, 0x1A86, 0x0403, 0x10C4}
+# What the beacon sends back when its button is held for 2 seconds.
+NEXT_SITE_LINE = "SITE"
+
+
+def log(message: str) -> None:
+    print(message, flush=True)
 
 
 def find_port() -> str:
     ports = list(list_ports.comports())
-    matches = [p for p in ports if p.vid in ARDUINO_VIDS]
+    matches = [p.device for p in ports if p.vid in ARDUINO_VIDS]
     if len(matches) == 1:
-        return matches[0].device
-    if not matches and len(ports) == 1:
+        return matches[0]
+    # Linux: the Uno is /dev/ttyACM* (ATmega16U2) or /dev/ttyUSB* (CH340); the Pi's own UARTs aren't.
+    usb = sorted(glob.glob("/dev/ttyACM*") + glob.glob("/dev/ttyUSB*"))
+    if len(usb) == 1:
+        return usb[0]
+    if not matches and not usb and len(ports) == 1:
         return ports[0].device
     found = ", ".join(f"{p.device} ({p.description})" for p in ports) or "none"
     raise serial.SerialException(f"couldn't pick the Arduino's port automatically (ports: {found}); pass --port")
@@ -87,44 +103,91 @@ class Beacon:
     def __init__(self, port: str | None):
         self.port = port
         self.conn: serial.Serial | None = None
+        self.error: str | None = None   # logged once per outage, not on every retry
+        self.pending = b""
+
+    def _connect(self) -> serial.Serial:
+        if self.conn is None:
+            device = self.port or find_port()
+            self.conn = serial.Serial(device, BAUD, timeout=0)
+            # Opening the port resets the Uno; wait for its self-test to finish.
+            time.sleep(3)
+            self.conn.reset_input_buffer()
+            self.pending = b""
+            log(f"Connected to {device}")
+            self.error = None
+        return self.conn
+
+    def _failed(self, e: Exception) -> None:
+        if str(e) != self.error:
+            log(f"Serial error: {e}; retrying")
+            self.error = str(e)
+        if self.conn is not None:
+            try:
+                self.conn.close()
+            except (serial.SerialException, OSError):
+                pass
+        self.conn = None
 
     def send(self, line: str) -> None:
         try:
-            if self.conn is None:
-                device = self.port or find_port()
-                self.conn = serial.Serial(device, BAUD, timeout=1)
-                # Opening the port resets the Uno; wait for its self-test to finish.
-                time.sleep(3)
-                print(f"Connected to {device}")
-            self.conn.write((line + "\n").encode("ascii", "replace"))
-            self.conn.flush()
-        except serial.SerialException as e:
-            print(f"Serial error: {e}; retrying", file=sys.stderr)
-            if self.conn is not None:
-                self.conn.close()
-            self.conn = None
+            conn = self._connect()
+            conn.write((line + "\n").encode("ascii", "replace"))
+            conn.flush()
+        except (serial.SerialException, OSError) as e:
+            self._failed(e)
 
-
-def run_live(beacon: Beacon, base_url: str, site_id: str) -> None:
-    base_url = base_url.rstrip("/")
-    site = urllib.parse.quote(site_id, safe="")
-    name: str | None = None
-    last = None
-    while True:
-        started = time.monotonic()
+    def read_lines(self) -> list[str]:
+        """Lines the beacon sent (without blocking); empty while disconnected."""
+        if self.conn is None:
+            return []
         try:
-            if name is None:
-                name = lcd_text(get_json(f"{base_url}/sites/{site}")["name"]) or site_id
+            waiting = self.conn.in_waiting
+            if waiting:
+                self.pending += self.conn.read(waiting)
+        except (serial.SerialException, OSError) as e:
+            self._failed(e)
+            return []
+        *lines, self.pending = self.pending.split(b"\n")
+        return [raw.decode("ascii", "replace").strip() for raw in lines]
+
+
+def run_live(beacon: Beacon, base_url: str, site_ids: list[str]) -> None:
+    base_url = base_url.rstrip("/")
+    names: dict[str, str] = {}
+    index = 0
+    last_state = last_error = None
+    log(f"Watching {site_ids[index]}")
+    while True:
+        site_id = site_ids[index]
+        site = urllib.parse.quote(site_id, safe="")
+        try:
+            if site_id not in names:
+                names[site_id] = lcd_text(get_json(f"{base_url}/sites/{site}")["name"]) or site_id
             speed = replay_speed(get_json(f"{base_url}/replay/status"))
-            line = beacon_line(get_json(f"{base_url}/sites/{site}/beacon"), name, speed)
+            line = beacon_line(get_json(f"{base_url}/sites/{site}/beacon"), names[site_id], speed)
+            last_error = None
         except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError, AttributeError) as e:
-            print(f"Backend error: {e}", file=sys.stderr)
+            if str(e) != last_error:
+                log(f"Backend error: {e}; showing UNKNOWN and retrying")
+                last_error = str(e)
             line = "UNKNOWN"
         beacon.send(line)
-        if line != last:
-            print(line)
-            last = line
-        time.sleep(max(0.0, POLL_SECONDS - (time.monotonic() - started)))
+        state = (site_id, line.split(" ")[0])   # log state changes, not every countdown tick
+        if state != last_state:
+            log(f"{site_id}: {line}")
+            last_state = state
+
+        # Wait for the next poll, listening for a long press on the beacon's button.
+        next_poll = time.monotonic() + POLL_SECONDS
+        while time.monotonic() < next_poll:
+            if NEXT_SITE_LINE in beacon.read_lines():
+                if len(site_ids) > 1:
+                    index = (index + 1) % len(site_ids)
+                    log(f"Button: switching to {site_ids[index]}")
+                    break   # poll the new site right away
+                log("Button: only one --site given, nothing to switch to")
+            time.sleep(0.1)
 
 
 def run_demo(beacon: Beacon) -> None:
@@ -133,7 +196,7 @@ def run_demo(beacon: Beacon) -> None:
     while True:
         for state, seconds in steps:
             end = time.monotonic() + seconds
-            print(f"{state} for {seconds} s")
+            log(f"{state} for {seconds} s")
             while (left := end - time.monotonic()) > 0:
                 beacon.send(f"STOP {round(left)} {name}" if state == "STOP" else f"{state} {name}")
                 time.sleep(min(POLL_SECONDS, left))
@@ -141,20 +204,23 @@ def run_demo(beacon: Beacon) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("url", nargs="?", help="backend URL, e.g. http://localhost:8000")
-    parser.add_argument("site_id", nargs="?", help="site id, e.g. okeechobee-clean-energy-center")
+    parser.add_argument("url", nargs="?", help="backend URL, e.g. https://api.stormsafecrews.us")
+    parser.add_argument("site_id", nargs="?", help=argparse.SUPPRESS)   # older form: bridge.py URL SITE_ID
+    parser.add_argument("--site", action="append", default=[], metavar="SITE_ID",
+                        help="site id, e.g. vandolah-power-station; repeat it to switch sites with a long press")
     parser.add_argument("--port", help="serial port (e.g. COM3 or /dev/ttyACM0); auto-detected if omitted")
     parser.add_argument("--demo", action="store_true", help="cycle CLEAR -> APPR -> STOP -> CLEAR without a backend")
     args = parser.parse_args()
-    if not args.demo and not (args.url and args.site_id):
-        parser.error("give a backend URL and a site id, or --demo")
+    site_ids = ([args.site_id] if args.site_id else []) + args.site
+    if not args.demo and not (args.url and site_ids):
+        parser.error("give a backend URL and --site SITE_ID, or --demo")
 
     beacon = Beacon(args.port)
     try:
         if args.demo:
             run_demo(beacon)
         else:
-            run_live(beacon, args.url, args.site_id)
+            run_live(beacon, args.url, site_ids)
     except KeyboardInterrupt:
         beacon.send("UNKNOWN")  # don't leave a stale state on the display
 
