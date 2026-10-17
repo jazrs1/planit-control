@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LightningFlash, Site } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import ReplayControl from "@/components/ReplayControl";
@@ -27,7 +27,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const [staleSince, setStaleSince] = useState<Date | null>(null);
   const [liveFlashes, setLiveFlashes] = useState<LightningFlash[]>([]);
   // Same alerts as the nav badge and /alerts (AlertsProvider), so the counts always agree.
-  const { alerts: knownAlerts, status: alertsStatus, replay, setDemo, refresh: refreshAlerts } = useAlertsState();
+  const { alerts: knownAlerts, status: alertsStatus, replay, setDemo, refresh: refreshAlerts, connection } = useAlertsState();
   const serverNow = useServerNow();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const rows = useRef(new Map<string, HTMLLIElement>());
@@ -38,7 +38,12 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const sites = demo ? DEMO_DATA.sites : liveSites;
   const flashes = demo ? DEMO_DATA.lightning : liveFlashes;
   // Fade by age on the backend clock (simulated during replay, the demo clock in demo mode).
-  const nowMs = serverNow();
+  // Offline, freeze the fade where it was: with no new data, letting flashes drain away would make
+  // the storm look like it passed.
+  const offline = connection.level !== "online";
+  const lastOnlineNow = useRef<number | null>(null);
+  const nowMs = offline && lastOnlineNow.current !== null ? lastOnlineNow.current : serverNow();
+  useEffect(() => { if (!offline) lastOnlineNow.current = nowMs; });
   const alertsKnown = knownAlerts !== null;
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
@@ -82,8 +87,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
       Sample sites, alerts and lightning from shared/mocks · not live conditions
       <button type="button" onClick={() => setDemo(false)} className="min-h-11 rounded-card px-2 text-brand underline focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
     </p>
-    : staleSince && sites
-      ? <p role="status" className="text-sm font-semibold text-risk-red">Connection lost · showing data from {timeOfDay(staleSince)}</p>
+    : (staleSince || offline) && sites
+      ? <p role="status" className="text-sm font-semibold text-risk-red">Connection lost · showing data from {timeOfDay(staleSince ?? new Date(connection.lastSuccessAt ?? Date.now()))}</p>
       : sites === null
         ? <p role="status" className="text-sm text-muted">{sitesFailed ? "Not connected to the server" : "Connecting…"}</p>
         : <p className="text-sm text-muted">Florida field operations · {replaying ? "Storm replay: refreshing every 3 seconds" : "Refreshes every 30 seconds, lightning every 10"}</p>;
@@ -119,7 +124,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
             <SiteMap sites={sites} alerts={alerts} flashes={flashes} nowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} />
             <div className="absolute bottom-10 left-3 flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 text-xs shadow-card" aria-label="Map legend">
               <span className="text-risk-green">● Low &lt; 4</span><span className="text-risk-amber">● Elevated 4–&lt;7</span><span className="text-risk-red">● High ≥ 7</span><span>◎ Lightning stop work</span>
-              <span className="flex items-center gap-1"><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}) · newest brightest</span>
+              <span className="flex items-center gap-1"><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{offline ? "?" : ""}) · {offline ? "last known, fade paused" : "newest brightest"}</span>
             </div>
           </section>
           <section aria-label="Sites ranked by hazard index" className="flex min-h-0 flex-col border-t border-border bg-bg lg:border-t-0 lg:border-l">

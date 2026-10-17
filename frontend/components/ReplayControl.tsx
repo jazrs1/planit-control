@@ -19,21 +19,23 @@ function formatSimulated(ms: number) {
 /** Starts and stops the backend's storm replay. Replay state lives in AlertsProvider, which also
  *  switches every dashboard refresh to the fast replay cadence while it runs. */
 export default function ReplayControl() {
-  const { replay, refresh, status } = useAlertsState();
+  const { replay, refresh, status, connection } = useAlertsState();
   const serverNow = useServerNow();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
   const running = replay?.running ?? false;
+  // Offline, the replay may have finished or been stopped: show what was last seen, not "running".
+  const offline = connection.level !== "online";
   const unavailable = status === "demo" || status === "connecting" || status === "unreachable";
 
-  // Tick the simulated clock between refreshes.
+  // Tick the simulated clock between refreshes (not while offline: it would be a guess).
   useEffect(() => {
-    if (!running) return;
+    if (!running || offline) return;
     setNow(serverNow());
     const tick = window.setInterval(() => setNow(serverNow()), 1000);
     return () => window.clearInterval(tick);
-  }, [running, serverNow]);
+  }, [running, offline, serverNow]);
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -50,7 +52,13 @@ export default function ReplayControl() {
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-      {running ? (
+      {running && offline ? (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 text-muted">
+          <span className="rounded-pill bg-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">Replay: last known</span>
+          <span className="font-mono tabular-nums">{replay?.simulated_now ? formatSimulated(Date.parse(replay.simulated_now)) : "--"}</span>
+          <span>simulated time when last seen · status unknown until the server answers</span>
+        </p>
+      ) : running ? (
         <>
           <p role="status" className="flex flex-wrap items-center gap-x-2">
             <span className="rounded-pill bg-risk-amber-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-risk-amber">Replay running</span>
