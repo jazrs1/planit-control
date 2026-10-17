@@ -104,8 +104,8 @@ def nws(event, ends_in_h=2.5, onset_in_h=None):
 
 
 @pytest.mark.parametrize("event, hazard", [
-    ("Flood Warning", "flood"), ("Flash Flood Warning", "flood"), ("Severe Thunderstorm Warning", "lightning"),
-    ("Tornado Warning", "lightning"), ("Excessive Heat Warning", "heat"), ("Extreme Heat Warning", "heat"),
+    ("Flood Warning", "flood"), ("Flash Flood Warning", "flood"), ("Severe Thunderstorm Warning", "storm"),
+    ("Tornado Warning", "storm"), ("Excessive Heat Warning", "heat"), ("Extreme Heat Warning", "heat"),
     ("Red Flag Warning", "wildfire"),
 ])
 def test_nws_warning_floors_today_at_7_and_names_the_alert(event, hazard):
@@ -131,7 +131,7 @@ def test_tropical_floors(event, floor):
     scored = predict(inputs(nws=[nws(event, ends_in_h=30)]), {})        # through 8 PM tomorrow
     assert scored["hazard_index_today"] == floor
     assert scored["hazard_index_tomorrow"] == floor                       # watches and warnings carry into tomorrow
-    assert scored["top_factors"][0] == {"hazard": "lightning", "label": f"NWS {event} until Thu 8 PM",
+    assert scored["top_factors"][0] == {"hazard": "storm", "label": f"NWS {event} until Thu 8 PM",
                                         "weight": 1.0, "source": "rule"}
 
 
@@ -331,3 +331,29 @@ def test_scoring_run_is_stored_and_read_back(conn):  # noqa: F811
 
 
 from tests.test_crew_reports import conn  # noqa: E402,F401 - the rolled-back DB fixture
+
+
+
+# ---------- "lightning" means detected strikes; forecast storm potential is "storm" ----------
+
+def test_forecast_storm_factors_are_storm_not_lightning():
+    from ml.model import FACTOR_HAZARD
+    assert {FACTOR_HAZARD[f] for f in ("gust_max_mph", "cape_max", "thunder_hours", "location")} == {"storm"}
+    gusts = ml(5.0, [{"factor": "gust_max_mph", "hazard": "storm", "label": "Wind gusts to 36 mph", "weight": 0.6},
+                     {"factor": "location", "hazard": "storm", "label": "Area with frequent past severe-weather reports",
+                      "weight": 0.4}])
+    scored = predict(inputs(model={"2026-07-15": gusts}), {})
+    assert scored["top_hazard"] == "storm" and {f["hazard"] for f in scored["top_factors"]} == {"storm"}
+    # A real stop-work is still lightning, and it comes first.
+    alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW, "all_clear_at": NOW + timedelta(minutes=30)}
+    struck = predict(inputs(model={"2026-07-15": gusts}, lightning_alert=alert), {})
+    assert struck["top_hazard"] == "lightning" and struck["top_factors"][1]["hazard"] == "storm"
+
+
+def test_stored_factors_get_the_current_hazard_mapping():
+    old = [{"factor": "gust_max_mph", "hazard": "lightning", "label": "Wind gusts to 36 mph", "weight": 0.4},
+           {"factor": "rain_in", "hazard": "flood", "label": "0.4 in of rain forecast", "weight": 0.3},
+           {"factor": "location", "hazard": "soil_saturation", "label": "Area with frequent past severe-weather reports",
+            "weight": 0.2},
+           {"factor": "season", "hazard": "lightning", "label": "Time of year (October)", "weight": 0.1}]
+    assert [f["hazard"] for f in model_scores.current_hazards(old)] == ["storm", "flood", "storm", "storm"]
