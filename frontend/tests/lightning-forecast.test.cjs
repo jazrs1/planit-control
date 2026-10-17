@@ -123,6 +123,11 @@ test("site detail shows the advisory, respects stop-work priority, and labels co
   }
   const Detail = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [lightning] })).default;
   assert.doesNotMatch(render(Detail, { siteId: site.id, initialDetail: detail }), /LIGHTNING POSSIBLE/);
+  // A replay stop-work is only a secondary tag: it never hides a real advisory.
+  const Replay = load("components/SiteDetailView.tsx", modules({ ...baseState, alerts: [{ ...lightning, replay: true }] })).default;
+  const replayHtml = render(Replay, { siteId: site.id, initialDetail: detail });
+  advisory(replayHtml);
+  assert.ok(replayHtml.indexOf("LIGHTNING POSSIBLE") < replayHtml.indexOf("Replay"), "the real advisory comes before the replay tag");
   const Offline = load("components/SiteDetailView.tsx", modules({ ...baseState, status: "stale", connection: { level: "offline", lastSuccessAt: nowMs } })).default;
   const html = render(Offline, { siteId: site.id, initialDetail: detail });
   advisory(html);
@@ -230,6 +235,8 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
     getSites: async () => [site],
     getLightningRecent: async () => { if (failFlashes) throw Error("offline flashes"); return [{ lat: 28, lon: -82, ts: approach.updated_at }]; },
     getLightningCells: async () => { cellReads++; if (failCells) throw Error("offline cells"); return [cell]; },
+    // A server without #48's counts endpoint: the dashboard counts the flashes it has.
+    getLightningCounts: async () => { throw Error("404 Not Found"); },
   });
   const Dashboard = load("components/SupervisorDashboard.tsx", overrides).default;
   const draw = () => { polls = []; return driver.render(Dashboard, { initialSites: [site] }); };

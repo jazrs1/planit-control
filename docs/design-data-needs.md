@@ -92,6 +92,10 @@ The layers panel shows these three as "Needs data" (disabled) until they exist:
 
 During a replay, `Site.lightning_approach` merges real and replay advisories (`hazards/snapshot.py`), and `LightningApproach` doesn't say which one it is. The dashboard needs that to keep replay advisories off real counts and to put them on the replay timeline. For now it guesses from `issued_at`: a replay advisory is issued on the replay clock, hours away from real time. Add `replay: boolean` to `LightningApproach`, the same as `Alert.replay`.
 
+## 8. Real flashes during a replay
+
+During a replay `/lightning/recent` runs on the simulated clock, so it returns only the replay's flashes. The dashboard draws those blue and counts them apart ("4,248 replay"), but it can't show or count the real flashes at the same time ("real not shown during a replay"). Needed: `GET /lightning/recent?minutes=15&clock=real` (real-time flashes, even during a replay), or a `replay: boolean` on each `LightningFlash` with both sets returned during a replay.
+
 ## 7. The new `storm` hazard type
 
 When the backend adds `"storm"` to `HazardType`, `HAZARD_LABEL` in `frontend/lib/risk.ts` must get a `storm` entry in the same PR. It's a `Record<HazardType, string>`, so the frontend type check fails without it. Proposed label: `"Storm"`.

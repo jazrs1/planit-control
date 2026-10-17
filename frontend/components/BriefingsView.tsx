@@ -7,7 +7,7 @@ import BriefingCard from "@/components/BriefingCard";
 import type { BriefingEntry } from "@/components/BriefingCard";
 import { useDemoCode } from "@/components/DemoCode";
 import { DEMO_DATA, getSites, sendBriefingNow } from "@/lib/api";
-import { GO_LABEL, GO_STYLE } from "@/lib/briefings";
+import { GO_LABEL } from "@/lib/briefings";
 import { loadBriefings } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
 import { usePolling } from "@/lib/usePolling";
@@ -162,54 +162,55 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
 
   if (!data) {
     return (
-      <section role="status" className="space-y-3 rounded-card border border-border bg-surface p-4">
-        <h2 className="font-semibold">Can&apos;t reach the server</h2>
-        <p className="text-sm text-muted">Tomorrow&apos;s briefings are unknown. This does not mean conditions are safe. Retrying every 5 seconds.</p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void refresh()} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
-          <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border border-border px-4 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
+      <section role="status" className="pc-panel flex flex-col gap-4 p-6 max-sm:p-5">
+        <h2 className="text-xl font-semibold">Can&apos;t reach the server</h2>
+        <p className="max-w-[68ch] text-muted">Tomorrow&apos;s briefings are unknown. This does not mean conditions are safe. Retrying every 5 seconds.</p>
+        <div className="flex flex-wrap items-center gap-6">
+          <button type="button" onClick={() => void refresh()} className="pc-btn pc-btn--primary">Retry now</button>
+          <button type="button" onClick={() => setDemo(true)} className="pc-link">Show demo data</button>
         </div>
       </section>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-6">
       {demo && (
-        <div role="status" className="rounded-card border border-border bg-surface p-3 text-sm text-muted">
-          <strong>Demo data</strong> · Sample briefings from shared/mocks, not live conditions.
-          <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 font-semibold text-brand underline">Exit demo</button>
-        </div>
+        <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted">
+          <span className="pc-chip pc-chip--unknown">Demo data</span>
+          Sample briefings from shared/mocks, not live conditions.
+          <button type="button" onClick={() => setDemo(false)} className="pc-link">Exit demo</button>
+        </p>
       )}
       {connectionLost && (
-        <p role="alert" className="rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
-          Connection lost · showing the last loaded briefings · ? = may be out of date
+        <p role="alert" className="rounded-card bg-risk-red-bg px-4 py-3 font-semibold text-risk-red">
+          Connection lost. Showing the last loaded briefings; ? means it may be out of date.
         </p>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="group" aria-label="Filter by decision" className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div role="group" aria-label="Filter by decision" className="flex flex-wrap gap-0.5 rounded-card bg-surface-2 p-1">
           {FILTERS.map((f) => (
             <button
               key={f}
               type="button"
               aria-pressed={filter === f}
               onClick={() => setFilter(f)}
-              className={`min-h-11 rounded-chip border px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-brand ${filter === f ? (f === "all" ? "border-brand bg-brand text-surface" : `border-transparent ${GO_STYLE[f]} ring-2 ring-brand`) : "border-border bg-surface text-text"}`}
+              className={`min-h-10 rounded-[6px] px-4 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-notice ${filter === f ? "bg-surface text-text shadow-card" : "text-muted hover:text-text"}`}
             >
-              {f === "all" ? "All" : GO_LABEL[f]} <span className="tabular-nums">({counts[f]}{connectionLost ? "?" : ""})</span>
+              {f === "all" ? "All" : GO_LABEL[f]} <span className="font-normal tabular-nums text-muted">{counts[f]}{connectionLost ? "?" : ""}</span>
             </button>
           ))}
         </div>
         {!demo && (
           confirming ? (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <span>Regenerate tomorrow&apos;s briefing for all {data.sites.length} sites? This replaces the stored ones.</span>
-              <button type="button" onClick={() => void sendAll()} className="min-h-11 rounded-card bg-brand px-3 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Yes, send now</button>
-              <button type="button" onClick={() => setConfirming(false)} className="min-h-11 rounded-card border border-border px-3 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Cancel</button>
+              <button type="button" onClick={() => void sendAll()} className="pc-btn pc-btn--primary">Yes, send now</button>
+              <button type="button" onClick={() => setConfirming(false)} className="pc-link">Cancel</button>
             </div>
           ) : (
-            <button type="button" disabled={sending} onClick={() => setConfirming(true)} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50">
+            <button type="button" disabled={sending} onClick={() => setConfirming(true)} className="pc-btn pc-btn--quiet">
               {sending ? "Sending…" : "Send briefings now"}
             </button>
           )
@@ -217,21 +218,22 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
       </div>
       {demoCode.form}
       {sendMessage && (
-        <p role={sendMessage.tone === "error" ? "alert" : "status"} className={`text-sm ${sendMessage.tone === "error" ? "text-risk-red" : "text-muted"}`}>
+        <p role={sendMessage.tone === "error" ? "alert" : "status"} className={sendMessage.tone === "error" ? "text-risk-red" : "text-muted"}>
           {sendMessage.text}{following && sendMessage.tone === "ok" ? " Checking every 5 seconds…" : ""}
         </p>
       )}
 
-      <p role="status" className="text-sm text-muted">
-        {shown.length} {shown.length === 1 ? "site" : "sites"} · Highest hazard index tomorrow first
-        {missing > 0 && ` · ${missing} without a briefing`}
-        {undecided > 0 && ` · ${undecided} without a go / no-go decision (shown under All)`}
+      <p role="status" className="text-xs text-muted">
+        {shown.length} {shown.length === 1 ? "site" : "sites"}{" · "}Highest hazard index tomorrow first
+        {missing > 0 && <>{" · "}{missing} without a briefing</>}
+        {undecided > 0 && <>{" · "}{undecided} without a go / no-go decision (shown under All)</>}
       </p>
 
       {shown.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface p-4 text-muted">No sites match this filter.</p>
+        <p className="pc-panel p-6 text-muted">No sites match this filter.</p>
       ) : (
-        <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        // Row by row, highest first: the riskiest card is always top left.
+        <ul className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
           {shown.map(({ site, entry }) => (
             <li key={site.id}>
               <BriefingCard

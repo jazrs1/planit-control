@@ -55,11 +55,11 @@ export default function ReplayControl() {
 
   const stopIcon = <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" fill="currentColor" /></svg>;
   const playIcon = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor" /></svg>;
-  const simulated = (label: string, time: string, detail: string, muted = false) => (
+  const simulated = (label: string, time: string, detail?: string, muted = false) => (
     <p role="status" className={`grid leading-tight ${muted ? "text-muted" : ""}`}>
-      <span className="pc-label text-muted">{label}</span>
+      <span className="text-xs text-muted">{label}</span>
       <span className="font-mono text-xl font-bold tabular-nums">{time}</span>
-      <span className="text-xs text-muted">{detail}</span>
+      {detail && <span className="text-xs text-muted">{detail}</span>}
     </p>
   );
 
@@ -72,11 +72,11 @@ export default function ReplayControl() {
         </>
       ) : running ? (
         <>
-          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger">
+          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger rounded-pill bg-transparent px-5">
             {stopIcon}{busy ? "Stopping…" : "Stop replay"}
           </button>
           <span className="pc-chip pc-chip--quiet text-[0.8125rem]" title="Simulated seconds per real second">{replay?.speed}×</span>
-          {simulated("Simulated time", now === null ? "--" : formatSimulated(now), `${replay?.files_done}/${replay?.files_total} files · ${replay?.flashes_ingested.toLocaleString()} flashes`)}
+          {simulated("Simulated time", now === null ? "--" : formatSimulated(now))}
         </>
       ) : (
         <button
@@ -84,7 +84,7 @@ export default function ReplayControl() {
           disabled={busy || unavailable}
           onClick={() => void run(() => startReplay())}
           title={unavailable ? "Needs a connection to the server" : "Play a recorded storm through the live pipeline on a simulated clock"}
-          className="pc-btn pc-btn--primary"
+          className="pc-btn rounded-pill border-text/40 bg-transparent px-5 text-text"
         >
           {playIcon}{busy ? "Starting…" : "Replay storm"}
         </button>
