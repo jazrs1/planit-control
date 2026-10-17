@@ -75,7 +75,11 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     const ts = Date.parse(flash.ts);
     return Number.isFinite(ts) && Date.now() - ts > REPLAY_FLASH_AGE_MS;
   }, []);
-  const cells = demo ? DEMO_DATA.lightningCells : liveCells;
+  // During a replay /lightning/cells also returns real cells (LightningCell.replay = false). Until cell
+  // freshness and the count are judged per layer on its own clock, the dashboard keeps showing only the
+  // replay's cells, as before: the count never mixes real and replay, and real cells aren't checked
+  // against the simulated clock (where they'd look like they're from the future).
+  const cells = demo ? DEMO_DATA.lightningCells : replaying && liveCells ? liveCells.filter((cell) => cell.replay !== false) : liveCells;
   // Fade by age on the backend clock (simulated during replay, the demo clock in demo mode).
   // Offline, freeze the fade where it was: with no new data, letting flashes drain away would make
   // the storm look like it passed.

@@ -10,7 +10,8 @@
     "speed_mph": 22.3,
     "heading_deg": 356.6,
     "moving_toward": "N",
-    "last_flash_at": "2025-08-04T22:29:59.003205Z"
+    "last_flash_at": "2025-08-04T22:29:59.003205Z",
+    "replay": false
   },
   {
     "id": "cell-2",
@@ -23,7 +24,8 @@
     "speed_mph": 12.0,
     "heading_deg": 43.6,
     "moving_toward": "NE",
-    "last_flash_at": "2025-08-04T22:29:59.631495Z"
+    "last_flash_at": "2025-08-04T22:29:59.631495Z",
+    "replay": false
   },
   {
     "id": "cell-3",
@@ -36,7 +38,8 @@
     "speed_mph": 4.8,
     "heading_deg": 359.7,
     "moving_toward": "N",
-    "last_flash_at": "2025-08-04T22:29:59.668880Z"
+    "last_flash_at": "2025-08-04T22:29:59.668880Z",
+    "replay": false
   },
   {
     "id": "cell-4",
@@ -49,7 +52,8 @@
     "speed_mph": 6.8,
     "heading_deg": 244.8,
     "moving_toward": "WSW",
-    "last_flash_at": "2025-08-04T22:29:58.420694Z"
+    "last_flash_at": "2025-08-04T22:29:58.420694Z",
+    "replay": false
   },
   {
     "id": "cell-5",
@@ -62,7 +66,8 @@
     "speed_mph": 25.1,
     "heading_deg": 28.4,
     "moving_toward": "NNE",
-    "last_flash_at": "2025-08-04T22:29:57.920961Z"
+    "last_flash_at": "2025-08-04T22:29:57.920961Z",
+    "replay": false
   },
   {
     "id": "cell-6",
@@ -75,7 +80,8 @@
     "speed_mph": 18.8,
     "heading_deg": 19.9,
     "moving_toward": "NNE",
-    "last_flash_at": "2025-08-04T22:29:59.319450Z"
+    "last_flash_at": "2025-08-04T22:29:59.319450Z",
+    "replay": false
   },
   {
     "id": "cell-7",
@@ -88,7 +94,8 @@
     "speed_mph": 23.7,
     "heading_deg": 107.3,
     "moving_toward": "ESE",
-    "last_flash_at": "2025-08-04T22:29:52.326622Z"
+    "last_flash_at": "2025-08-04T22:29:52.326622Z",
+    "replay": false
   },
   {
     "id": "cell-8",
@@ -101,6 +108,7 @@
     "speed_mph": 12.0,
     "heading_deg": 60.6,
     "moving_toward": "ENE",
-    "last_flash_at": "2025-08-04T22:29:14.629972Z"
+    "last_flash_at": "2025-08-04T22:29:14.629972Z",
+    "replay": false
   }
 ]

@@ -374,7 +374,8 @@ export interface LightningRecentCounts {
 
 // ---------- GET /lightning/cells ----------
 
-/** A storm cell: a cluster of flashes from the last 20 minutes. Ids are per response (not stable). */
+/** A storm cell: a cluster of flashes from the last 20 minutes. Ids are per response (not stable); a
+ * replay cell's id starts with "replay-". */
 export interface LightningCell {
   id: string;
   lat: number;
@@ -393,9 +394,14 @@ export interface LightningCell {
   heading_deg: number | null;
   /** 16-point compass of heading_deg, e.g. "NE". */
   moving_toward: string | null;
+  /** Real cells: real time. Replay cells: the replay's (historical) clock, like LightningFlash.ts. */
   last_flash_at: string;
+  /** false: from real lightning (always included, largest first). true: from the running replay, listed
+   * after the real ones, largest first. */
+  replay: boolean;
 }
 
+/** GET /lightning/cells: real storm cells always, plus a running replay's. */
 export type LightningCellsResponse = LightningCell[];
 
 // ---------- GET /sites/{id}/beacon ----------
