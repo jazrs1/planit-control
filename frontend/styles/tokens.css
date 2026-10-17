@@ -104,8 +104,11 @@
   --pc-font-mono: var(--font-overpass-mono), ui-monospace, "SF Mono", Menlo, monospace;
   /* Type scale: four sizes, two weights (400, 600). Labels 12px grey, body 15px at 1.5 line height,
      values 20px, headline numbers 32px. Tailwind: text-xs, text-sm (15px here), text-xl, text-[2rem].
-     Mono only for clocks and countdowns; tabular numbers everywhere. Times read "4:03 PM EDT" in the
-     site's zone (lib/time.ts), distances "9.6 mi" / "12 mi" (lib/alerts.ts formatMiles). */
+     Mono only for clocks and countdowns; tabular numbers everywhere. Buttons and text links are body size.
+     Times: always in the site's own zone. "4:03 PM EDT" for today (formatSiteTime, lib/time.ts) and
+     "Oct 17, 4:03 PM EDT" for another day (formatSiteDateTime / formatAlertTime); drop the zone
+     abbreviation where the page already states it. Distances: "9.6 mi" under 10, "12 mi" from 10 up
+     (formatMiles); strike distances round down (formatStrikeDistance, lib/alerts.ts). */
   --pc-text-label: 0.75rem;
   --pc-text-body: 0.9375rem;
   --pc-text-value: 1.25rem;

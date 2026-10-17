@@ -1,11 +1,12 @@
-import { pageMetadata } from "@/lib/metadata";
+import { APP_NAME, APP_TAGLINE, pageMetadata } from "@/lib/metadata";
 import SupervisorDashboard from "@/components/SupervisorDashboard";
 import { getSites, orNull } from "@/lib/api";
 
 // Live safety data: always render per request, never prerender.
 export const dynamic = "force-dynamic";
 
-export const metadata = pageMetadata("Dashboard", "Monitor utility site conditions, lightning stop-work alerts, and flood risk across Florida.");
+export const metadata = pageMetadata("Dashboard", "Monitor utility site conditions, lightning stop-work alerts, and flood risk across Florida.",
+  { title: APP_NAME, description: APP_TAGLINE });
 
 export default async function HomePage() {
   // Alerts come from AlertsProvider in the root layout.

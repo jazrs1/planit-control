@@ -52,13 +52,13 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
         {sitesUnconfirmed && <p className="text-sm text-muted">Site list not confirmed · showing last loaded names.</p>}
       </fieldset>
     </details>
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
       <button type="button" disabled={disabled || !valid} onClick={() => void push.enable({ site_ids: all ? null : chosen, role })} className={`${control} bg-brand text-on-brand`}>{push.busy ? "Please wait…" : push.phase === "registered" ? "Save alert preferences" : "Get alerts on this device"}</button>
-      <button type="button" disabled={disabled || push.phase !== "registered"} onClick={() => void push.sendTest()} className={control}>Send test notification</button>
-      {push.canUnsubscribe && <button type="button" disabled={push.busy || demo} onClick={() => void push.unsubscribe()} className={control}>Unsubscribe</button>}
+      <button type="button" disabled={disabled || push.phase !== "registered"} onClick={() => void push.sendTest()} className="pc-link disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline">Send test notification</button>
+      {push.canUnsubscribe && <button type="button" disabled={push.busy || demo} onClick={() => void push.unsubscribe()} className="pc-link disabled:cursor-not-allowed disabled:opacity-50">Unsubscribe</button>}
     </div>
     <p role="status" className="text-sm font-medium text-muted">{push.message}</p>
     {!demo && connection.level !== "online" && push.phase === "registered" && <p role="status" className="text-sm font-semibold text-muted">? Last confirmed registration · server connection lost.</p>}
-    <p className="rounded-card border-s-4 border-risk-amber bg-bg p-3 text-sm text-muted"><strong>Notifications can be delayed, arrive out of order, or never arrive.</strong> No notification does not mean all clear. Check the app&apos;s current alerts and follow your site&apos;s safety procedures.</p>
+    <p className="text-sm text-muted"><strong className="font-semibold text-text">Notifications can be delayed, arrive out of order, or never arrive.</strong> No notification does not mean all clear. Check the app&apos;s current alerts and follow your site&apos;s safety procedures.</p>
   </section>;
 }
