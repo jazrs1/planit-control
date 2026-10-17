@@ -84,7 +84,7 @@ Press **Replay storm** about **5 seconds in**; after that the replay runs on its
 - **Say:** "Crews report hazards with a photo and a map pin. A report near a site raises that site's card."
 
 **2:45–3:30. Briefings, the model, the honest limits.**
-- **≈ 2:54:** the beacon turns **green**, and the phone says "Replay: All clear at Vandolah Power Station. Stop work has ended." Pause and point at both.
+- **≈ 2:54:** the beacon turns **green**, and the phone says "Replay: Stop work ended at Vandolah Power Station." Pause and point at both. A replay never says "All clear" aloud; that phrase is kept for real alerts.
 - **Show:** the **Briefings** tab, and open one.
 - **Say:** "Every evening at 6, Claude writes a briefing for each site. Code checks every number against the data, and the go or no-go call is made in code, never by the model."
 - **Say:** "The index is a LightGBM model on archived forecasts. On a year it never saw, it ranks risky days three to four times better than the baselines."
