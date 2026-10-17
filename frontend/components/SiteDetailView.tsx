@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Alert, FloodStatus, OshaHeatRisk, SiteDetail, SoilLevel } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
-import { ReplayTag } from "@/components/AlertBanner";
+import { NoticeCard, ReplayLine, StopWorkCard } from "@/components/AlertCards";
 import BriefingCard from "@/components/BriefingCard";
 import HazardPanel from "@/components/HazardPanel";
 import LightningApproachChip from "@/components/LightningApproachChip";
@@ -15,7 +15,8 @@ import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/li
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
 import { HAZARD_LABEL, factorHazardLabel, riskLevel } from "@/lib/risk";
-import { formatAgo, formatSiteDateTime, formatSiteTime, timeZoneAbbr } from "@/lib/time";
+import { formatPageTime, zoneLabel } from "@/lib/siteTime";
+import { formatAgo } from "@/lib/time";
 import { usePolling } from "@/lib/usePolling";
 
 // Refresh cadence: same as the dashboard's sites (the lightning card changes fast during replay).
@@ -30,9 +31,9 @@ const BRIEFING_MS = 5 * 60_000;
 const STALE_AFTER_MIN = { weather: 180, wildfire: 90, wildlife: 18 * 60 } as const;
 
 const RISK_STYLES = {
-  green: { badge: "bg-risk-green-bg text-risk-green", label: "Low" },
-  amber: { badge: "bg-risk-amber-bg text-risk-amber", label: "Elevated" },
-  red: { badge: "bg-risk-red-bg text-risk-red", label: "High" },
+  green: { text: "text-risk-green", shape: "pc-shape--green", label: "Low" },
+  amber: { text: "text-risk-amber", shape: "pc-shape--amber", label: "Elevated" },
+  red: { text: "text-risk-red", shape: "pc-shape--red", label: "High" },
 } as const;
 
 const OSHA_LABEL: Record<OshaHeatRisk, string> = { lower: "Lower", moderate: "Moderate", high: "High", very_high: "Very high" };
@@ -41,77 +42,37 @@ const SOIL_LABEL: Record<SoilLevel, string> = { dry: "Dry", moist: "Moist", satu
 
 const fmt = (v: number | null | undefined, unit: string, digits = 0) => (v == null ? null : `${v.toFixed(digits)}${unit}`);
 const yesNo = (v: boolean | null | undefined) => (v == null ? null : v ? "Yes" : "No");
+const count = (v: number | null | undefined) => (v == null ? null : String(v));
+
+/** A panel on this page: white, small radius, soft shadow. */
+const PANEL = "pc-panel flex flex-col gap-4 p-6 max-sm:p-5";
 
 function timeOfDay(date: Date) {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-function IndexBadge({ label, value, uncertain, unknown }: { label: string; value: number; uncertain: boolean; unknown: boolean }) {
-  const risk = RISK_STYLES[riskLevel(value)];
-  if (unknown) {
-    // No card has live data (e.g. the backend has no database): the index is a placeholder.
-    return (
-      <div className="flex min-w-24 flex-col items-center rounded-card bg-bg px-3 py-1 text-muted" aria-label={`${label}: hazard index unknown, no live data`}>
-        <span className="text-xs font-medium">{label}</span>
-        <span className="font-mono text-2xl font-bold leading-tight">—</span>
-        <span className="text-xs font-medium uppercase tracking-wide">No data</span>
-      </div>
-    );
-  }
-  return (
-    <div
-      className={`flex min-w-24 flex-col items-center rounded-card px-3 py-1 ${uncertain ? "bg-bg text-muted" : risk.badge}`}
-      aria-label={`${label}: hazard index ${value} of 10, ${risk.label} risk${uncertain ? ", last known" : ""}`}
-    >
-      <span className="text-xs font-medium">{label}</span>
-      <span className="font-mono text-2xl font-bold leading-tight">{value.toFixed(1)}{uncertain && "?"}</span>
-      <span className="text-xs font-medium uppercase tracking-wide">{risk.label}</span>
-    </div>
-  );
+/** The FEMA zone once, with what it means: "X, not high-risk", "AE, high-risk floodplain". */
+function femaZone(zone: string | null | undefined, highRisk: boolean | null | undefined) {
+  if (zone == null) return null;
+  if (zone === "unmapped") return "Not mapped";
+  return highRisk == null ? zone : `${zone}, ${highRisk ? "high-risk floodplain" : "not high-risk"}`;
 }
 
-/** This site's active alerts from the shared alerts state (same source as the nav badge). */
-function SiteAlerts({ alerts, timeZone, alertsUnknown }: { alerts: Alert[]; timeZone: string; alertsUnknown: boolean }) {
-  if (alertsUnknown) {
-    return (
-      <p role="status" className="rounded-card border border-dashed border-border bg-surface p-3 text-sm font-semibold text-muted">
-        Alert status unknown · not connected to the server. Don&apos;t treat this site as clear.
-      </p>
-    );
-  }
+function IndexStat({ label, value, uncertain, unknown }: { label: string; value: number; uncertain: boolean; unknown: boolean }) {
+  const risk = RISK_STYLES[riskLevel(value)];
+  // No card has live data (e.g. the backend has no database): the index is a placeholder.
+  const aria = unknown ? `${label}: hazard index unknown, no live data` : `${label}: hazard index ${value} of 10, ${risk.label} risk${uncertain ? ", last known" : ""}`;
   return (
-    <>
-      {alerts.map((alert) =>
-        alert.type === "lightning" ? (
-          <article key={alert.id} className="flex flex-col gap-3 rounded-card border border-risk-red bg-risk-red-solid p-4 text-on-risk-red sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-lg font-bold">{alert.replay && <ReplayTag />}⚡ STOP WORK: lightning</p>
-              <p className="text-sm">
-                {/* Same rounding as every other page: down, so a strike inside 10 mi never reads 10.0. */}
-                {formatStrikeDistance(alert.last_strike_distance_mi) === null ? "Lightning within 10 mi." : `Last strike ${formatStrikeDistance(alert.last_strike_distance_mi)} away.`}
-                {" "}Each new strike restarts the 30-minute wait.
-              </p>
-            </div>
-            <div className="shrink-0 sm:min-w-56"><StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} /></div>
-          </article>
-        ) : alert.type === "flood" ? (
-          <article key={alert.id} className="rounded-card border border-risk-amber bg-risk-amber-bg p-4 text-risk-amber">
-            <p className="text-lg font-bold">{alert.replay && <ReplayTag />}FLOOD RISK</p>
-            <p className="text-sm">
-              {alert.all_clear_at
-                ? `NWS flood warning in effect until ${formatSiteDateTime(alert.all_clear_at, timeZone)}.`
-                : "Heavy rain on flood-prone ground. Clears when conditions improve."}
-              {" "}Started {formatSiteDateTime(alert.started_at, timeZone)}.
-            </p>
-          </article>
-        ) : (
-          <article key={alert.id} className="rounded-card border border-risk-red bg-risk-red-bg p-4 text-risk-red">
-            <p className="text-lg font-bold">{alert.replay && <ReplayTag />}{HAZARD_LABEL[alert.type].toUpperCase()} ALERT</p>
-            <p className="text-sm">Started {formatSiteDateTime(alert.started_at, timeZone)}.</p>
-          </article>
-        ),
-      )}
-    </>
+    <div className="flex flex-col" aria-label={aria}>
+      <span aria-hidden="true" className="text-xs text-muted">{label}</span>
+      <span aria-hidden="true" className={`text-[2rem] font-semibold leading-tight tracking-[-0.01em] ${unknown || uncertain ? "text-muted" : ""}`}>
+        {unknown ? "—" : `${value.toFixed(1)}${uncertain ? "?" : ""}`}
+      </span>
+      <span aria-hidden="true" className={`flex items-center gap-1.5 text-xs font-semibold ${unknown || uncertain ? "text-muted" : risk.text}`}>
+        <span className={`pc-shape ${unknown || uncertain ? "pc-shape--unknown" : risk.shape}`} />
+        {unknown ? "No data" : uncertain ? "Last known" : risk.label}
+      </span>
+    </div>
   );
 }
 
@@ -181,32 +142,32 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   }, [demo, serverNow]);
 
   const backLink = (
-    <Link href="/" className="inline-flex min-h-11 items-center text-sm font-medium text-brand focus-visible:outline-2 focus-visible:outline-brand">
+    <Link href="/" className="inline-flex min-h-11 items-center self-start text-xs text-muted hover:text-text focus-visible:outline-2 focus-visible:outline-notice">
       ← Dashboard
     </Link>
   );
 
   if (detail === null) {
     return (
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
         {backLink}
-        <section role="status" className="mbs-6 flex flex-col items-center gap-3 p-8 text-center">
+        <section role="status" className="flex flex-col items-center gap-4 p-8 text-center">
           {demo ? (
             <>
-              <h1 className="text-lg font-semibold">No demo data for this site</h1>
-              <p className="text-sm text-muted">Demo data covers only the six sample sites.</p>
-              <button type="button" onClick={() => setDemo(false)} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
+              <h1 className="text-xl font-semibold">No demo data for this site</h1>
+              <p className="text-muted">Demo data covers only the six sample sites.</p>
+              <button type="button" onClick={() => setDemo(false)} className="pc-btn pc-btn--quiet">Exit demo</button>
             </>
           ) : missing ? (
-            <h1 className="text-lg font-semibold">Site not found</h1>
+            <h1 className="text-xl font-semibold">Site not found</h1>
           ) : failed ? (
             <>
-              <h1 className="text-lg font-semibold text-risk-red">Can&apos;t reach the server</h1>
-              <p className="max-w-md text-sm text-muted">This site&apos;s conditions and stop-work status are unknown. Don&apos;t treat it as clear. Retrying every 5 seconds.</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => { void poll(); void refreshAlerts(); }} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
+              <h1 className="text-xl font-semibold text-risk-red">Can&apos;t reach the server</h1>
+              <p className="max-w-md text-muted">This site&apos;s conditions and stop-work status are unknown. Don&apos;t treat it as clear. Retrying every 5 seconds.</p>
+              <div className="flex flex-wrap items-center justify-center gap-6">
+                <button type="button" onClick={() => { void poll(); void refreshAlerts(); }} className="pc-btn pc-btn--primary">Retry now</button>
                 {siteId in DEMO_DATA.siteDetails && (
-                  <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
+                  <button type="button" onClick={() => setDemo(true)} className="pc-link">Show demo data</button>
                 )}
               </div>
             </>
@@ -221,139 +182,172 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   const tz = detail.timezone;
   const c = detail.conditions;
   const siteAlerts = (alerts ?? []).filter((a) => a.site_id === detail.id);
+  // Real alerts lead; replay ones are a secondary tag after them and never hide a real advisory.
+  const realAlerts = siteAlerts.filter((a) => !a.replay);
+  const replayAlerts = siteAlerts.filter((a) => a.replay);
+  const realStops = realAlerts.filter((a) => a.type === "lightning");
+  const realOthers = realAlerts.filter((a) => a.type !== "lightning");
+  const approach = detail.lightning_approach;
+  // An advisory is hidden only by a stop-work of its own kind (real by real, replay by replay).
+  const approachStopWork = siteAlerts.some((a) => a.type === "lightning" && a.replay === !!approach?.replay);
+  const alertsLastKnown = alertsStatus === "stale";
   // No card has a status: everything is placeholder, so the index is too.
   const noLiveData = [c.lightning, c.heat, c.flood, c.soil, c.wildfire, c.wildlife_summary].every((card) => !card?.hazard_status);
   const nws = detail.nws_alerts;
+  const factors = [...detail.top_factors].sort((a, b) => b.weight - a.weight);
+  const replayNowMs = replay?.running || demo ? serverNow() : nowMs;
+  const peakHour = c.heat.peak_at ? new Date(c.heat.peak_at).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric" }) : null;
+  // "FEMA zone X" as a source only repeats the zone row.
+  const floodSource = c.flood.source && !/^FEMA\b/i.test(c.flood.source) ? c.flood.source : null;
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6">
-      <div>
+    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
+      <div className="flex flex-col gap-2">
         {backLink}
         {demo && (
-          <p role="status" className="mbs-2 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-3 text-sm font-semibold text-muted">
-            <span className="rounded-chip border border-border px-2 py-0.5 text-xs">Demo data</span>
-            Sample conditions from shared/mocks · not live
-            <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 text-brand underline focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
+          <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted">
+            <span className="pc-chip pc-chip--unknown">Demo data</span>
+            Sample conditions from shared/mocks, not live.
+            <button type="button" onClick={() => setDemo(false)} className="pc-link">Exit demo</button>
           </p>
         )}
         {connectionLost && (
-          <p role="status" className="mbs-2 rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
-            Connection lost · showing last known conditions from {timeOfDay(lostSince)} · ? = may be out of date
+          <p role="status" className="rounded-card bg-risk-red-bg px-4 py-3 font-semibold text-risk-red">
+            Connection lost. Showing last known conditions from {timeOfDay(lostSince)}; ? means it may be out of date.
           </p>
         )}
       </div>
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-text">{detail.name}</h1>
-          <p className="text-sm text-muted">
-            {detail.county} County · {timeZoneAbbr(tz)} · Updated {formatSiteDateTime(detail.updated_at, tz)}
-            {nowMs !== null && ` (${formatAgo(Math.max(0, nowMs - Date.parse(detail.updated_at)))})`}
-          </p>
-          <p className="mbs-1 text-sm">
-            <span className="text-muted">Top hazard: </span>
-            <span className="font-medium">{HAZARD_LABEL[detail.top_hazard]}</span>
+      <header className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em] text-balance">{detail.name}</h1>
+          <p className="text-xs text-muted">
+            {detail.county} County{" · "}Times in {zoneLabel(tz)}{" · "}
+            <span className="whitespace-nowrap">Updated {formatPageTime(detail.updated_at, tz, nowMs)}{nowMs !== null && `, ${formatAgo(Math.max(0, nowMs - Date.parse(detail.updated_at)))}`}</span>
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex gap-2">
-            <IndexBadge label="Today" value={detail.hazard_index_today} uncertain={connectionLost} unknown={noLiveData} />
-            <IndexBadge label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} unknown={noLiveData} />
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-4" title="Hazard index 0–10: weather model + safety rules">
+          <IndexStat label="Today" value={detail.hazard_index_today} uncertain={connectionLost} unknown={noLiveData} />
+          <IndexStat label="Tomorrow" value={detail.hazard_index_tomorrow} uncertain={connectionLost} unknown={noLiveData} />
+          <div className="flex flex-col">
+            <span className="text-xs text-muted">Top hazard</span>
+            <span className={`text-xl font-semibold leading-[2.5rem] ${connectionLost ? "text-muted" : ""}`}>{HAZARD_LABEL[detail.top_hazard]}</span>
+            <span className="text-xs text-muted">Hazard index, 0–10</span>
           </div>
-          <p className="text-xs text-muted">Hazard index 0–10 · weather model + safety rules</p>
         </div>
       </header>
 
-      <SiteAlerts alerts={siteAlerts} timeZone={tz} alertsUnknown={alerts === null} />
-      <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : detail.lightning_approach?.replay || !replay?.running ? serverNow() : Date.now()} demo={demo} />
+      {/* Order: real stop-work, real advisory, real flood risk, then unknown; replay tags last. */}
+      {alerts === null ? (
+        <p role="status" className="rounded-card border-2 border-dashed border-muted px-6 py-4 font-semibold text-muted">
+          Alert status unknown: not connected to the server. Don&apos;t treat this site as clear.
+        </p>
+      ) : realStops.map((alert) => <StopWorkCard key={alert.id} alert={alert} lastKnown={alertsLastKnown} />)}
+      {approach && !approach.replay && <LightningApproachChip approach={approach} stopWork={approachStopWork} unconfirmed={connectionLost || alerts === null || alertsLastKnown} nowMs={nowMs === null ? null : !replay?.running ? serverNow() : Date.now()} demo={demo} />}
+      {alerts !== null && realOthers.map((alert) => <NoticeCard key={alert.id} alert={alert} lastKnown={alertsLastKnown} started={formatPageTime(alert.started_at, tz, nowMs)}>
+        {alert.type === "flood" && (alert.all_clear_at
+          ? `NWS flood warning in effect until ${formatPageTime(alert.all_clear_at, tz, nowMs)}.`
+          : "Heavy rain on flood-prone ground. Clears when conditions improve.")}
+      </NoticeCard>)}
+      {(replayAlerts.length > 0 || approach?.replay) && (
+        <div className="flex flex-col gap-2">
+          {replayAlerts.map((alert) => <ReplayLine key={alert.id} alert={alert} timeZone={tz} replayNowMs={replayNowMs} />)}
+          {approach?.replay && <LightningApproachChip approach={approach} stopWork={approachStopWork} unconfirmed={connectionLost || alerts === null || alertsLastKnown} nowMs={nowMs === null ? null : serverNow()} demo={demo} />}
+        </div>
+      )}
+
       <SiteScoreHistory site={detail} unconfirmed={connectionLost} />
 
-      <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4">
-        <h2 id="nws-heading" className="text-base font-semibold">National Weather Service alerts</h2>
+      <section aria-labelledby="nws-heading" className={PANEL}>
+        <h2 id="nws-heading" className="text-xs text-muted">National Weather Service</h2>
         {nws == null ? (
-          <p className="mbs-2 text-sm text-muted">NWS alerts unavailable for this site.</p>
+          <p className="text-muted">NWS alerts unavailable for this site.</p>
         ) : nws.length === 0 ? (
-          <p className="mbs-2 text-sm text-muted">No active NWS alerts{connectionLost ? " (last known)" : ""}.</p>
+          <p className="text-muted">No active NWS alerts{connectionLost ? " (last known)" : ""}.</p>
         ) : (
-          <ul className="mbs-2 divide-y divide-border">
+          <ul className="flex flex-col gap-4">
             {nws.map((a, i) => (
-              <li key={`${a.event}-${i}`} className="py-2 text-sm">
-                <p className="font-semibold">
-                  {a.event}
-                  {a.severity && <span className="ms-2 rounded-chip bg-bg px-2 py-0.5 text-xs font-medium text-muted">{a.severity}</span>}
+              <li key={`${a.event}-${i}`} className="flex flex-col">
+                <p className="font-semibold">{a.event}</p>
+                <p className="text-xs text-muted">
+                  {a.severity && <>{a.severity}{" · "}</>}
+                  {a.ends_at ? `Until ${formatPageTime(a.ends_at, tz, nowMs)}` : "End time not given"}
                 </p>
-                {a.headline && <p className="text-muted">{a.headline}</p>}
-                <p className="text-xs text-muted">{a.ends_at ? `Until ${formatSiteDateTime(a.ends_at, tz)}` : "End time not given"}</p>
+                {/* The headline mostly repeats the event and times: kept, behind Details. */}
+                {a.headline && (
+                  <details className="group">
+                    <summary className="pc-link list-none text-xs"><span className="group-open:hidden">Details</span><span className="hidden group-open:inline">Hide details</span></summary>
+                    <p className="max-w-[68ch] text-muted">{a.headline}</p>
+                  </details>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section aria-label="Hazard conditions" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section aria-label="Hazard conditions" className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <HazardPanel
           title="Lightning" card={c.lightning} freshness={{ kind: "live" }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
+          value={c.lightning.nearest_strike_mi === null ? "None" : formatStrikeDistance(c.lightning.nearest_strike_mi)}
+          caption={c.lightning.nearest_strike_mi === null ? "Nearest strike, last 30 min" : `Nearest strike${c.lightning.nearest_strike_at ? `, ${formatPageTime(c.lightning.nearest_strike_at, tz, nowMs)}` : ""}`}
           rows={[
-            { label: "Nearest strike", value: c.lightning.nearest_strike_mi === null ? "None in 30 min" : formatStrikeDistance(c.lightning.nearest_strike_mi) },
-            { label: "Strike time", value: c.lightning.nearest_strike_at && formatSiteTime(c.lightning.nearest_strike_at, tz) },
             { label: "Strikes, last 30 min", value: String(c.lightning.strikes_last_30_min) },
           ]}
         />
         <HazardPanel
           title="Heat" card={c.heat} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
+          value={fmt(c.heat.heat_index_f, "°F")} caption="Heat index now"
           rows={[
-            { label: "Heat index now", value: fmt(c.heat.heat_index_f, "°F") },
-            { label: "Today's peak", value: c.heat.peak_heat_index_f == null ? null : `${fmt(c.heat.peak_heat_index_f, "°F")}${c.heat.peak_at ? ` at ${formatSiteTime(c.heat.peak_at, tz)}` : ""}` },
-            { label: "OSHA risk", value: c.heat.risk_band ? OSHA_LABEL[c.heat.risk_band] : null },
+            { label: "Today's peak", value: c.heat.peak_heat_index_f == null ? null : `${fmt(c.heat.peak_heat_index_f, "°F")}${c.heat.peak_at ? ` at ${formatPageTime(c.heat.peak_at, tz, nowMs)}` : ""}` },
+            // The card's status is for the rest of today; the OSHA band is for today's peak, so say so.
+            { label: `OSHA risk at today's peak${peakHour ? ` (${peakHour})` : ""}`, value: c.heat.risk_band ? OSHA_LABEL[c.heat.risk_band] : null },
             { label: "Air temperature", value: fmt(c.heat.air_temp_f, "°F") },
             { label: "Humidity", value: fmt(c.heat.humidity_pct, "%") },
           ]}
         />
         <HazardPanel
           title="Flooding" card={c.flood} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
+          value={fmt(c.flood.rain_next_24h_in, " in", 1)} caption="Rain expected, next 24 h"
           rows={[
-            { label: "NWS level", value: FLOOD_LABEL[c.flood.status] },
-            { label: "Source", value: c.flood.source },
             { label: "Rain, past 12 h", value: fmt(c.flood.rain_past_12h_in, " in", 1) },
             { label: "Rain, past 24 h", value: fmt(c.flood.rain_past_24h_in, " in", 1) },
             { label: "Rain, past 72 h", value: fmt(c.flood.rain_past_72h_in, " in", 1) },
-            { label: "Rain, next 24 h", value: fmt(c.flood.rain_next_24h_in, " in", 1) },
-            { label: "FEMA flood zone", value: c.flood.fema_flood_zone == null ? null : c.flood.fema_flood_zone === "unmapped" ? "Not mapped" : c.flood.fema_flood_zone },
-            { label: "High-risk floodplain", value: yesNo(c.flood.in_special_flood_hazard_area) },
+            { label: "NWS flood level", value: FLOOD_LABEL[c.flood.status] },
+            ...(floodSource ? [{ label: "Source", value: floodSource }] : []),
+            { label: "FEMA flood zone", value: femaZone(c.flood.fema_flood_zone, c.flood.in_special_flood_hazard_area) },
             { label: "River within 1 mi", value: yesNo(c.flood.near_river) },
           ]}
         />
         <HazardPanel
           title="Soil saturation" card={c.soil} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
-          rows={[
-            { label: "Soil moisture", value: fmt(c.soil.moisture_pct, "%") },
-            { label: "Ground", value: c.soil.level ? SOIL_LABEL[c.soil.level] : null },
-          ]}
+          value={fmt(c.soil.moisture_pct, "%")} caption={`Soil moisture${c.soil.level ? `, ${SOIL_LABEL[c.soil.level].toLowerCase()}` : ""}`}
+          rows={[]}
         />
         <HazardPanel
           title="Wildfire" card={c.wildfire} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.wildfire }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
+          value={count(c.wildfire.detections_25mi)} caption="Fires within 25 mi, last 24 h"
           rows={[
             { label: "Nearest fire", value: c.wildfire.nearest_detection_mi === null ? "None detected" : formatMiles(c.wildfire.nearest_detection_mi) },
-            { label: "Detected", value: c.wildfire.detected_at && formatSiteDateTime(c.wildfire.detected_at, tz) },
+            { label: "Detected", value: formatPageTime(c.wildfire.detected_at, tz, nowMs) },
             { label: "Confidence", value: c.wildfire.confidence },
-            { label: "Fires within 25 mi (24 h)", value: c.wildfire.detections_25mi == null ? null : String(c.wildfire.detections_25mi) },
             { label: "Red flag warning", value: yesNo(c.wildfire.red_flag_warning) },
           ]}
         />
         <HazardPanel
           title="Wildlife" card={c.wildlife_summary} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.wildlife }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
+          value={count(c.wildlife_summary?.observations_30d)} caption="Alligator and snake sightings, 30 days"
           rows={c.wildlife_summary ? [
-            { label: "Alligator & snake sightings (30 d)", value: String(c.wildlife_summary.observations_30d) },
             { label: "Venomous (30 d)", value: String(c.wildlife_summary.venomous_30d) },
             { label: "Crew reports within 2 mi", value: String(c.wildlife_summary.crew_reports_2mi) },
           ] : []}
         >
           {c.wildlife.length > 0 && (
-            <ul className="divide-y divide-border border-bs border-border text-sm">
+            <ul className="flex flex-col gap-2">
               {c.wildlife.slice(0, 8).map((s, i) => (
-                <li key={`${s.species}-${s.seen_at}-${i}`} className="flex flex-wrap justify-between gap-x-2 py-1">
-                  <span className="min-w-0 font-medium">{s.species}</span>
-                  <span className="shrink-0 text-muted tabular-nums">{formatMiles(s.distance_mi) ?? "Distance unknown"} · {formatSiteDateTime(s.seen_at, tz)}</span>
+                <li key={`${s.species}-${s.seen_at}-${i}`} className="flex flex-wrap justify-between gap-x-4">
+                  <span className="min-w-0 font-semibold">{s.species}</span>
+                  <span className="ms-auto text-muted tabular-nums">{formatMiles(s.distance_mi) ?? "Distance unknown"}{" · "}{formatPageTime(s.seen_at, tz, nowMs)}</span>
                 </li>
               ))}
             </ul>
@@ -372,20 +366,20 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         onRegenerate={demo ? undefined : regenerateBriefing}
       />
 
-      <section aria-labelledby="factors-heading" className="rounded-card border border-border bg-surface p-4">
-        <h2 id="factors-heading" className="text-base font-semibold">What drives today&apos;s index</h2>
-        {detail.top_factors.length === 0 ? (
-          <p className="mbs-2 text-sm text-muted">No contributing factors.</p>
+      <section aria-labelledby="factors-heading" className={PANEL}>
+        <h2 id="factors-heading" className="text-xs text-muted">What drives today&apos;s index</h2>
+        {factors.length === 0 ? (
+          <p className="text-muted">No contributing factors.</p>
         ) : (
-          <ul className="mbs-3 flex flex-col gap-3">
-            {detail.top_factors.map((f) => (
-              <li key={`${f.hazard}-${f.label}`} className="text-sm">
-                <div className="flex justify-between gap-2">
-                  <span><span className="font-medium">{factorHazardLabel(f.hazard)}</span> · {f.label}</span>
+          <ul className="flex flex-col gap-4">
+            {factors.map((f) => (
+              <li key={`${f.hazard}-${f.label}`} className="flex flex-col gap-1.5">
+                <div className="flex justify-between gap-4">
+                  <span><span className="font-semibold">{factorHazardLabel(f.hazard)}</span>{" · "}{f.label}</span>
                   <span className="shrink-0 tabular-nums text-muted">{Math.round(f.weight * 100)}%</span>
                 </div>
-                <div className="mbs-1 h-2 rounded-chip bg-bg" aria-hidden="true">
-                  <div className={`h-2 rounded-chip ${connectionLost ? "bg-border" : "bg-brand"}`} style={{ width: `${Math.min(100, Math.max(0, f.weight * 100))}%` }} />
+                <div className="h-1 overflow-clip rounded-pill bg-surface-2" aria-hidden="true">
+                  <div className={`h-1 rounded-pill ${connectionLost ? "bg-border-strong" : "bg-text/70"}`} style={{ width: `${Math.min(100, Math.max(0, f.weight * 100))}%` }} />
                 </div>
               </li>
             ))}
