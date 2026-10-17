@@ -7,6 +7,8 @@ import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import { ReplayTag } from "@/components/AlertBanner";
 import BriefingCard from "@/components/BriefingCard";
 import HazardPanel from "@/components/HazardPanel";
+import LightningApproachChip from "@/components/LightningApproachChip";
+import SiteScoreHistory from "@/components/SiteScoreHistory";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { formatStrikeDistance } from "@/lib/alerts";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
@@ -263,6 +265,8 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       </header>
 
       <SiteAlerts alerts={siteAlerts} timeZone={tz} alertsUnknown={alerts === null} />
+      <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : serverNow()} demo={demo} />
+      <SiteScoreHistory site={detail} unconfirmed={connectionLost} />
 
       <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4 shadow-card">
         <h2 id="nws-heading" className="text-base font-semibold">National Weather Service alerts</h2>
