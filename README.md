@@ -113,9 +113,9 @@ Other commands: `npm run typecheck`, `npm run build`.
 | POST | `/uploads` | Upload a report photo (raw image body); returns `photo_url` |
 | GET | `/briefing/{site_id}` | Latest next-day briefing (generated 6 PM site time) and key numbers |
 | GET | `/briefings` | Latest briefing for every site in one response |
-| POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`, at most once a minute per site) or all (needs `X-Admin-Token`, at most once per 15 min) |
+| POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`, at most once a minute per site) or all (at most once per 15 min). Needs `X-Admin-Token` |
 | GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
-| GET | `/sites/{id}/beacon` | Tiny alarm state: stop / approaching / flood / clear, with countdowns |
+| GET | `/sites/{id}/beacon` | Tiny alarm state: stop / unknown / approaching / flood / clear, with countdowns |
 
 Shapes: [`shared/types.ts`](shared/types.ts).
 

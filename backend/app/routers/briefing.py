@@ -51,13 +51,15 @@ def get_briefing(site_id: str, pool: ConnectionPool | None = Depends(get_pool_op
 @router.post("/send-now", response_model=SendBriefingResponse)
 async def send_now(body: SendBriefingRequest | None = None, pool: ConnectionPool = Depends(get_pool),
                    x_admin_token: str | None = Header(None, alias=ADMIN_HEADER)):
-    """Generate tomorrow's briefing now: one site (returned right away; at most once a minute per
-    site) or all sites (in the background, 202; needs the X-Admin-Token demo code, at most once per
-    15 minutes and not while a run is in progress). Replaces any briefing already stored for that day."""
+    """Generate tomorrow's briefing now (paid model calls, so both need the X-Admin-Token demo code):
+    one site (returned right away; at most once a minute per site) or all sites (in the background,
+    202; at most once per 15 minutes and not while a run is in progress). Replaces any briefing
+    already stored for that day."""
     global _all_running
     body = body or SendBriefingRequest()
     if body.site_id and body.site_id not in site_data._real_sites():
         raise HTTPException(404, f"Site '{body.site_id}' not found")
+    check_admin_token(x_admin_token)   # before the limits, so a bad request can't use up a window
     if body.site_id:
         send_site_limit.hit(body.site_id)
         done = await asyncio.to_thread(service.generate, pool, [body.site_id])
@@ -65,7 +67,6 @@ async def send_now(body: SendBriefingRequest | None = None, pool: ConnectionPool
             raise HTTPException(404, f"Site '{body.site_id}' not found")
         return {"generated": [service.to_response(service.latest(pool, body.site_id))], "queued": 0}
 
-    check_admin_token(x_admin_token)   # before the limit, so a bad request can't use up the window
     if _all_running:
         raise HTTPException(409, "Briefings for all sites are already being written.")
     with pool.connection() as conn:
