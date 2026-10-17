@@ -101,6 +101,7 @@ function modules(state, extra = {}) {
     "@/components/AlertsProvider": { useAlertsState: () => state, useServerNow: () => () => nowMs },
     "@/components/BriefingCard": nullComponent,
     "@/components/HazardPanel": nullComponent,
+    "@/components/SiteScoreHistory": nullComponent,
     "@/components/CrewReadings": nullComponent,
     "@/components/CrewBriefing": nullComponent,
     "@/lib/api": { DEMO_DATA: { sites: [site], lightning: [], lightningCells: [cell], siteDetails: { [site.id]: detail }, briefings: {} } },
