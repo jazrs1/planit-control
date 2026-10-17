@@ -363,7 +363,7 @@ def prune_subscriptions(pool) -> int:
 
 async def run_sweep_loop() -> None:
     """Every minute: catch recent events nobody pushed (live, and the replay while one runs).
-    Every hour: delete subscriptions not seen for 14 days or failing."""
+    Every hour: delete subscriptions that are failing and have had nothing delivered for 7 days."""
     sweeps = 0
     while True:
         alerts_changed(clock.real_now(), replay=False)

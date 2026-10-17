@@ -8,7 +8,9 @@ are bearer secrets (anyone holding one can push to that device): never log them.
 Limits (docs/push-notifications.md):
   - at most MAX_SUBSCRIPTIONS rows in total; re-subscribing an existing endpoint never counts as new;
   - the same p256dh key under a second endpoint is refused (browsers make fresh keys per subscription);
-  - MAX_FAILURES failed sends in a row, or STALE_AFTER without the browser showing up, deletes the row;
+  - only the push service saying 404/410 deletes a subscription right away. Timeouts, 5xx and sends cut
+    off by the deadline are counted in `failures` but never delete one, except that a subscription
+    still failing with no successful delivery (or subscribe / test) for FAILING_FOR is pruned;
   - per-client limits on new subscriptions are in app/routers/push.py.
 """
 
@@ -36,8 +38,9 @@ PUSH_SERVICE_DOMAINS = ("googleapis.com", "mozilla.com", "push.apple.com", "noti
 SEND_TIMEOUT_SECONDS = 4
 GONE = (404, 410)   # the push service says the subscription no longer exists
 MAX_SUBSCRIPTIONS = 1000
-MAX_FAILURES = 5                    # failed sends in a row (a success resets the count)
-STALE_AFTER = timedelta(days=14)    # since the browser last subscribed, re-subscribed or sent a test
+# A subscription that is still failing and hasn't worked (delivered, subscribed, test) for this long is
+# pruned. Quiet weeks with nothing to send never delete anyone: it has to be failing.
+FAILING_FOR = timedelta(days=7)
 
 
 class SubscriptionLimitReached(Exception):
@@ -151,38 +154,36 @@ def seen(conn: Connection, sub_id: str, now: datetime) -> None:
     conn.execute("UPDATE push_subscriptions SET last_seen_at = %s WHERE id = %s", (now, sub_id))
 
 
-def for_site(conn: Connection, site_id: str | None, now: datetime | None = None) -> list[dict]:
-    """Subscriptions that want this site (all of them for site_id None) and were seen in the last
-    STALE_AFTER. Healthy ones first, so a failing subscription waits behind them, not in front."""
+def for_site(conn: Connection, site_id: str | None) -> list[dict]:
+    """Subscriptions that want this site (all of them for site_id None). Healthy ones first, so a
+    failing subscription waits behind them, not in front."""
     return conn.execute(
         """SELECT id, endpoint, keys, site_ids FROM push_subscriptions
-           WHERE (%(site)s::text IS NULL OR site_ids IS NULL OR %(site)s = ANY(site_ids))
-             AND last_seen_at > %(stale)s
+           WHERE %(site)s::text IS NULL OR site_ids IS NULL OR %(site)s = ANY(site_ids)
            ORDER BY failures, last_sent_at DESC NULLS LAST, id""",
-        {"site": site_id, "stale": (now or clock.real_now()) - STALE_AFTER}).fetchall()
+        {"site": site_id}).fetchall()
 
 
-def record(conn: Connection, outcomes: dict[str, str]) -> None:
-    """Store send outcomes (subscription id -> 'sent' / 'gone' / 'failed'). 'gone' deletes the row, and so
-    does the MAX_FAILURES-th failure in a row."""
+def record(conn: Connection, outcomes: dict[str, str], now: datetime | None = None) -> None:
+    """Store send outcomes (subscription id -> 'sent' / 'gone' / 'failed'). Only 'gone' (the push service
+    said 404/410) deletes a row. 'failed' (timeout, 5xx, cut off by the deadline, any other error) is
+    only counted. A delivery counts as seen."""
+    now = now or clock.real_now()
     by = {k: [i for i, o in outcomes.items() if o == k] for k in ("sent", "gone", "failed")}
     if by["sent"]:
-        conn.execute("UPDATE push_subscriptions SET last_sent_at = now(), failures = 0 WHERE id = ANY(%s)",
-                     (by["sent"],))
+        conn.execute("UPDATE push_subscriptions SET last_sent_at = %s, last_seen_at = %s, failures = 0 "
+                     "WHERE id = ANY(%s)", (now, now, by["sent"]))
     if by["failed"]:
         conn.execute("UPDATE push_subscriptions SET failures = failures + 1 WHERE id = ANY(%s)", (by["failed"],))
-        by["gone"] += [r["id"] for r in conn.execute(
-            "SELECT id FROM push_subscriptions WHERE id = ANY(%s) AND failures >= %s",
-            (by["failed"], MAX_FAILURES)).fetchall()]
     if by["gone"]:
         conn.execute("DELETE FROM push_subscriptions WHERE id = ANY(%s)", (by["gone"],))
-        log.info("Removed %d push subscriptions (expired, or %d failed sends in a row)", len(by["gone"]), MAX_FAILURES)
+        log.info("Removed %d push subscriptions (the push service says they no longer exist)", len(by["gone"]))
 
 
 def prune(conn: Connection, now: datetime) -> int:
-    """Delete subscriptions not seen for STALE_AFTER, or failing MAX_FAILURES times in a row."""
-    n = conn.execute("DELETE FROM push_subscriptions WHERE last_seen_at <= %s OR failures >= %s",
-                     (now - STALE_AFTER, MAX_FAILURES)).rowcount
+    """Delete subscriptions that are failing and haven't worked for FAILING_FOR."""
+    n = conn.execute("DELETE FROM push_subscriptions WHERE failures > 0 AND last_seen_at <= %s",
+                     (now - FAILING_FOR,)).rowcount
     if n:
-        log.info("Pruned %d push subscriptions (not seen for %d days, or failing)", n, STALE_AFTER.days)
+        log.info("Pruned %d push subscriptions (failing, nothing delivered for %d days)", n, FAILING_FOR.days)
     return n

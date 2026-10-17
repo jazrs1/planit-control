@@ -1,10 +1,12 @@
 """Push subscription limits: per-client and total caps, duplicates, cleanup, and sends that can't
 hold each other up. Database tests share tests/test_push.py's rolled-back transaction fixtures."""
 
+import json
 import threading
 import time
 from datetime import timedelta
 
+import psycopg
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -132,25 +134,58 @@ def test_total_cap(conn, monkeypatch):
     assert not created
 
 
-def test_repeated_failures_delete_and_a_success_resets(conn):
-    (row, _), (other, _) = add(conn, "flaky"), add(conn, "steady")
-    for _ in range(webpush.MAX_FAILURES - 1):
-        webpush.record(conn, {row["id"]: "failed", other["id"]: "failed"})
-    webpush.record(conn, {other["id"]: "sent"})                     # back to 0
-    webpush.record(conn, {row["id"]: "failed", other["id"]: "failed"})
+def test_only_gone_deletes_failures_are_just_counted(conn):
+    (flaky, _), (dead, _) = add(conn, "flaky"), add(conn, "dead")
+    for _ in range(50):                                             # timeouts, 5xx, deadline cut-offs
+        webpush.record(conn, {flaky["id"]: "failed"})
+    webpush.record(conn, {dead["id"]: "gone"})                      # the push service said 404/410
     ids = {r["id"]: r["failures"] for r in conn.execute("SELECT id, failures FROM push_subscriptions").fetchall()}
-    assert row["id"] not in ids and ids[other["id"]] == 1
+    assert ids[flaky["id"]] == 50 and dead["id"] not in ids
 
 
-def test_stale_subscriptions_get_nothing_and_are_pruned(conn):
+def test_a_delivery_counts_as_seen_and_resets_failures(conn):
     now = clock.real_now()
-    (old, _), (fresh, _), (failing, _) = add(conn, "old", now=now - 15 * DAY), add(conn, "fresh"), add(conn, "failing")
-    conn.execute("UPDATE push_subscriptions SET failures = %s WHERE id = %s", (webpush.MAX_FAILURES, failing["id"]))
-    targets = [s["id"] for s in webpush.for_site(conn, None, now)]
-    assert old["id"] not in targets and fresh["id"] in targets
-    assert webpush.prune(conn, now) >= 2
+    row, _ = add(conn, "phone", now=now - 30 * DAY)
+    webpush.record(conn, {row["id"]: "failed"})
+    webpush.record(conn, {row["id"]: "sent"}, now)
+    got = conn.execute("SELECT failures, last_seen_at, last_sent_at FROM push_subscriptions WHERE id = %s",
+                       (row["id"],)).fetchone()
+    assert got["failures"] == 0 and got["last_seen_at"] == now and got["last_sent_at"] == now
+
+
+def test_prune_drops_only_subscriptions_failing_for_7_days(conn):
+    now = clock.real_now()
+    (quiet, _), (failing, _), (recent, _) = (add(conn, "quiet", now=now - 60 * DAY),
+                                             add(conn, "failing", now=now - 8 * DAY),
+                                             add(conn, "recent-fail", now=now - 6 * DAY))
+    webpush.record(conn, {failing["id"]: "failed", recent["id"]: "failed"}, now)
+    targets = [s["id"] for s in webpush.for_site(conn, None)]
+    assert {quiet["id"], failing["id"], recent["id"]} <= set(targets)    # nothing is skipped for age
+    assert webpush.prune(conn, now) >= 1
     left = {r["id"] for r in conn.execute("SELECT id FROM push_subscriptions").fetchall()}
-    assert fresh["id"] in left and old["id"] not in left and failing["id"] not in left
+    assert quiet["id"] in left           # nothing to send for 60 days isn't a reason to delete
+    assert recent["id"] in left          # failing, but worked 6 days ago
+    assert failing["id"] not in left     # failing, nothing delivered for 8 days
+
+
+def test_migration_010_keeps_the_newest_of_duplicate_keys(conn):
+    """On a copy of the 009 table (a temp table, which shadows the real one in this transaction)."""
+    from tests.push_schema import MIGRATIONS
+    sql = (MIGRATIONS / "009_push_notifications.sql").read_text()
+    start = sql.index("CREATE TABLE push_subscriptions")
+    create = sql[start:sql.index(");", start) + 2].replace("CREATE TABLE", "CREATE TEMP TABLE", 1)
+    conn.execute(create)
+    now = clock.real_now()
+    for name, key, age in (("old", "dup", 2), ("new", "dup", 1), ("other", "solo", 3)):
+        conn.execute("""INSERT INTO pg_temp.push_subscriptions (endpoint, keys, role, updated_at)
+                        VALUES (%s, %s, 'crew', %s)""",
+                     (f"{FCM}{name}", json.dumps({"p256dh": key, "auth": "a"}), now - age * DAY))
+    conn.execute((MIGRATIONS / "010_push_limits.sql").read_text())
+    left = {r["endpoint"] for r in conn.execute("SELECT endpoint FROM pg_temp.push_subscriptions").fetchall()}
+    assert left == {f"{FCM}new", f"{FCM}other"}
+    with pytest.raises(psycopg.errors.UniqueViolation), conn.transaction():
+        conn.execute("INSERT INTO pg_temp.push_subscriptions (endpoint, keys, role) VALUES (%s, %s, 'crew')",
+                     (f"{FCM}copy", json.dumps({"p256dh": "dup", "auth": "a"})))
 
 
 def test_failing_subscriptions_are_sent_to_last(conn):

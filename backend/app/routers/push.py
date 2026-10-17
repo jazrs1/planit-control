@@ -6,7 +6,8 @@ and the role. All routes answer 503 until VAPID keys are set and migrations 009-
 
 Limits: new subscriptions at most NEW_PER_CLIENT per hour per client network (429) and
 webpush.MAX_SUBSCRIPTIONS in total (503); re-subscribing an existing endpoint is an update (200), never
-a new one; another endpoint's keys are refused (409). Stale and failing ones are deleted (webpush.py).
+a new one; another endpoint's keys are refused (409). Only 404/410 from the push service deletes one
+right away (webpush.py).
 """
 
 from contextlib import contextmanager
@@ -25,7 +26,7 @@ from push import notify, webpush
 
 router = APIRouter(prefix="/push", tags=["push"])
 test_limit = RateLimit(10)   # per subscription
-NEW_PER_CLIENT = 10
+NEW_PER_CLIENT = 100
 new_per_client = WindowLimit(NEW_PER_CLIENT, 3600)   # new subscriptions per client network per hour
 
 

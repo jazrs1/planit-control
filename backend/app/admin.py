@@ -5,7 +5,7 @@
   for). Without ADMIN_TOKEN set, those actions are off (503). Read-only routes stay open.
 - Rate limits (in-process, real time): send-now for all sites at most once per 15 minutes and
   never while a run is in progress; one site at most once per minute per site; new push
-  subscriptions at most 10 per hour per client network (app/routers/push.py).
+  subscriptions at most 100 per hour per client network (app/routers/push.py).
 """
 
 import hmac

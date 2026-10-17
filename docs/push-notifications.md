@@ -33,7 +33,7 @@ Phones and browsers get a notification when a site's safety state changes, even 
   A claimed key is never sent again, across retries, restarts or a second API process. The tradeoff: a send that fails isn't retried.
 - **Missed calls are caught.** A sweep every minute picks up events from the last 10 minutes (60 simulated minutes during a replay) that nobody claimed, e.g. after a restart right after a commit. Older events are never pushed, so a server that was down doesn't send stale alerts.
 - **"Restart" all clears are skipped.** The engine sometimes closes an expired countdown and opens a new stop-work in the same cycle. The all clear is then skipped, so a phone doesn't get "All clear" and "STOP WORK" in the same second.
-- **Dead subscriptions are removed.** When a push service answers 404 or 410, the subscription is deleted. Other failures are logged with the subscription id (never the endpoint, which works like a password) and counted in `failures`. The 5th failure in a row deletes it too; a success resets the count.
+- **Dead subscriptions are removed.** When a push service answers 404 or 410, the subscription is deleted. Nothing else deletes one on the spot. Timeouts, 5xx answers and sends cut off by the deadline are logged with the subscription id (never the endpoint, which works like a password) and counted in `failures`; a delivery resets the count. A push service having a bad hour never costs a crew its alerts.
 - **One slow subscription can't hold up the others.**
   - **Parallel:** every send of a notification runs at the same time, up to 32 at once.
   - **Short timeouts:** each request to the push service has a 4 s timeout, and the whole fan-out stops waiting after 15 s. Whatever hasn't answered by then counts as a failure, and the next notification goes out straight away.
@@ -44,15 +44,16 @@ Phones and browsers get a notification when a site's safety state changes, even 
 
 | Limit | Value | Response |
 |---|---|---|
-| New subscriptions per client network | 10 per hour (an IPv4 address, or an IPv6 /64) | 429 with `Retry-After` |
+| New subscriptions per client network | 100 per hour (an IPv4 address, or an IPv6 /64), enough for a crew yard behind one NAT | 429 with `Retry-After` |
 | Subscriptions in total | 1,000 | 503 "Push subscriptions are full" |
 | The same push keys under a second endpoint | refused: a browser makes fresh keys for every subscription | 409 |
-| Failed sends in a row | 5, then the subscription is deleted | — |
-| Not seen for | 14 days: no more sends, and the hourly prune deletes it | — |
+| The push service answers 404 or 410 | deleted right away | — |
+| Still failing, with nothing delivered for 7 days | deleted by the hourly prune | — |
 
 **What counts:**
 - **Duplicates never count.** Re-subscribing an existing endpoint is an update (200, same `id`): it never makes a second row and never counts against the caps. Only new endpoints count, and only when they're saved.
-- **"Seen"** means the browser called `POST /push/subscribe` or `POST /push/test`. That's why the frontend re-subscribes on every page load.
+- **Quiet weeks are safe.** The 7-day rule only applies to a subscription that is failing (`failures > 0`). One with nothing to send, or one whose browser never opens the app, is never deleted for that.
+- **What resets the 7 days:** a delivered notification, a subscribe or re-subscribe, or a test.
 
 **How it's implemented:**
 - **The per-client limit** is kept in memory, since the API runs one worker (`docs/deploy.md`); it starts over on a restart. Behind Caddy, uvicorn's `--proxy-headers` gives the real client address.
@@ -107,7 +108,7 @@ The frontend has a manifest (`app/manifest.ts`, `display: standalone`) but no se
    ```
    Decode `public_key` (base64url) into a `Uint8Array` before passing it: not every browser accepts the string.
 3. **Site choice:** "All sites", or a list, and the role (crew / supervisor). Keep the endpoint (`sub.endpoint`) to call `/push/unsubscribe` and `/push/test` later. **"Send test notification"** calls `/push/test`. If it returns `removed: true`, subscribe again.
-4. **Re-subscribe on every load** if `pushManager.getSubscription()` returns one: POST it again (200). It refreshes the server's copy if the browser rotated it, and it's what keeps the subscription alive: one not seen for 14 days is deleted. Show 429 ("too many new subscriptions from this network, try later") and 503 ("notifications are full") as plain messages. On 409, unsubscribe in the browser (`sub.unsubscribe()`) and subscribe again.
+4. **Re-subscribe on every load** if `pushManager.getSubscription()` returns one: POST it again (200). It refreshes the server's copy if the browser rotated it. Show 429 ("too many new subscriptions from this network, try later") and 503 ("notifications are full") as plain messages. On 409, unsubscribe in the browser (`sub.unsubscribe()`) and subscribe again.
 5. **iPhone:** web push works only after **Add to Home Screen** (iOS 16.4+), from the installed app. Show that hint on iOS Safari when the app isn't installed.
 6. **Treat it as an extra, not the alert itself.** The app stays the source of truth. A notification can arrive late or not at all, because phones in battery saver delay pushes. Don't present "no notification" as "all clear".
 7. **Types** are in `shared/types.ts`: `PushPublicKey`, `PushSubscribeRequest`, `WebPushSubscription`, `PushSubscriptionInfo`, `PushEndpointRequest`, `PushUnsubscribeResponse`, `PushTestResponse`, `PushNotification`. In demo-data mode, use the matching mocks and don't subscribe.
