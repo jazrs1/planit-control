@@ -79,6 +79,10 @@ def replay_speed(status: dict) -> int:
 def beacon_line(beacon: dict, name: str, speed: int = 1) -> str:
     """Turns a Beacon (shared/types.ts) into one serial line."""
     state = beacon.get("state")
+    if state in ("stop", "approaching") and beacon.get("replay") is True:
+        # Mark a replayed alert on line 1 (the sketch cuts it to 16 characters), so nobody takes a
+        # demo for a real one. The backend already prefers a real stop-work over a replayed one.
+        name = f"REPLAY {name}"
     if state == "stop":
         secs = beacon.get("seconds_to_all_clear")
         # No countdown known: "-" makes the beacon show STOP WORK without a time.

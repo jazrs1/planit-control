@@ -10,7 +10,7 @@ A desk-sized alarm for one job site: red / yellow / green lights, a buzzer and a
 | All clear | green | `ALL CLEAR` | — |
 | No data (backend down, bad reply, or nothing from the bridge for 15 s) | blinking yellow | `NO DATA` | — |
 
-Line 1 is the site name (first 16 characters). Green only appears after the backend explicitly says `clear`. If the countdown reaches 00:00 before the backend confirms the all-clear, the beacon stays red at `STOP WORK 00:00`. A short press of the push button silences the beeps until the state changes. Holding it for **2 seconds** switches to the bridge's next site (when it was started with more than one `--site`): the LCD shows `Switching site` / `NO DATA` until the new site's first update, a moment later, then the new site's name and state.
+Line 1 is the site name (first 16 characters). A stop-work or approaching alert that comes from a **replay** (the beacon endpoint's `replay: true`) shows `REPLAY` before the name, e.g. `REPLAY Vandolah ` / `STOP WORK 24:31`, so a demo is never taken for a real alert; LEDs and buzzer are the same. Real alerts show the plain name. Green only appears after the backend explicitly says `clear`. If the countdown reaches 00:00 before the backend confirms the all-clear, the beacon stays red at `STOP WORK 00:00`. A short press of the push button silences the beeps until the state changes. Holding it for **2 seconds** switches to the bridge's next site (when it was started with more than one `--site`): the LCD shows `Switching site` / `NO DATA` until the new site's first update, a moment later, then the new site's name and state.
 
 ## Parts (Elegoo Uno R3 kit)
 
@@ -82,6 +82,8 @@ python bridge.py https://api.stormsafecrews.us --site vandolah-power-station --s
 
 The site id is the slug from `GET /sites` (e.g. `big-bend`, `vandolah-power-station`). Repeat `--site` to switch between sites with a long press; the bridge starts on the first one. The older form `python bridge.py URL SITE_ID` still works. The bridge only reads public GET endpoints; it never needs `ADMIN_TOKEN` or any other secret. The port is auto-detected (on Linux, the one `/dev/ttyACM*` or `/dev/ttyUSB*`); if you have several serial devices, pass it: `--port COM5` or `--port /dev/ttyACM0`. Opening the port resets the Uno, so the bridge waits 3 seconds before its first line. Any network error, HTTP error or unexpected reply sends `UNKNOWN`. If the USB cable is pulled or the network drops, the bridge keeps retrying (logging each problem once, not on every retry) and recovers on its own. Ctrl+C sends `UNKNOWN` before exiting so the beacon doesn't keep showing a stale state.
 
+Tests (sample API responses → serial lines; needs pyserial): `cd hardware && python -m unittest test_bridge`.
+
 ### Serial protocol
 
 One line per message, `\n`-terminated, 115200 baud:
@@ -129,7 +131,7 @@ Start the backend and frontend (repo `README.md`) and plug in the beacon. To sta
 curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "content-type: application/json" -d '{"speed": 30}'
 ```
 
-Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"`; the beacon goes back to the live state. During a replay the backend combines the real and replayed state for the site and the higher one wins (stop > unknown > approaching > flood > clear), so a real stop-work, storm warning or flood alert still shows. The beacon's `replay` field says whose countdown it is: only a replayed stop-work ticks at the replay speed. If a real and a replayed stop-work overlap, the real one is shown. On a backend with `LIGHTNING_INGEST_ENABLED=false` the replay's yellow and green show normally; with ingestion on but stalled, the beacon shows `NO DATA` instead.
+Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"`; the beacon goes back to the live state. During a replay the backend combines the real and replayed state for the site and the higher one wins (stop > unknown > approaching > flood > clear), so a real stop-work, storm warning or flood alert still shows. The beacon's `replay` field says whose alert it is: only a replayed stop-work ticks at the replay speed, and only replayed stop-work and approaching alerts get the `REPLAY` label on line 1. If a real and a replayed stop-work overlap, the real one is shown. On a backend with `LIGHTNING_INGEST_ENABLED=false` the replay's yellow and green show normally; with ingestion on but stalled, the beacon shows `NO DATA` instead.
 
 ### 1. Yellow, then red: Vandolah Power Station
 
@@ -137,7 +139,7 @@ Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop -H
 python bridge.py http://localhost:8000 --site vandolah-power-station --site okeechobee-clean-energy-center
 ```
 
-1. The beacon shows green `ALL CLEAR` (assuming no live storm right now).
+1. The beacon shows green `ALL CLEAR` (assuming no live storm right now). During the replay, line 1 reads `REPLAY Vandolah ` whenever the yellow or red comes from the replay.
 2. Start the replay. About 20 seconds in, it turns **yellow**, `STORM NEARBY`, with three beeps: the storm forecast spotted the cell heading for Vandolah about 24 simulated minutes before it hit. (No minutes are shown on purpose: arrival estimates run late.)
 3. About 70 seconds in, the first strike lands within 10 miles: **red**, three beeps, `STOP WORK 30:00`, counting down. Press the button to silence the beeps.
 
