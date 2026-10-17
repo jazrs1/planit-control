@@ -1,10 +1,11 @@
-import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, ReplayStatus, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
+import type { Alert, ApiError, Briefing, BriefingsResponse, CreateReportRequest, HazardReport, LightningCellsResponse, LightningFlash, ModelInfo, ReplayStatus, ScoreHistory, SendBriefingRequest, SendBriefingResponse, Site, SiteDetail, StartReplayRequest, UploadResponse } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockBriefings from "@shared/mocks/briefings.json";
 import mockLightning from "@shared/mocks/lightning_recent.json";
 import mockLightningCells from "@shared/mocks/lightning_cells.json";
 import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
+import mockScoreHistory from "@shared/mocks/score_history.json";
 
 import mockReports from "@shared/mocks/reports.json";
 import { markFailure, markSuccess } from "@/lib/connection";
@@ -54,6 +55,7 @@ export async function orNull<T>(promise: Promise<T>): Promise<T | null> {
 export const getReports = () => request<HazardReport[]>("/reports");
 export const getSites = () => request<Site[]>("/sites");
 export const getSiteDetail = (id: string) => request<SiteDetail>(`/sites/${encodeURIComponent(id)}`);
+export const getScoreHistory = (id: Site["id"]) => request<ScoreHistory>(`/sites/${encodeURIComponent(id)}/score-history`, { signal: AbortSignal.timeout(15_000) });
 export const getAlerts = () => request<Alert[]>("/alerts");
 export const getLightningRecent = (minutes = 15) => request<LightningFlash[]>(`/lightning/recent?minutes=${minutes}`);
 export const getLightningCells = () => request<LightningCellsResponse>("/lightning/cells");
@@ -82,6 +84,8 @@ export const DEMO_DATA = {
   alerts: mockAlerts as Alert[],
   lightning: mockLightning as LightningFlash[],
   lightningCells: mockLightningCells as LightningCellsResponse,
+  /** The sample belongs only to its site_id; never reuse it for another site. */
+  scoreHistory: mockScoreHistory as ScoreHistory,
   /** Keyed by site id; only the 6 mock sites have one. */
   siteDetails: mockSiteDetails as Record<string, SiteDetail>,
   /** Keyed by site id; only the 6 mock sites have one. */

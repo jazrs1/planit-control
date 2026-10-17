@@ -78,6 +78,17 @@ test("the outage starts 2 minutes after the last success (or page load if none)"
   assert.equal(conn.outageStartsAt({ lastSuccessAt: null, failingSince: 5_000 }, 500), 500 + 120_000);
 });
 
+test("score history uses the encoded site path and errors never turn into sample history", async () => {
+  let status = 200, url;
+  const history = { site_id: "big-bend", points: [] };
+  const { api } = load(async (path) => { url = path; return json(status, status === 200 ? history : { detail: "History unavailable" }); });
+  assert.deepEqual(await api.getScoreHistory("a/b"), history);
+  assert.equal(url, "http://api.test/sites/a%2Fb/score-history");
+  status = 503;
+  await assert.rejects(api.getScoreHistory("big-bend"), /History unavailable/);
+  assert.equal(api.DEMO_DATA.scoreHistory.site_id, "big-bend");
+});
+
 test("storm-cell requests use the API contract path and reject errors without mock fallback", async () => {
   let status = 200, requested;
   const cells = [{ id: "cell-1", lat: 28, lon: -82, radius_mi: 10 }];

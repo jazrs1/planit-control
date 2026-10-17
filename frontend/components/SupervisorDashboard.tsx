@@ -5,6 +5,7 @@ import type { LightningCell, LightningFlash, Site } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import ReplayControl from "@/components/ReplayControl";
 import SiteCard from "@/components/SiteCard";
+import SiteScoreHistory from "@/components/SiteScoreHistory";
 import SiteMap, { LIGHTNING_WINDOW_MIN } from "@/components/SiteMap";
 import { DEMO_DATA, getLightningCells, getLightningRecent, getSites } from "@/lib/api";
 import { cellUnconfirmed } from "@/lib/lightning";
@@ -167,7 +168,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
             <ul className="relative space-y-3 p-4 lg:overflow-y-auto">
               {sorted.map((site) => <li key={site.id} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }} onClick={() => setSelectedId(site.id)}>
-                <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
+                <SiteCard site={site} alerts={alerts.filter((alert) => alert.site_id === site.id)} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId(site.id)} />
               </li>)}
             </ul>
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}
