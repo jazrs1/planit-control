@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { Alert, Site } from "@shared/types";
-import StopWorkCountdown from "@/components/StopWorkCountdown";
+import type { Alert, FloodConditions, Site } from "@shared/types";
+import AlertBanner from "@/components/AlertBanner";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
-import { formatSiteTime, timeZoneAbbr } from "@/lib/time";
+import { timeZoneAbbr } from "@/lib/time";
 
 // Reference component: copy this structure for new cards.
 // - Props are shared/types shapes, not ad-hoc objects.
@@ -17,13 +17,14 @@ const RISK_STYLES = {
 
 type SiteCardProps = {
   site: Site;
-  /** Active lightning alert for this site, if any. */
-  lightningAlert?: Alert;
+  alerts?: Alert[];
+  flood?: FloodConditions;
+  alertsUnconfirmed?: boolean;
   selected?: boolean;
   onSelect?: () => void;
 };
 
-export default function SiteCard({ site, lightningAlert, selected, onSelect }: SiteCardProps) {
+export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, selected, onSelect }: SiteCardProps) {
   const risk = RISK_STYLES[riskLevel(site.hazard_index)];
 
   return (
@@ -55,22 +56,7 @@ export default function SiteCard({ site, lightningAlert, selected, onSelect }: S
 
       {onSelect && <button type="button" onClick={onSelect} aria-pressed={!!selected} className="rounded-card border border-border px-3 py-2 text-left text-sm text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">{selected ? "Selected on map" : "Show on map"}</button>}
 
-      {lightningAlert && (
-        <div className="flex flex-col gap-2 rounded-card bg-risk-red p-3 text-sm font-semibold text-surface">
-          <p>
-            ⚡ STOP WORK: {lightningAlert.last_strike_distance_mi === null
-              ? "lightning nearby"
-              : `lightning ${lightningAlert.last_strike_distance_mi} mi away`}
-          </p>
-          {/* Same live countdown as /alerts; it resets when a new strike moves all_clear_at. */}
-          <StopWorkCountdown all_clear_at={lightningAlert.all_clear_at} />
-          {lightningAlert.all_clear_at && (
-            <p className="font-normal">
-              All clear at {formatSiteTime(lightningAlert.all_clear_at, site.timezone)} if no new strikes
-            </p>
-          )}
-        </div>
-      )}
+      {alerts.map((alert) => <AlertBanner key={alert.id} alert={alert} site={site} flood={flood} compact unconfirmed={alertsUnconfirmed} />)}
     </article>
   );
 }

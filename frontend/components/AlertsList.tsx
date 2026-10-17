@@ -4,9 +4,13 @@ import type { Site } from "@shared/types";
 import AlertBanner from "@/components/AlertBanner";
 import { useAlertsState } from "@/components/AlertsProvider";
 import { DEMO_DATA } from "@/lib/api";
+import { countAlerts } from "@/lib/alerts";
+import { useFloodConditions } from "@/lib/useFloodConditions";
 
 export default function AlertsList({ sites }: { sites: Site[] }) {
   const { alerts, status, staleSince, replay } = useAlertsState();
+  const floodConditions = useFloodConditions();
+  const counts = countAlerts(alerts ?? []);
   const sitesById = new Map((status === "demo" ? DEMO_DATA.sites : sites).map((site) => [site.id, site]));
 
   if (alerts === null) {
@@ -30,18 +34,18 @@ export default function AlertsList({ sites }: { sites: Site[] }) {
         </p>
       )}
       <p role="status" className="mb-4 text-sm text-muted">
-        {alerts.length} active {alerts.length === 1 ? "alert" : "alerts"} · Newest first
+        {alerts.length}{status === "stale" ? "? last known" : " active"} {alerts.length === 1 ? "alert" : "alerts"} · {counts.lightning} stop work · {counts.flood} flood risk · Newest first
         {status !== "demo" && (replay?.running ? " · Storm replay: updates every 3 seconds" : " · Updates every 30 seconds")}
       </p>
       {alerts.length === 0 ? (
-        <p className="rounded-card border border-border bg-risk-green-bg p-4 font-medium text-risk-green">
-          No active alerts.
+        <p className={`rounded-card border border-border p-4 font-medium ${status === "stale" ? "bg-bg text-muted" : "bg-risk-green-bg text-risk-green"}`}>
+          {status === "stale" ? "Current alerts unknown. The last confirmed list was empty." : "No active alerts."}
         </p>
       ) : (
         <ul className="grid gap-4">
           {alerts.map((alert) => (
             <li key={alert.id}>
-              <AlertBanner alert={alert} site={sitesById.get(alert.site_id)} />
+              <AlertBanner alert={alert} site={sitesById.get(alert.site_id)} flood={floodConditions[alert.site_id]} unconfirmed={status === "stale"} />
             </li>
           ))}
         </ul>
