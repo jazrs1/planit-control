@@ -11,8 +11,8 @@
 #   --no-replay    don't copy backend/data/replay/
 #   --uploads      also copy backend/uploads/ (report photos) into /var/lib/planit/uploads (existing files kept)
 #
-# The server's copy always gets LIGHTNING_INGEST_ENABLED, HAZARD_POLLING_ENABLED and BRIEFING_ENABLED
-# set to true: the server is the only machine that polls. Your laptop's .env sets them to false
+# The server's copy always gets LIGHTNING_INGEST_ENABLED, HAZARD_POLLING_ENABLED, BRIEFING_ENABLED and
+# PUSH_ENABLED set to true: the server is the only machine that polls and sends notifications. Your laptop's .env sets them to false
 # (docs/deploy.md, "Stop your laptop polling"). Secret values are never printed.
 set -euo pipefail
 
@@ -65,6 +65,8 @@ CORS=$clean
 (( https_origins > 0 )) || fail "CORS_ORIGINS has no https:// origin. Pass --cors https://<your-domain>,https://<project>.vercel.app"
 [[ -n $(value_of FIRMS_MAP_KEY) ]] || warn "FIRMS_MAP_KEY is empty: no wildfire data"
 [[ -n $(value_of ANTHROPIC_API_KEY)$(value_of GEMINI_API_KEY) ]] || warn "no ANTHROPIC_API_KEY or GEMINI_API_KEY: briefings use the template"
+[[ -n $(value_of VAPID_PRIVATE_KEY) && -n $(value_of VAPID_PUBLIC_KEY) ]] \
+  || warn "no VAPID keys: push notifications are off (cd backend && python -m scripts.generate_vapid_keys)"
 if (( REPLAY )); then
   ls "$REPLAY_DIR"/*/*.nc >/dev/null 2>&1 || fail "no replay files in $REPLAY_DIR (use --no-replay to skip, or run python -m scripts.find_replay_window)"
 fi
@@ -73,13 +75,14 @@ fi
 umask 077
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-{ grep -vE '^[[:space:]]*(export[[:space:]]+)?(LIGHTNING_INGEST_ENABLED|HAZARD_POLLING_ENABLED|BRIEFING_ENABLED|UPLOADS_DIR|CORS_ORIGINS)=' "$ENV_FILE" || true; } > "$tmp/env"
+{ grep -vE '^[[:space:]]*(export[[:space:]]+)?(LIGHTNING_INGEST_ENABLED|HAZARD_POLLING_ENABLED|BRIEFING_ENABLED|PUSH_ENABLED|UPLOADS_DIR|CORS_ORIGINS)=' "$ENV_FILE" || true; } > "$tmp/env"
 cat >> "$tmp/env" <<EOF
 
 # ---- set by deploy/copy-to-server.sh: the server is the only machine that polls ----
 LIGHTNING_INGEST_ENABLED=true
 HAZARD_POLLING_ENABLED=true
 BRIEFING_ENABLED=true
+PUSH_ENABLED=true
 CORS_ORIGINS=$CORS
 EOF
 

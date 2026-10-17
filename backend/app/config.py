@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -44,6 +45,15 @@ class Settings(BaseSettings):
     nws_contact: str = "https://github.com/jazrs1/planit-control"
     # Where report photos are stored (empty: backend/uploads). The server uses a folder outside the checkout.
     uploads_dir: str = ""
+    # Web push (push/): VAPID keys from `python -m scripts.generate_vapid_keys`. Never change them once
+    # browsers have subscribed: their subscriptions are tied to the public key. Empty keys: push is off.
+    vapid_private_key: str = ""
+    vapid_public_key: str = ""
+    # Contact sent to push services: mailto:name@host or an https origin WITHOUT a path (pywebpush rejects
+    # paths). Set it to the frontend's origin once the domain exists, e.g. https://planit.example.com.
+    vapid_subject: str = "https://jazrs1.github.io"
+    # Send notifications for alert events and briefings. Only one machine (the server) should send.
+    push_enabled: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -51,8 +61,17 @@ class Settings(BaseSettings):
         return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
 
     @property
+    def push_configured(self) -> bool:
+        return bool(self.vapid_private_key and self.vapid_public_key) and vapid_subject_ok(self.vapid_subject)
+
+    @property
     def uploads_path(self) -> Path:
         return Path(self.uploads_dir).expanduser() if self.uploads_dir else BACKEND_DIR / "uploads"
+
+
+def vapid_subject_ok(subject: str) -> bool:
+    """What pywebpush (py_vapid) accepts, or stricter: mailto:name@host, or https://host with no path or port."""
+    return bool(re.fullmatch(r"mailto:[^@\s]+@[\w-]+(\.[\w-]+)+|https://[\w-]+(\.[\w-]+)+", subject or ""))
 
 
 @lru_cache

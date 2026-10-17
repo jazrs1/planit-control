@@ -1,0 +1,15 @@
+{
+  "subscription": {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/example-not-a-real-endpoint",
+    "expirationTime": null,
+    "keys": {
+      "p256dh": "BExampleP256dhKeyNotReal_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "auth": "ExampleAuthNotReal"
+    }
+  },
+  "site_ids": [
+    "big-bend",
+    "lansing-smith"
+  ],
+  "role": "crew"
+}
