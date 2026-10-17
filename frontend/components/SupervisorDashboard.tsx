@@ -9,7 +9,7 @@ import SiteScoreHistory from "@/components/SiteScoreHistory";
 import InfoButton from "@/components/InfoButton";
 import SiteMap, { LIGHTNING_WINDOW_MIN, type MapLayers } from "@/components/SiteMap";
 import { DEMO_DATA, getFires, getLightningCells, getLightningCounts, getLightningRecent, getReports, getSites, getWildlife } from "@/lib/api";
-import { cellUnconfirmed } from "@/lib/lightning";
+import { cellIsReplay, cellUnconfirmed } from "@/lib/lightning";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
 import { countAlerts, realAlerts } from "@/lib/alerts";
@@ -89,7 +89,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   useEffect(() => { if (!lightningStale) lastOnlineNow.current = nowMs; });
   const cellsUnconfirmed = !demo && (offline || cellsFailed);
   // Each quiet cell is already drawn as unconfirmed; the legend only says so when every cell is.
-  const oldCells = !demo && !!cells?.length && cells.every((cell) => cellUnconfirmed(cell, serverNow()));
+  const oldCells = !demo && !!cells?.length && cells.every((cell) => cellUnconfirmed(cell, serverNow(), Date.now()));
   const alertsKnown = knownAlerts !== null;
   // Showing last-known alerts while offline: counts are greyed and marked, never shown as current.
   const alertsStale = alertsStatus === "stale";
@@ -220,8 +220,12 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     </li>
   );
   // A real count or no count: cells we can't confirm are drawn grey and described, never counted with "?".
+  // Real and replay cells counted apart, never mixed.
+  const replayCells = (cells ?? []).filter((cell) => cellIsReplay(cell, Date.now())).length;
+  const realCells = (cells?.length ?? 0) - replayCells;
   const cellsText = cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…"
-    : cellsUnconfirmed ? "last known · Not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed" : `${cells.length} active`;
+    : cellsUnconfirmed ? "last known · Not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed"
+    : replayCells > 0 ? `${realCells} real · ${replayCells} replay` : `${realCells} active`;
   // A map layer's count, or why there isn't one: never a "0" for data we couldn't fetch.
   const pointsText = (count: number, loaded: boolean, failed: boolean, unit: string) =>
     !loaded ? failed ? "Unavailable · can't load" : "Loading…" : failed ? `${count} ${unit} · last known` : `${count} ${unit}`;

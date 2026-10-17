@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Alert, FireDetection, HazardReport, LightningCell, LightningFlash, Site, WildlifeSightingPoint } from "@shared/types";
 import type { ExpressionSpecification, GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
-import { cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
+import { cellIsReplay, cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 import { formatStrikeDistance } from "@/lib/alerts";
 import { paintBasemap } from "@/lib/mapStyle";
 import { formatAgo } from "@/lib/time";
@@ -177,7 +177,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   useEffect(() => {
     const instance = map.current;
     if (!styleLoaded || !instance) return;
-    const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo);
+    const data = stormCellsGeoJson(cells, nowMs, cellsUnconfirmed, demo, realFlashNowMs ?? nowMs);
     // Paint needs real colors, so resolve them from tokens.css (light or dark).
     const ink: ExpressionSpecification = ["case", ["get", "replay"], resolveColor("--pc-notice"), resolveColor("--pc-risk-amber")];
     const muted = resolveColor("--pc-text-muted");
@@ -212,7 +212,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": ["case", ["get", "uncertain"], muted, ink], "line-width": 1.5, "line-opacity": 0.7 },
     }, before);
-  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs]);
+  }, [styleLoaded, cells, cellsUnconfirmed, demo, nowMs, realFlashNowMs]);
 
   // Recent lightning: a GeoJSON circle layer under the site markers (markers are DOM, always on top).
   useEffect(() => {
@@ -425,8 +425,8 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   return <><div ref={container} className="h-full w-full bg-(--pc-map-land)" />
     <ul className="sr-only" aria-label="Storm cell motion">
       {cells.map((cell) => <li key={cell.id}>
-        {demo && "Demo data · "}Storm cell at {cell.lat.toFixed(2)}, {cell.lon.toFixed(2)}, radius {cell.radius_mi.toFixed(1)} mi. {cell.tracked ? cell.heading_deg !== null && cell.speed_mph !== null && cell.speed_mph >= 2 ? `Moving toward ${cell.moving_toward ?? `${cell.heading_deg} degrees`} at ${Math.round(cell.speed_mph)} mph.` : "Stationary." : "Motion unconfirmed."}
-        {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs))) && " Last known · Not confirmed."}
+        {demo && "Demo data · "}{cellIsReplay(cell, realFlashNowMs ?? nowMs) && "Replay · "}Storm cell at {cell.lat.toFixed(2)}, {cell.lon.toFixed(2)}, radius {cell.radius_mi.toFixed(1)} mi. {cell.tracked ? cell.heading_deg !== null && cell.speed_mph !== null && cell.speed_mph >= 2 ? `Moving toward ${cell.moving_toward ?? `${cell.heading_deg} degrees`} at ${Math.round(cell.speed_mph)} mph.` : "Stationary." : "Motion unconfirmed."}
+        {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs, realFlashNowMs ?? nowMs))) && " Last known · Not confirmed."}
       </li>)}
     </ul>
     {!painted && !error && <p role="status" className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Loading map…</p>}

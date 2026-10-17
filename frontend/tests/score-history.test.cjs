@@ -117,6 +117,14 @@ test("risk zones have fixed 0–10 geometry, latest point uses shared risk bands
   }
 });
 
+test("a stop-work spike says so in its tooltip, and axis labels drop the zone where the page states it", () => {
+  const spike = { ...history, points: [...history.points.slice(0, -1), point(0, 9, { top_hazard: "lightning" })] };
+  assert.match(renderChart({ history: spike }), /9\.0 \/ 10 · Stop-work active at this run/);
+  const stated = renderChart({ zoneStated: true });
+  assert.match(stated, />Oct 16, 3:00 PM</);
+  assert.doesNotMatch(stated, />Oct 16, 3:00 PM CDT</);
+});
+
 test("tooltips work with keyboard, hover and touch and always use the site's timezone", () => {
   const driver = hooks();
   const Component = loader({ react: driver.react })("components/ScoreSparkline.tsx").default;
