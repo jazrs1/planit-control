@@ -4,7 +4,7 @@ import { APP_DESCRIPTION, APP_NAME } from "@/lib/metadata";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    id: "/", name: APP_NAME, short_name: APP_NAME, description: APP_DESCRIPTION,
+    id: "/", name: APP_NAME, short_name: "PlanIT", description: APP_DESCRIPTION,
     lang: "en-US", start_url: "/crew", scope: "/", display: "standalone",
     background_color: APP_COLORS.background, theme_color: APP_COLORS.theme,
     icons: [

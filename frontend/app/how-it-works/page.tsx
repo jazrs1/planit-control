@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { HazardIndex, HazardType } from "@shared/types";
+import { pageMetadata } from "@/lib/metadata";
 import { HAZARD_LABEL, riskLevel } from "@/lib/risk";
 
 // "How it works" for judges and supervisors. Every fact here was checked against the backend
 // (hazards/scheduler.py, hazards/sources/*, hazards/scoring.py, lightning/*) and docs/alert-engine.md.
 // When docs/ml-model.md lands, fill in the "Machine learning model" section below.
 
-export const metadata: Metadata = {
-  title: "How it works · PlanIT Control",
-  description: "Data sources, the lightning stop-work rule, the hazard index, honest limits and replay mode.",
-};
+export const metadata = pageMetadata("How it works", "Data sources, the lightning stop-work rule, the hazard index, honest limits and replay mode.");
 
 const SECTIONS = [
   { id: "problem", label: "The problem" },
