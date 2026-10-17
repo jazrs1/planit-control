@@ -68,9 +68,9 @@ async def send_now(body: SendBriefingRequest | None = None, pool: ConnectionPool
     check_admin_token(x_admin_token)   # before the limit, so a bad request can't use up the window
     if _all_running:
         raise HTTPException(409, "Briefings for all sites are already being written.")
-    send_all_limit.hit("all")
     with pool.connection() as conn:
         count = conn.execute("SELECT count(*) AS n FROM sites").fetchone()["n"]
+    send_all_limit.hit("all")   # after the query, so a database error doesn't use up the window
 
     async def run_all():
         global _all_running
