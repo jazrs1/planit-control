@@ -99,6 +99,11 @@ def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snaps
                 "heat_index_91_or_higher": {"from": clock_time(times[hot[0]], tz),
                                             "until": clock_time(times[hot[-1]] + timedelta(hours=1), tz)} if hot else None}
 
+    # Wind: the strongest forecast gust during work hours (mph, the same units as the hazard model).
+    gusts = h.get("wind_gusts_10m") or []
+    gust_i = max((i for i in work if i < len(gusts) and gusts[i] is not None), key=lambda i: gusts[i], default=None)
+    wind = {"max_gust_mph": round(gusts[gust_i]), "peak_time": clock_time(times[gust_i], tz)} if gust_i is not None else None
+
     # Rain and thunderstorms by time of day. Storm chance = share of the 31 GFS ensemble runs
     # with a thunderstorm weather code in that period.
     e = ensemble["hourly"]
@@ -164,6 +169,7 @@ def site_inputs(site: dict, forecast: dict, ensemble: dict, snap: snapshot.Snaps
         "top_factors": [{"hazard": f["hazard"], "label": f["label"]} for f in scored["top_factors_tomorrow"]],
         "daylight": daylight or None,
         "heat": heat,
+        "wind": wind,
         "periods": periods,
         "rain_total_in": round(sum(p["rain_in"] for p in periods), 2),
         "thunderstorms_likely_from": storms_from,
