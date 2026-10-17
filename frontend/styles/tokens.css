@@ -1,0 +1,34 @@
+/*
+ * PlanIT Control design tokens. Use these (via the Tailwind names in app/globals.css),
+ * never raw hex values in components. Light, high-contrast theme for outdoor phone use.
+ */
+:root {
+  /* Surfaces */
+  --pc-bg: #f4f5f7;
+  --pc-surface: #ffffff;
+  --pc-border: #d9dde3;
+
+  /* Text */
+  --pc-text: #111827;
+  --pc-text-muted: #5b6472;
+
+  /* Brand */
+  --pc-brand: #0b3d91;
+
+  /* Risk bands (hazard_index): green 0-3, amber 4-6, red 7-10 */
+  --pc-risk-green: #166534;
+  --pc-risk-green-bg: #dcfce7;
+  --pc-risk-amber: #92400e;
+  --pc-risk-amber-bg: #fef3c7;
+  --pc-risk-red: #b91c1c;
+  --pc-risk-red-bg: #fee2e2;
+
+  /* Shape */
+  --pc-radius-card: 12px;
+  --pc-radius-pill: 999px;
+  --pc-shadow-card: 0 1px 2px rgb(17 24 39 / 0.06), 0 1px 3px rgb(17 24 39 / 0.1);
+
+  /* Type */
+  --pc-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pc-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}

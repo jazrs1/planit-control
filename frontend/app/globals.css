@@ -1,0 +1,32 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/* Expose tokens as Tailwind utilities: bg-surface, text-muted, text-risk-red, rounded-card, ... */
+@theme inline {
+  --color-bg: var(--pc-bg);
+  --color-surface: var(--pc-surface);
+  --color-border: var(--pc-border);
+  --color-text: var(--pc-text);
+  --color-muted: var(--pc-text-muted);
+  --color-brand: var(--pc-brand);
+
+  --color-risk-green: var(--pc-risk-green);
+  --color-risk-green-bg: var(--pc-risk-green-bg);
+  --color-risk-amber: var(--pc-risk-amber);
+  --color-risk-amber-bg: var(--pc-risk-amber-bg);
+  --color-risk-red: var(--pc-risk-red);
+  --color-risk-red-bg: var(--pc-risk-red-bg);
+
+  --radius-card: var(--pc-radius-card);
+  --radius-pill: var(--pc-radius-pill);
+  --shadow-card: var(--pc-shadow-card);
+
+  --font-sans: var(--pc-font-sans);
+  --font-mono: var(--pc-font-mono);
+}
+
+body {
+  background: var(--pc-bg);
+  color: var(--pc-text);
+  font-family: var(--pc-font-sans);
+}

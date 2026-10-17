@@ -1,0 +1,56 @@
+{
+  "crist": {
+    "site_id": "crist",
+    "site_name": "Crist Generating Plant",
+    "for_date": "2026-10-17",
+    "generated_at": "2026-10-16T18:00:00-05:00",
+    "top_hazard": "soil_saturation",
+    "text": "Low risk tomorrow at Crist (3.4/10). Expect a high near 83°F, heat index topping out around 86°F. Ground along the Escambia River is still soft from Tuesday's rain, so stage bucket trucks on gravel and check outrigger pads before setting up. No lightning expected.",
+    "key_numbers": { "hazard_index": 3.4, "max_heat_index_f": 86, "lightning_probability_pct": 10, "rain_in": 0.0, "soil_moisture_pct": 40, "wildfire_detections_25mi": 0 }
+  },
+  "deerhaven": {
+    "site_id": "deerhaven",
+    "site_name": "Deerhaven Generating Station",
+    "for_date": "2026-10-17",
+    "generated_at": "2026-10-16T18:00:00-04:00",
+    "top_hazard": "flood",
+    "text": "Moderate risk tomorrow at Deerhaven (5.2/10). The Flood Watch runs through 8 PM Friday, and another 0.8 in. of rain is likely, mostly after 2 PM. The south laydown yard already has standing water and the soil is saturated. Plan off-road work for the morning, keep trucks off the grass, and expect a 40% chance of afternoon storms.",
+    "key_numbers": { "hazard_index": 5.2, "max_heat_index_f": 88, "lightning_probability_pct": 40, "rain_in": 0.8, "soil_moisture_pct": 48, "wildfire_detections_25mi": 0 }
+  },
+  "crystal-river": {
+    "site_id": "crystal-river",
+    "site_name": "Crystal River Energy Complex",
+    "for_date": "2026-10-17",
+    "generated_at": "2026-10-16T18:00:00-04:00",
+    "top_hazard": "wildlife",
+    "text": "Low risk tomorrow at Crystal River (3.0/10). An alligator is using the discharge canal bank and a diamondback was reported 0.6 mi from the plant. Walk the work area before staging and keep 30 ft from the canal edge. Heat index near 90°F, so take water breaks every hour.",
+    "key_numbers": { "hazard_index": 3.0, "max_heat_index_f": 90, "lightning_probability_pct": 20, "rain_in": 0.1, "soil_moisture_pct": 32, "wildfire_detections_25mi": 0 }
+  },
+  "big-bend": {
+    "site_id": "big-bend",
+    "site_name": "Big Bend Power Station",
+    "for_date": "2026-10-17",
+    "generated_at": "2026-10-16T18:00:00-04:00",
+    "top_hazard": "lightning",
+    "text": "Moderate risk tomorrow at Big Bend (5.9/10). Today's storms clear overnight, but sea-breeze storms are likely again after 1 PM (60%). Finish elevated and switchyard work before noon. If a strike lands within 10 mi, stop work and shelter in trucks; the 30-minute clock restarts on every new strike. Heat index 99°F before the storms arrive.",
+    "key_numbers": { "hazard_index": 5.9, "max_heat_index_f": 99, "lightning_probability_pct": 60, "rain_in": 0.5, "soil_moisture_pct": 41, "wildfire_detections_25mi": 0 }
+  },
+  "martin": {
+    "site_id": "martin",
+    "site_name": "Martin Clean Energy Center",
+    "for_date": "2026-10-17",
+    "generated_at": "2026-10-16T18:00:00-04:00",
+    "top_hazard": "wildfire",
+    "text": "Moderate risk tomorrow at Martin (4.9/10). NASA FIRMS still shows 2 fire detections within 25 mi, the closest 9.6 mi NW near DuPuis. Winds out of the NW at 10–15 mph could push smoke over the site by afternoon. Keep vehicles off dry grass, carry extinguishers, and watch for smoke on SR-710.",
+    "key_numbers": { "hazard_index": 4.9, "max_heat_index_f": 93, "lightning_probability_pct": 10, "rain_in": 0.0, "soil_moisture_pct": 17, "wildfire_detections_25mi": 2 }
+  },
+  "turkey-point": {
+    "site_id": "turkey-point",
+    "site_name": "Turkey Point Clean Energy Center",
+    "for_date": "2026-10-17",
+    "generated_at": "2026-10-16T18:00:00-04:00",
+    "top_hazard": "heat",
+    "text": "Moderate risk tomorrow at Turkey Point (5.6/10). Heat index will reach about 105°F in the switchyard between noon and 4 PM. Use a 30-minutes-on, 30-minutes-off schedule after noon, set up shade at the truck, and pair crew members to watch each other for heat illness. A crocodile is still using the cooling canal berm.",
+    "key_numbers": { "hazard_index": 5.6, "max_heat_index_f": 105, "lightning_probability_pct": 30, "rain_in": 0.2, "soil_moisture_pct": 28, "wildfire_detections_25mi": 0 }
+  }
+}

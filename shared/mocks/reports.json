@@ -1,0 +1,57 @@
+[
+  {
+    "id": "rpt_7f3a91",
+    "site_id": "big-bend",
+    "photo_url": "https://storage.planit-control.dev/reports/rpt_7f3a91.jpg",
+    "lat": 27.7968,
+    "lon": -82.4012,
+    "category": "downed_line",
+    "note": "Distribution line sagging across access road near coal yard gate 3 after the cell passed. Crew pulled back, waiting on all-clear.",
+    "reporter_role": "foreman",
+    "created_at": "2026-10-16T16:31:00-04:00"
+  },
+  {
+    "id": "rpt_2c81d0",
+    "site_id": "deerhaven",
+    "photo_url": "https://storage.planit-control.dev/reports/rpt_2c81d0.jpg",
+    "lat": 29.7552,
+    "lon": -82.3907,
+    "category": "flooding",
+    "note": "Standing water ~8 in. deep on the south laydown yard. Bucket truck can't get to pole 14 without rutting.",
+    "reporter_role": "crew_member",
+    "created_at": "2026-10-16T13:47:00-04:00"
+  },
+  {
+    "id": "rpt_b40e57",
+    "site_id": "crystal-river",
+    "photo_url": "https://storage.planit-control.dev/reports/rpt_b40e57.jpg",
+    "lat": 28.9549,
+    "lon": -82.7021,
+    "category": "wildlife",
+    "note": "~7 ft alligator sunning on the discharge canal bank by the intake screens. Gave it 30 ft, kept working.",
+    "reporter_role": "safety_officer",
+    "created_at": "2026-10-16T10:15:00-04:00"
+  },
+  {
+    "id": "rpt_e19c33",
+    "site_id": "turkey-point",
+    "photo_url": "https://storage.planit-control.dev/reports/rpt_e19c33.jpg",
+    "lat": 25.4381,
+    "lon": -80.3290,
+    "category": "heat_illness",
+    "note": "Lineman cramping and lightheaded after 2 hrs in the switchyard. Moved to truck AC, fluids, recovered. Shifting crew to 30/30 work-rest.",
+    "reporter_role": "foreman",
+    "created_at": "2026-10-16T14:05:00-04:00"
+  },
+  {
+    "id": "rpt_59ad12",
+    "site_id": null,
+    "photo_url": "https://storage.planit-control.dev/reports/rpt_59ad12.jpg",
+    "lat": 27.1214,
+    "lon": -80.6402,
+    "category": "fire_smoke",
+    "note": "Smoke column visible to the northwest from SR-710 on the way to Martin. Not near our ROW yet.",
+    "reporter_role": "crew_member",
+    "created_at": "2026-10-16T12:52:00-04:00"
+  }
+]
