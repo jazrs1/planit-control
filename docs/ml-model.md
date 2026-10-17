@@ -8,9 +8,10 @@ For each site and day, a LightGBM model estimates **the chance that NOAA logs a 
 
 - It ranks risky days **3–4× better than both baselines** (PR-AUC 0.128 vs 0.032 for monthly climatology and 0.040 for a rain/heat-index rule). The 95% confidence intervals for the improvement exclude zero.
 - **The index is anchored by lift** over the average day: amber starts at **2×** and red at **5×** the 2024 rate of logged events (2.76% of site-days). On 2025, **amber days (5% of site-days) had a logged event 1 in 9 times** and **red days (2%) 1 in 5 times**, against **1 in 68 green days**.
+- **Most hazard days still look green.** Amber and red days held **42%** of 2025's logged events (83% with the first version's looser anchors, which colored most sites on an ordinary day); **58% fell on green days**, because many Florida storms form with little warning. The index plans the day; the live lightning engine and NWS warnings protect the crew.
 - It works a day ahead too, with somewhat less skill (PR-AUC 0.102 tomorrow vs 0.128 today).
 
-It's a decent first model, not a finished one: it can't learn heat or wildfire well from these labels, and it leans partly on *where* NOAA tends to receive reports. Details are in [Limitations](#honest-limitations). That's why the index in the app is a **hybrid**: the model's weather score or a safety rule (OSHA heat band, wildfire, wildlife, crew reports), whichever is higher, plus the lightning stop-work override. See [section 8](#8-live-the-hybrid-hazard-index).
+It's a decent first model, not a finished one: it can't learn heat or wildfire well from these labels, and it leans partly on *where* NOAA tends to receive reports. Details are in [Limitations](#honest-limitations). That's why the index in the app is a **hybrid**: the model's weather score or a safety rule (OSHA heat band, wildfire, wildlife, crew reports), whichever is higher, plus the lightning stop-work override. Wildlife sightings and distant fires can't color a site on their own. See [section 8](#8-live-the-hybrid-hazard-index).
 
 ## 1. Labels: what counts as a hazardous day
 
@@ -202,7 +203,7 @@ Between anchors the index rises linearly. For example, a 9.7% chance is halfway 
 | Amber (4–7) | 5.0% [25.6%] | 10.8%, 1 in 9 [3.6%, 1 in 27] | 23% [39%] |
 | Red (≥ 7) | 2.2% [7.7%] | 21.3%, 1 in 5 [13.6%, 1 in 7] | 20% [44%] |
 
-Day-ahead: green 93.2% of days (1.6% event rate), amber 4.8% (12.0%), red 2.1% (14.2%) [was 69.2% / 23.5% / 7.3% at 0.8% / 3.9% / 12.6%]. The trade-off is deliberate: far fewer amber and red days, each much more likely to be a real hazard day, while more events now fall on green days, where the live rules (heat, fire, crew reports, NWS floors, lightning) still raise the index. Scores of 9–10 should be rare outside tropical systems.
+Day-ahead: green 93.2% of days (1.6% event rate), amber 4.8% (12.0%), red 2.1% (14.2%) [was 69.2% / 23.5% / 7.3% at 0.8% / 3.9% / 12.6%]. The trade-off is deliberate: far fewer amber and red days, each much more likely to be a real hazard day, while more events now fall on green days, where the live rules (heat, fire, crew reports, NWS floors, lightning) still raise the index. Scores of 9–10 should be rare outside tropical systems. In numbers: amber and red days held 42.4% of 2025's same-day events (83.4% before) and 36.6% day-ahead (77.7% before).
 
 ## 7. Explanations: the top 3 factors
 
