@@ -199,8 +199,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   const replayNowMs = replay?.running || demo ? serverNow() : nowMs;
   const peakHour = c.heat.peak_at ? new Date(c.heat.peak_at).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric" }) : null;
   // Our rain forecast, cross-checked against NWS: a range when they disagree, never the higher one as fact.
-  // rain_next_24h_nws_in comes with #47; read it narrowly until that contract change is on main.
-  const nwsRain = (c.flood as { rain_next_24h_nws_in?: number | null }).rain_next_24h_nws_in;
+  const nwsRain = c.flood.rain_next_24h_nws_in;
   const rain = rainForecast(c.flood.rain_next_24h_in, nwsRain);
   // "FEMA zone X" as a source only repeats the zone row.
   const floodSource = c.flood.source && !/^FEMA\b/i.test(c.flood.source) ? c.flood.source : null;
