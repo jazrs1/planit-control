@@ -17,6 +17,8 @@
   --color-risk-amber-bg: var(--pc-risk-amber-bg);
   --color-risk-red: var(--pc-risk-red);
   --color-risk-red-bg: var(--pc-risk-red-bg);
+  --color-lightning: var(--pc-lightning);
+  --color-lightning-ring: var(--pc-lightning-ring);
 
   --radius-card: var(--pc-radius-card);
   --radius-pill: var(--pc-radius-pill);

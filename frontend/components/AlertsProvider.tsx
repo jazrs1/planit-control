@@ -1,87 +1,106 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { Alert } from "@shared/types";
-import { getAlerts, getReplayStatus } from "@/lib/api";
+import type { Alert, ReplayStatus } from "@shared/types";
+import { DEMO_DATA, getAlerts, getReplayStatus } from "@/lib/api";
+import { usePolling } from "@/lib/usePolling";
 
 /** The backend's clock: real time normally, the simulated replay clock while a replay runs. */
 type ServerClock = { simulatedMs: number; fetchedAtMs: number; speed: number } | null;
 
-type AlertsState = { alerts: Alert[]; staleSince: Date | null; clock: ServerClock };
+/**
+ * connecting:  no alerts loaded yet. unreachable: no alerts loaded and the last try failed.
+ * live:        alerts are current.  stale:       showing the last real alerts; the latest refresh failed.
+ * demo:        showing shared/mocks because the user asked for demo data.
+ */
+export type AlertsStatus = "connecting" | "unreachable" | "live" | "stale" | "demo";
 
-const AlertsContext = createContext<AlertsState | null>(null);
+type AlertsState = {
+  /** null until real alerts load: unknown, never "no alerts". */
+  alerts: Alert[] | null;
+  status: AlertsStatus;
+  staleSince: Date | null;
+  clock: ServerClock;
+  replay: ReplayStatus | null;
+};
+
+type AlertsContextValue = AlertsState & {
+  /** Refetch alerts and replay status now (e.g. right after starting or stopping a replay). */
+  refresh: () => Promise<void>;
+  setDemo: (on: boolean) => void;
+};
+
+const AlertsContext = createContext<AlertsContextValue | null>(null);
+
+// Refresh cadence. Replay compresses an hour into minutes, so poll fast while it runs.
+const REPLAY_MS = 3_000;
+const LIVE_MS = 30_000;
+const RETRY_MS = 5_000;
 
 function newestFirst(alerts: Alert[]) {
   return [...alerts].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
 }
 
-async function fetchClock(): Promise<ServerClock> {
-  try {
-    const status = await getReplayStatus();
-    if (!status.running || !status.simulated_now || !status.speed) return null;
-    return { simulatedMs: Date.parse(status.simulated_now), fetchedAtMs: Date.now(), speed: status.speed };
-  } catch {
-    return null; // replay status unavailable: assume real time
-  }
+function clockFrom(status: ReplayStatus | null): ServerClock {
+  if (!status?.running || !status.simulated_now || !status.speed) return null;
+  return { simulatedMs: Date.parse(status.simulated_now), fetchedAtMs: Date.now(), speed: status.speed };
 }
 
-export function AlertsProvider({ initialAlerts, children }: { initialAlerts: Alert[]; children: ReactNode }) {
-  const [state, setState] = useState<AlertsState>(() => ({ alerts: newestFirst(initialAlerts), staleSince: null, clock: null }));
+const UNKNOWN: AlertsState = { alerts: null, status: "connecting", staleSince: null, clock: null, replay: null };
 
-  useEffect(() => {
-    let disposed = false;
-    let pending = false;
-    let lastGood = new Date();
+/** Demo data is a fixed sample: run its clock from the newest sample flash so mock countdowns and
+ *  flash fading look as they would have live, instead of "All clear" against today's real time. */
+const DEMO_START_MS = Math.max(...DEMO_DATA.lightning.map((f) => Date.parse(f.ts)));
 
-    async function refresh() {
-      if (pending) return;
-      pending = true;
-      try {
-        // No mock fallback: a backend blip must never show mock STOP WORK alerts.
-        const [next, clock] = await Promise.all([getAlerts({ fallbackToMocks: false }), fetchClock()]);
-        lastGood = new Date();
-        if (!disposed) setState({ alerts: newestFirst(next), staleSince: null, clock });
-      } catch {
-        // Keep the last real alerts and say they may be out of date.
-        if (!disposed) setState((prev) => ({ ...prev, staleSince: lastGood }));
-      } finally {
-        pending = false;
+export function AlertsProvider({ initialAlerts, children }: { initialAlerts: Alert[] | null; children: ReactNode }) {
+  const [state, setState] = useState<AlertsState>(() =>
+    initialAlerts === null ? UNKNOWN : { ...UNKNOWN, alerts: newestFirst(initialAlerts), status: "live" },
+  );
+  const demo = useRef(false);
+  const lastGood = useRef<Date | null>(initialAlerts === null ? null : new Date());
+
+  const refresh = useCallback(async () => {
+    if (demo.current) return;
+    const [alerts, replay] = await Promise.allSettled([getAlerts(), getReplayStatus()]);
+    if (demo.current) return; // demo turned on while this was in flight
+    setState((prev) => {
+      // Replay status is optional: if it fails, assume the last known replay state.
+      const nextReplay = replay.status === "fulfilled" ? replay.value : prev.replay;
+      const clock = replay.status === "fulfilled" ? clockFrom(replay.value) : prev.clock;
+      if (alerts.status === "fulfilled") {
+        lastGood.current = new Date();
+        return { alerts: newestFirst(alerts.value), status: "live", staleSince: null, clock, replay: nextReplay };
       }
-    }
-
-    function onVisible() {
-      if (!document.hidden) void refresh();
-    }
-
-    void refresh(); // pick up the replay clock right away
-    const interval = window.setInterval(() => void refresh(), 15_000);
-    window.addEventListener("focus", onVisible);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      disposed = true;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onVisible);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+      // Never swap in mocks: keep the last real alerts and say they may be out of date.
+      return prev.alerts === null
+        ? { ...prev, status: "unreachable", clock, replay: nextReplay }
+        : { ...prev, status: "stale", staleSince: lastGood.current, clock, replay: nextReplay };
+    });
   }, []);
 
-  return <AlertsContext.Provider value={state}>{children}</AlertsContext.Provider>;
+  const setDemo = useCallback((on: boolean) => {
+    demo.current = on;
+    lastGood.current = null;
+    setState(on
+      ? { ...UNKNOWN, alerts: newestFirst(DEMO_DATA.alerts), status: "demo",
+          clock: { simulatedMs: DEMO_START_MS, fetchedAtMs: Date.now(), speed: 1 } }
+      : UNKNOWN);
+  }, []);
+
+  const loaded = state.alerts !== null && state.status !== "demo";
+  const pollMs = state.status === "demo" ? null : !loaded ? RETRY_MS : state.replay?.running ? REPLAY_MS : LIVE_MS;
+  usePolling(refresh, pollMs);
+
+  const value = useMemo(() => ({ ...state, refresh, setDemo }), [state, refresh, setDemo]);
+  return <AlertsContext.Provider value={value}>{children}</AlertsContext.Provider>;
 }
 
-function useAlertsState() {
+/** The one alerts state shared by the nav badge, the dashboard and /alerts, so they always agree. */
+export function useAlertsState() {
   const state = useContext(AlertsContext);
-  if (state === null) throw new Error("useAlerts must be used inside AlertsProvider");
+  if (state === null) throw new Error("useAlertsState must be used inside AlertsProvider");
   return state;
-}
-
-export function useAlerts() {
-  return useAlertsState().alerts;
-}
-
-/** When the alerts last refreshed successfully, if the latest refresh failed; otherwise null. */
-export function useAlertsStaleSince() {
-  return useAlertsState().staleSince;
 }
 
 /** Current time in ms on the backend's clock. Countdowns must use this, not Date.now(), so they

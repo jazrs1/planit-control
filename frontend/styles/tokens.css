@@ -23,6 +23,10 @@
   --pc-risk-red: #b91c1c;
   --pc-risk-red-bg: #fee2e2;
 
+  /* Lightning flashes on the map: bright fill, dark ring so they read on the light basemap */
+  --pc-lightning: #facc15;
+  --pc-lightning-ring: #854d0e;
+
   /* Shape */
   --pc-radius-card: 12px;
   --pc-radius-pill: 999px;

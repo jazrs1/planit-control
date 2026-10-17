@@ -1,20 +1,55 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Alert, Site } from "@shared/types";
-import type { Map as LibreMap, Marker } from "maplibre-gl";
+import type { Alert, LightningFlash, Site } from "@shared/types";
+import type { GeoJSONSource, Map as LibreMap, Marker } from "maplibre-gl";
 import { riskLevel } from "@/lib/risk";
 
-export default function SiteMap({ sites, alerts, selectedId, onSelect }: { sites: Site[]; alerts: Alert[]; selectedId: string | null; onSelect: (id: string) => void }) {
+const LIGHTNING_SOURCE = "recent-lightning";
+/** Flashes older than this are gone; matches the /lightning/recent window the dashboard asks for. */
+export const LIGHTNING_WINDOW_MIN = 15;
+/** A tile that loads this long after the last error means the tile server has recovered. */
+const TILE_RECOVERY_MS = 3_000;
+
+/** Newest flash: opacity 1 and largest; a flash at the end of the window: faint (0.3) and small, but still findable. */
+function lightningGeoJson(flashes: LightningFlash[], nowMs: number): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  const windowMs = LIGHTNING_WINDOW_MIN * 60_000;
+  const features = flashes.map((flash) => {
+    const age = Math.min(1, Math.max(0, (nowMs - Date.parse(flash.ts)) / windowMs));
+    return {
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [flash.lon, flash.lat] },
+      properties: { opacity: 1 - 0.7 * age, radius: 4.5 - 1.5 * age, age },
+    };
+  });
+  // Oldest first, so the newest flashes draw on top.
+  features.sort((a, b) => b.properties.age - a.properties.age);
+  return { type: "FeatureCollection", features };
+}
+
+type SiteMapProps = {
+  sites: Site[];
+  alerts: Alert[];
+  /** Recent flashes, any order. */
+  flashes: LightningFlash[];
+  /** "Now" for fading flashes by age: the backend clock, so replayed flashes fade in simulated time. */
+  nowMs: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+};
+
+export default function SiteMap({ sites, alerts, flashes, nowMs, selectedId, onSelect }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
   const [ready, setReady] = useState(false);
+  const [styleLoaded, setStyleLoaded] = useState(false);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let disposed = false;
     let observer: ResizeObserver | undefined;
+    let lastErrorAt = 0;
     void import("maplibre-gl").then((lib) => {
       if (disposed || !container.current) return;
       // maplibre builds its worker URL at runtime relative to its own chunk, which Next's bundler
@@ -23,8 +58,14 @@ export default function SiteMap({ sites, alerts, selectedId, onSelect }: { sites
       const instance = new lib.Map({ container: container.current, style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", center: [-83.5, 28.2], zoom: 5.5, attributionControl: { compact: false } });
       map.current = instance;
       instance.addControl(new lib.NavigationControl(), "top-right");
-      instance.on("error", () => setError(true));
+      instance.on("error", () => { lastErrorAt = Date.now(); setError(true); });
       instance.on("load", () => setError(false));
+      // Custom layers can be added once the style is parsed; "load" also waits for every initial tile.
+      instance.on("style.load", () => setStyleLoaded(true));
+      // Clear the notice once basemap tiles load again after an error, without a reload.
+      instance.on("sourcedata", (e) => {
+        if (e.tile && e.sourceId !== LIGHTNING_SOURCE && Date.now() - lastErrorAt > TILE_RECOVERY_MS) setError(false);
+      });
       observer = new ResizeObserver(() => instance.resize());
       observer.observe(container.current);
       setReady(true);
@@ -50,13 +91,38 @@ export default function SiteMap({ sites, alerts, selectedId, onSelect }: { sites
         button.addEventListener("click", () => onSelect(site.id));
         markers.current.set(site.id, new Marker({ element: button }).setLngLat([site.lon, site.lat]).addTo(map.current));
       }
-      // RECENT-LIGHTNING LAYER INTEGRATION POINT:
-      // When shared/types.ts exports LightningFlash and GET /lightning/recent is
-      // available, add its typed helper in lib/api.ts. Pass flashes here and draw
-      // small yellow circles using a tokens.css color, with opacity fading by age.
     });
     return () => { disposed = true; };
   }, [ready, sites, alerts, onSelect, selectedId]);
+
+  // Recent lightning: a GeoJSON circle layer under the site markers (markers are DOM, always on top).
+  useEffect(() => {
+    const instance = map.current;
+    if (!styleLoaded || !instance) return;
+    const data = lightningGeoJson(flashes, nowMs);
+    const source = instance.getSource<GeoJSONSource>(LIGHTNING_SOURCE);
+    if (source) {
+      void source.setData(data);
+      return;
+    }
+    // Paint needs real colors, so read them from the tokens.css variables.
+    const tokens = getComputedStyle(document.documentElement);
+    instance.addSource(LIGHTNING_SOURCE, { type: "geojson", data });
+    instance.addLayer({
+      id: LIGHTNING_SOURCE,
+      type: "circle",
+      source: LIGHTNING_SOURCE,
+      paint: {
+        "circle-color": tokens.getPropertyValue("--pc-lightning").trim(),
+        "circle-stroke-color": tokens.getPropertyValue("--pc-lightning-ring").trim(),
+        "circle-stroke-width": 0.5,
+        "circle-radius": ["get", "radius"],
+        "circle-opacity": ["get", "opacity"],
+        // A faint ring keeps dots visible on the light basemap without muddying dense clusters.
+        "circle-stroke-opacity": ["*", 0.5, ["get", "opacity"]],
+      },
+    });
+  }, [styleLoaded, flashes, nowMs]);
 
   useEffect(() => {
     if (!ready || !selectedId) return;
