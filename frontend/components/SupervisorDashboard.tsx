@@ -98,7 +98,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
 
   const statusLine = demo
     ? <p role="status" className="flex items-center gap-2 text-sm font-semibold text-muted">
-      <span className="rounded-pill border border-border px-2 py-0.5 text-xs">Demo data</span>
+      <span className="rounded-chip border border-border px-2 py-0.5 text-xs">Demo data</span>
       Sample sites, alerts and lightning from shared/mocks · not live conditions
       <button type="button" onClick={() => setDemo(false)} className="min-h-11 rounded-card px-2 text-brand underline focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
     </p>
@@ -110,7 +110,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
 
   return (
     <main className="flex min-h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] flex-col lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))] lg:overflow-hidden">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-surface px-5 py-3">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-be border-border bg-surface px-5 py-3">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold">Supervisor Dashboard</h1>
           {statusLine}
@@ -125,8 +125,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               <h2 className="text-lg font-semibold text-risk-red">Can&apos;t reach the server</h2>
               <p className="max-w-md text-sm text-muted">Site conditions and stop-work status are unknown. Don&apos;t treat any site as clear. Retrying every 5 seconds.</p>
               <div className="flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => { void pollSites(); void refreshAlerts(); }} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
-                <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
+                <button type="button" onClick={() => { void pollSites(); void refreshAlerts(); }} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
+                <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border-2 border-rule bg-surface px-4 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
               </div>
             </>
           ) : (
@@ -137,18 +137,18 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
         <div className="grid flex-1 lg:min-h-0 lg:grid-cols-[2fr_1fr]">
           <section aria-label="Florida site safety map" className="relative h-[55dvh] min-h-80 lg:h-full">
             <SiteMap sites={sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={nowMs} selectedId={selectedId} onSelect={selectFromMap} />
-            <div className="absolute bottom-10 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-3 rounded-card border border-border bg-surface px-3 py-2 text-xs shadow-card" aria-label="Map legend">
+            <div className="absolute inset-be-10 inset-s-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-3 rounded-card border-2 border-rule bg-surface px-3 py-2 text-xs" aria-label="Map legend">
               <span className="text-risk-green">● Low &lt; 4</span><span className="text-risk-amber">● Elevated 4–&lt;7</span><span className="text-risk-red">● High ≥ 7</span><span>◎ Lightning stop work</span>
-              <span className={`flex items-center gap-1 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{lightningStale ? "?" : ""}) · {lightningStale ? "last known, fade paused" : "newest brightest"}</span>
+              <span className={`flex items-center gap-1 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-chip bg-lightning ring-1 ring-lightning-ring" />Flash, last {LIGHTNING_WINDOW_MIN} min ({flashes.length.toLocaleString()}{lightningStale ? "?" : ""}) · {lightningStale ? "last known, fade paused" : "newest brightest"}</span>
               <span role="status" className={cells === null || cellsUnconfirmed || oldCells ? "text-muted" : "text-risk-amber"}>
                 {demo && "Demo data · "}Storm cells: {cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…" : `${cells.length}${cellsUnconfirmed || oldCells ? "? · Last known · Not confirmed" : ""}`} · circle = cell extent, arrow = motion direction; no arrow = stationary or untracked
               </span>
             </div>
           </section>
-          <section aria-label="Sites ranked by hazard index" className="flex min-h-0 flex-col border-t border-border bg-bg lg:border-t-0 lg:border-l">
-            <div className="shrink-0 border-b border-border bg-surface p-4">
+          <section aria-label="Sites ranked by hazard index" className="flex min-h-0 flex-col border-bs border-border bg-bg lg:border-bs-0 lg:border-s">
+            <div className="shrink-0 border-be border-border bg-surface p-4">
               {!alertsKnown && (
-                <p role="status" className="mb-3 rounded-card border border-risk-red bg-risk-red-bg p-2 text-sm font-semibold text-risk-red">
+                <p role="status" className="mbe-3 rounded-card border border-risk-red bg-risk-red-bg p-2 text-sm font-semibold text-risk-red">
                   Stop-work status unknown · can&apos;t load alerts · retrying…
                 </p>
               )}
@@ -161,8 +161,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 <div><dt className="text-xs text-muted">Stop work</dt><dd className={`text-2xl font-bold ${!alertsKnown || alertsStale ? "text-muted" : stopWork ? "text-risk-red" : ""}`}>{alertsKnown ? `${stopWork}${alertsStale ? "?" : ""}` : "—"}</dd></div>
                 <div><dt className="text-xs text-muted">Flood risk</dt><dd className={`text-2xl font-bold ${!alertsKnown || alertsStale ? "text-muted" : counts.flood ? "text-risk-amber" : ""}`}>{alertsKnown ? `${counts.flood}${alertsStale ? "?" : ""}` : "—"}</dd></div>
               </dl>
-              {alertsStale && <p role="status" className="mt-2 text-center text-xs font-medium text-muted">? = last known before the connection was lost</p>}
-              <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>
+              {alertsStale && <p role="status" className="mbs-2 text-center text-xs font-medium text-muted">? = last known before the connection was lost</p>}
+              <p className="mbs-4 text-xs font-medium uppercase tracking-wide text-muted">Stop-work sites first, then highest risk</p>
             </div>
             {/* relative: contains the cards' absolutely positioned screen-reader text, which otherwise escapes
                 the scrolling list and stretches the page (the desktop page scrolled into blank space). */}

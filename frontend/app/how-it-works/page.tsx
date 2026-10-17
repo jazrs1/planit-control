@@ -47,10 +47,10 @@ const BAND_EXAMPLES: HazardIndex[] = [2, 5, 8];
 
 function Section({ id, title, takeaway, children }: { id: string; title: string; takeaway: string; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-4 rounded-card border border-border bg-surface p-4 shadow-card sm:p-6">
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-4 rounded-card border-2 border-rule bg-surface p-4 sm:p-6">
       <h2 id={`${id}-title`} className="text-xl font-bold text-brand">{title}</h2>
-      <p className="mt-1 font-semibold text-text">{takeaway}</p>
-      <div className="mt-4 space-y-4 text-sm leading-relaxed text-text sm:text-base">{children}</div>
+      <p className="mbs-1 font-semibold text-text">{takeaway}</p>
+      <div className="mbs-4 space-y-4 text-sm leading-relaxed text-text sm:text-base">{children}</div>
     </section>
   );
 }
@@ -61,7 +61,7 @@ function Box({ title, children, tone = "plain" }: { title: string; children?: Re
   return (
     <div className={`flex-1 rounded-card border p-3 text-sm ${toneCls}`}>
       <p className="font-semibold">{title}</p>
-      {children && <div className="mt-1 text-xs leading-snug">{children}</div>}
+      {children && <div className="mbs-1 text-xs leading-snug">{children}</div>}
     </div>
   );
 }
@@ -90,13 +90,13 @@ export default async function HowItWorksPage() {
     <main className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-6">
       <header>
         <p className="text-sm font-semibold uppercase tracking-wide text-muted">How it works</p>
-        <h1 className="mt-1 text-2xl font-bold text-brand sm:text-3xl">One honest picture of every job site&apos;s hazards</h1>
-        <p className="mt-2 text-muted">PlanIT Control pulls live hazard data for 55 real Florida power plants, stops work when lightning gets close, and tells supervisors each evening whether tomorrow is go, caution or no-go.</p>
+        <h1 className="mbs-1 pc-title">One honest picture of every job site&apos;s hazards</h1>
+        <p className="mbs-2 text-muted">PlanIT Control pulls live hazard data for 55 real Florida power plants, stops work when lightning gets close, and tells supervisors each evening whether tomorrow is go, caution or no-go.</p>
       </header>
 
-      <aside aria-labelledby="sixty-title" className="rounded-card border-2 border-brand bg-surface p-4 shadow-card">
+      <aside aria-labelledby="sixty-title" className="rounded-card border-2 border-brand bg-surface p-4">
         <h2 id="sixty-title" className="font-bold text-brand">In 60 seconds</h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm sm:text-base">
+        <ul className="mbs-2 list-disc space-y-1 ps-5 text-sm sm:text-base">
           <li><strong>9 data sources</strong>, from satellite lightning every 20 seconds to FEMA flood maps, joined per site.</li>
           <li><strong>Lightning within 10 miles stops work</strong> for 30 minutes, and every new strike restarts the clock. It runs on strike time, so late data can&apos;t end it early.</li>
           <li><strong>A hybrid 0–10 hazard index</strong> for today and tomorrow: a trained weather model plus safety rules for heat, fire and crew reports. Official warnings and lightning stop-work can only raise it.</li>
@@ -107,7 +107,7 @@ export default async function HowItWorksPage() {
 
       <nav aria-label="On this page" className="flex flex-wrap gap-2">
         {SECTIONS.map((s) => (
-          <a key={s.id} href={`#${s.id}`} className="flex min-h-11 items-center rounded-pill border border-border bg-surface px-3 text-sm font-semibold text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">
+          <a key={s.id} href={`#${s.id}`} className="flex min-h-11 items-center rounded-chip border border-border bg-surface px-3 text-sm font-semibold text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand">
             {s.label}
           </a>
         ))}
@@ -132,9 +132,9 @@ export default async function HowItWorksPage() {
       </Section>
 
       <Section id="sources" title="Data sources" takeaway="Nine sources, each checked as often as it actually changes.">
-        <div className="overflow-hidden rounded-card border border-border">
-          <div className="hidden grid-cols-[10rem_1fr_7rem] gap-3 border-b border-border bg-bg px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted sm:grid">
-            <span>Source</span><span>What it gives us</span><span className="text-right">How often</span>
+        <div className="overflow-hidden rounded-card border-2 border-rule">
+          <div className="hidden grid-cols-[10rem_1fr_7rem] gap-3 border-be border-border bg-bg px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted sm:grid">
+            <span>Source</span><span>What it gives us</span><span className="text-end">How often</span>
           </div>
           <ul className="divide-y divide-border">
             {SOURCES.map((s) => (
@@ -144,7 +144,7 @@ export default async function HowItWorksPage() {
                   <p className="text-xs text-muted">{s.from}</p>
                 </div>
                 <p className="text-sm">{s.gives}</p>
-                <p className="text-sm font-semibold text-brand sm:text-right">{s.every}</p>
+                <p className="text-sm font-semibold text-brand sm:text-end">{s.every}</p>
               </li>
             ))}
           </ul>
@@ -153,39 +153,39 @@ export default async function HowItWorksPage() {
       </Section>
 
       <Section id="stop-work" title="Stop-work rule" takeaway="Lightning within 10 miles stops work. The 30-minute countdown restarts with every new strike.">
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>Any flash within <strong>10 miles</strong> of a site starts a stop-work alert.</li>
           <li><strong>All clear = the latest strike + 30 minutes.</strong> Each new strike pushes it later.</li>
           <li>The countdown uses <strong>when the lightning struck</strong>, not when our server read the file, so late or out-of-order satellite data can never shorten it.</li>
           <li>The check runs every 20 seconds <strong>even with no lightning</strong>, because the all-clear is triggered by silence.</li>
         </ul>
 
-        <figure className="rounded-card border border-border bg-bg p-3">
-          <figcaption className="mb-3 text-sm font-semibold">Example: three strikes near one site</figcaption>
+        <figure className="rounded-card border-2 border-rule bg-bg p-3">
+          <figcaption className="mbe-3 text-sm font-semibold">Example: three strikes near one site</figcaption>
           <div className="space-y-3">
             {TIMELINE.map((row) => (
               <div key={row.label} className="grid gap-1 sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-3">
                 <p className="text-xs font-semibold">{row.label}</p>
                 <div>
-                  <div className="relative h-6 rounded-pill bg-surface" aria-hidden="true">
+                  <div className="relative h-6 rounded-chip bg-surface" aria-hidden="true">
                     <div
-                      className={`absolute top-0 h-6 rounded-pill ${row.kind === "late" ? "border-2 border-dashed border-muted bg-bg" : "bg-risk-red"}`}
+                      className={`absolute inset-bs-0 h-6 rounded-chip ${row.kind === "late" ? "border-2 border-dashed border-muted bg-bg" : "bg-risk-red"}`}
                       style={{ left: pct(row.at), width: pct(30) }}
                     />
-                    <span className="absolute top-0 -ml-2 flex h-6 items-center text-sm" style={{ left: pct(row.at) }}>⚡</span>
+                    <span className="absolute inset-bs-0 -ms-2 flex h-6 items-center text-sm" style={{ left: pct(row.at) }}>⚡</span>
                   </div>
-                  <p className={`mt-1 text-xs ${row.kind === "late" ? "text-muted" : "text-risk-red"}`}>{row.note}</p>
+                  <p className={`mbs-1 text-xs ${row.kind === "late" ? "text-muted" : "text-risk-red"}`}>{row.note}</p>
                 </div>
               </div>
             ))}
             <div className="grid gap-1 sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-3">
               <p className="text-xs font-semibold">Result</p>
               <div>
-                <div className="relative h-6 rounded-pill bg-surface" aria-hidden="true">
-                  <div className="absolute top-0 h-6 rounded-pill bg-risk-red" style={{ left: 0, width: pct(42) }} />
-                  <div className="absolute top-0 h-6 rounded-pill bg-risk-green-bg" style={{ left: pct(42), width: pct(AXIS_MIN - 42) }} />
+                <div className="relative h-6 rounded-chip bg-surface" aria-hidden="true">
+                  <div className="absolute inset-bs-0 h-6 rounded-chip bg-risk-red" style={{ left: 0, width: pct(42) }} />
+                  <div className="absolute inset-bs-0 h-6 rounded-chip bg-risk-green-bg" style={{ left: pct(42), width: pct(AXIS_MIN - 42) }} />
                 </div>
-                <p className="mt-1 text-xs font-semibold text-risk-green">One continuous stop-work, 6:00 to 6:42. All clear at 6:42.</p>
+                <p className="mbs-1 text-xs font-semibold text-risk-green">One continuous stop-work, 6:00 to 6:42. All clear at 6:42.</p>
               </div>
             </div>
             <div className="grid sm:grid-cols-[11rem_1fr] sm:gap-3" aria-hidden="true">
@@ -214,16 +214,16 @@ export default async function HowItWorksPage() {
         </div>
 
         <h3 className="text-base font-bold">A hybrid: the highest risk wins</h3>
-        <ol className="list-decimal space-y-1 pl-5">
+        <ol className="list-decimal space-y-1 ps-5">
           <li><strong>The model learns storms and floods</strong> from the forecast, turning its estimated probability into a 0–10 weather score. An index of 7 does not mean a 70% chance.</li>
           <li><strong>Take the highest score</strong> from the model, OSHA heat-index bands, wildfire detections, wildlife and crew reports. A mild forecast can never average away dangerous heat or a reported hazard.</li>
           <li><strong>Official NWS warnings set minimum scores:</strong> at least 9 for a Hurricane Warning, 7 for other supported warnings, and 4 for watches or advisories. Floors only raise a lower score. A nearby downed-line report also sets today&apos;s minimum to 7; our flood-risk alert sets it to 4.</li>
           <li><strong>Lightning stop-work overrides today&apos;s index to at least 9.0.</strong> The stop-work engine runs independently; no model forecast can shorten or clear its wait.</li>
           <li>Tomorrow uses tomorrow&apos;s forecast, peak heat, and watches or warnings in effect then. Today&apos;s crew-report floors, advisories and lightning stop-work do not carry over. If the model cannot score, safety rules still run.</li>
         </ol>
-        {modelInfo && <details className="rounded-card border border-border bg-bg p-3">
+        {modelInfo && <details className="rounded-card border-2 border-rule bg-bg p-3">
           <summary className="cursor-pointer font-semibold text-brand">Hybrid rules from the model service</summary>
-          <p className="mt-2 text-sm text-muted">{modelInfo.hybrid}</p>
+          <p className="mbs-2 text-sm text-muted">{modelInfo.hybrid}</p>
         </details>}
         <ModelExplanation info={modelInfo} />
       </Section>
@@ -239,7 +239,7 @@ export default async function HowItWorksPage() {
             { t: "Reporting bias affects the model.", d: "NOAA records reported events, not every event that happened. Rural sites and nights are under-reported; lightning is usually logged only after damage or injury. Location partly reflects where reports come from, so a low score at a remote site is weaker evidence of a quiet day." },
             { t: "Heat and wildfire cannot be learned reliably from these labels.", d: "Heat reports are too sparse to validate the model's heat predictions, and weather alone captures wildfire poorly without drought or fuel conditions. OSHA heat bands and satellite fire detections supply the safety rules for these hazards." },
           ].map((l) => (
-            <li key={l.t} className="rounded-card border-l-4 border-risk-amber bg-bg p-3">
+            <li key={l.t} className="rounded-card border-s-4 border-risk-amber bg-bg p-3">
               <p className="font-semibold">{l.t}</p>
               <p className="text-sm text-muted">{l.d}</p>
             </li>
@@ -259,7 +259,7 @@ export default async function HowItWorksPage() {
           <Arrow />
           <Box title="Dashboard">Map, alerts, countdowns</Box>
         </div>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li><strong>Why the real pipeline:</strong> it proves the code that protects crews actually works, and it gives exactly the alerts crews would have seen that evening. The alert engine has no clock of its own; it runs on whatever time it&apos;s given.</li>
           <li>Replay alerts are stored separately and <strong>never mix with live ones</strong>. Real lightning keeps being tracked during a replay: real alerts stay on screen next to the replay&apos;s, which are tagged REPLAY.</li>
           <li>After the last file, replay runs 31 quiet simulated minutes so every countdown can finish.</li>

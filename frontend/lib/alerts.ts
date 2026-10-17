@@ -6,6 +6,11 @@ export function formatStrikeDistance(distance: Alert["last_strike_distance_mi"])
   return `${(Math.floor(distance * 10) / 10).toFixed(1)} mi`;
 }
 
+/** Real alerts only. Counts never mix real and replay: replay counts belong on the replay timeline. */
+export function realAlerts(alerts: Alert[]) {
+  return alerts.filter((alert) => !alert.replay);
+}
+
 export function countAlerts(alerts: Alert[]) {
   const lightning = alerts.filter((alert) => alert.type === "lightning").length;
   const flood = alerts.filter((alert) => alert.type === "flood").length;

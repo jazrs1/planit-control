@@ -2,108 +2,286 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "../styles/tokens.css";
 
-/* Expose tokens as Tailwind utilities: bg-surface, text-muted, text-risk-red, rounded-card, ... */
+/* Hover only where a fine pointer hovers, so a tap never leaves a hover state stuck. */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover { @slot; }
+  }
+}
+
+/* Expose tokens as Tailwind utilities: bg-surface, text-muted, bg-risk-red-solid, rounded-card, ... */
 @theme inline {
-  --color-bg: var(--pc-bg);
+  --color-bg: var(--pc-page);
   --color-surface: var(--pc-surface);
+  --color-surface-2: var(--pc-surface-2);
   --color-border: var(--pc-border);
+  --color-rule: var(--pc-rule);
   --color-text: var(--pc-text);
   --color-muted: var(--pc-text-muted);
-  --color-brand: var(--pc-brand);
+  --color-brand: var(--pc-ink);
+  --color-on-brand: var(--pc-on-ink);
+  --color-bar: var(--pc-bar);
+  --color-on-bar: var(--pc-on-bar);
+  --color-bar-muted: var(--pc-bar-muted);
+  --color-notice: var(--pc-notice);
+  --color-on-notice: var(--pc-on-notice);
 
   --color-risk-green: var(--pc-risk-green);
   --color-risk-green-bg: var(--pc-risk-green-bg);
+  --color-risk-green-solid: var(--pc-risk-green-solid);
+  --color-on-risk-green: var(--pc-on-risk-green);
   --color-risk-amber: var(--pc-risk-amber);
   --color-risk-amber-bg: var(--pc-risk-amber-bg);
+  --color-risk-amber-solid: var(--pc-risk-amber-solid);
+  --color-on-risk-amber: var(--pc-on-risk-amber);
   --color-risk-red: var(--pc-risk-red);
   --color-risk-red-bg: var(--pc-risk-red-bg);
+  --color-risk-red-solid: var(--pc-risk-red-solid);
+  --color-on-risk-red: var(--pc-on-risk-red);
   --color-lightning: var(--pc-lightning);
   --color-lightning-ring: var(--pc-lightning-ring);
 
   --radius-card: var(--pc-radius-card);
+  --radius-chip: var(--pc-radius-chip);
   --radius-pill: var(--pc-radius-pill);
   --shadow-card: var(--pc-shadow-card);
+  --shadow-float: var(--pc-shadow-float);
 
   --font-sans: var(--pc-font-sans);
   --font-mono: var(--pc-font-mono);
+  --text-title: var(--pc-text-title);
+  --text-sign: var(--pc-text-sign);
+  --text-timer: var(--pc-text-timer);
+  --ease-out: var(--pc-ease-out);
 }
 
-body {
-  background: var(--pc-bg);
-  color: var(--pc-text);
-  font-family: var(--pc-font-sans);
+@layer base {
+  :root {
+    text-wrap: pretty;
+    overflow-wrap: break-word;
+    font-synthesis: none;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--pc-page);
+    color: var(--pc-text);
+    font-family: var(--pc-font-sans);
+  }
+  h1, h2, h3, h4 { text-wrap: balance; }
+  time, [role="timer"] { font-variant-numeric: tabular-nums; }
+  input, textarea, select { font-size: max(16px, 1rem); }
+  button, a, [role="button"] { touch-action: manipulation; }
+  :focus-visible { outline-color: var(--pc-notice); }
 }
 
+@layer components {
+  /* A label, tag or heading set like a sign legend. Uppercase is only for these, never sentences. */
+  .pc-label {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  /* Page title: a sign header. */
+  .pc-title {
+    font-size: var(--pc-text-title);
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+
+  /* A panel: white with a black rule. The heavy variant is for the crew view. */
+  .pc-panel {
+    background: var(--pc-surface);
+    border: var(--pc-rule-width) solid var(--pc-rule);
+  }
+  .pc-panel--heavy { border-width: var(--pc-rule-heavy); }
+  /* Unknown, last known or no data: dashed and grey, never a safety color. */
+  .pc-panel--unknown {
+    border-style: dashed;
+    border-color: var(--pc-text-muted);
+    color: var(--pc-text-muted);
+  }
+
+  /* Status tags. Solid only for what a crew must act on (stop work, flood risk). */
+  .pc-chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.25em 0.45em 0.15em;
+    border-radius: var(--pc-radius-chip);
+    font-size: 0.6875rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .pc-chip--stop { background: var(--pc-risk-red-solid); color: var(--pc-on-risk-red); }
+  .pc-chip--flood { background: var(--pc-risk-amber-solid); color: var(--pc-on-risk-amber); }
+  .pc-chip--clear { background: var(--pc-risk-green-solid); color: var(--pc-on-risk-green); }
+  .pc-chip--replay { background: var(--pc-notice); color: var(--pc-on-notice); }
+  /* A heads-up, not an order: amber dashed outline on white. */
+  .pc-chip--approach {
+    background: var(--pc-surface);
+    color: var(--pc-risk-amber);
+    outline: 2px dashed var(--pc-risk-amber-solid);
+    outline-offset: -2px;
+  }
+  .pc-chip--quiet { background: var(--pc-surface-2); color: var(--pc-text); }
+  .pc-chip--unknown {
+    background: transparent;
+    color: var(--pc-text-muted);
+    outline: 1.5px dashed currentColor;
+    outline-offset: -1.5px;
+  }
+
+  /* Buttons */
+  .pc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    min-block-size: 2.75rem;
+    padding-inline: 1rem;
+    border: var(--pc-rule-width) solid var(--pc-rule);
+    border-radius: var(--pc-radius-card);
+    background: var(--pc-surface);
+    color: var(--pc-text);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .pc-btn > svg { flex: none; inline-size: 1.1em; block-size: 1.1em; }
+  .pc-btn--primary { background: var(--pc-ink); border-color: var(--pc-ink); color: var(--pc-on-ink); }
+  .pc-btn--danger { color: var(--pc-risk-red); border-color: var(--pc-risk-red); }
+  .pc-btn--large { min-block-size: 4rem; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
+  .pc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pc-btn:not(:disabled):active { scale: 0.97; }
+  .pc-btn:focus-visible { outline: 3px solid var(--pc-notice); outline-offset: 2px; }
+  @media (hover: hover) and (pointer: fine) {
+    .pc-btn:not(:disabled):hover { background: var(--pc-surface-2); }
+    .pc-btn--primary:not(:disabled):hover { background: color-mix(in oklch, var(--pc-ink), var(--pc-surface) 18%); }
+    .pc-btn--danger:not(:disabled):hover { background: var(--pc-risk-red-bg); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pc-btn { transition: scale 140ms var(--pc-ease-out), background-color 140ms var(--pc-ease-out); }
+  }
+
+  /* Risk shapes, so the band reads without color: circle low, triangle elevated, diamond high,
+     octagon stop work. */
+  .pc-shape {
+    display: inline-block;
+    flex: none;
+    inline-size: 0.85em;
+    block-size: 0.85em;
+    background: var(--pc-shape, currentColor);
+  }
+  .pc-shape--green { --pc-shape: var(--pc-risk-green-solid); border-radius: 50%; }
+  .pc-shape--amber { --pc-shape: var(--pc-risk-amber-solid); clip-path: polygon(50% 3%, 100% 97%, 0 97%); inline-size: 0.95em; }
+  .pc-shape--red { --pc-shape: var(--pc-risk-red-solid); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); inline-size: 1em; block-size: 1em; }
+  .pc-shape--stop { --pc-shape: var(--pc-risk-red-solid); clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); inline-size: 1em; block-size: 1em; }
+  .pc-shape--unknown { --pc-shape: var(--pc-text-muted); border-radius: 50%; opacity: 0.6; }
+}
+
+/* ---------- Map markers (DOM elements made by SiteMap and ReportMap) ---------- */
+
+/* The button stays square so its focus ring isn't clipped; the shape inside carries the risk. */
 .site-marker {
-  width: 22px;
-  height: 22px;
-  border: 3px solid var(--pc-surface);
-  border-radius: var(--pc-radius-pill);
-  background: var(--site-risk);
+  display: grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
-  box-shadow: var(--pc-shadow-card);
+  font-size: 17px;
 }
-.site-marker--green { --site-risk: var(--pc-risk-green); }
-.site-marker--amber { --site-risk: var(--pc-risk-amber); }
-.site-marker--red { --site-risk: var(--pc-risk-red); }
+.site-marker .pc-shape {
+  filter:
+    drop-shadow(1.5px 0 0 var(--pc-rule)) drop-shadow(-1.5px 0 0 var(--pc-rule))
+    drop-shadow(0 1.5px 0 var(--pc-rule)) drop-shadow(0 -1.5px 0 var(--pc-rule));
+}
 .site-marker[aria-pressed="true"], .site-marker:focus-visible {
-  outline: 3px solid var(--pc-brand);
-  outline-offset: 4px;
+  outline: 3px solid var(--pc-notice);
+  outline-offset: 2px;
   z-index: 2;
 }
+.site-marker:active .pc-shape { scale: 0.92; }
+/* A real lightning stop-work: a red halo, pulsing only for people who allow motion. */
 .site-marker--lightning::after {
   content: "";
   position: absolute;
-  inset: -7px;
-  border: 2px solid var(--pc-risk-red);
+  inset: -6px;
+  border: 2px solid var(--pc-risk-red-solid);
   border-radius: var(--pc-radius-pill);
-  animation: lightning-pulse 1.8s ease-out infinite;
   pointer-events: none;
 }
 @keyframes lightning-pulse {
   from { scale: 0.8; opacity: 1; }
-  to { scale: 1.7; opacity: 0; }
+  to { scale: 1.6; opacity: 0; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .site-marker--lightning::after { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .site-marker--lightning::after { animation: lightning-pulse 1.8s var(--pc-ease-out) infinite; }
 }
+
+/* A replay stop-work: dashed blue ring, still. Never the real red halo. */
+.site-marker--replay::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 2px dashed var(--pc-notice);
+  border-radius: var(--pc-radius-pill);
+  pointer-events: none;
+}
+.site-marker[hidden] { display: none; }
 
 /* Three brief flashes make a new lightning strike visible without constant motion. */
 @keyframes stop-work-reset {
   50% {
     background-color: var(--pc-risk-red-bg);
-    box-shadow: 0 0 0 3px var(--pc-risk-red);
+    box-shadow: 0 0 0 3px var(--pc-risk-red-solid);
   }
 }
-
-.stop-work-reset {
-  animation: stop-work-reset 400ms ease-in-out 3;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stop-work-reset {
-    animation: none;
-    outline: 2px solid var(--pc-risk-red);
-  }
+.stop-work-reset { outline: 2px solid var(--pc-risk-red-solid); }
+@media (prefers-reduced-motion: no-preference) {
+  .stop-work-reset { outline: 0; animation: stop-work-reset 400ms ease-in-out 3; }
 }
 
 .report-marker {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  inline-size: 44px;
+  block-size: 44px;
   border: 3px solid var(--pc-surface);
   border-radius: var(--pc-radius-pill);
-  background: var(--pc-risk-red);
-  color: var(--pc-surface);
-  font-weight: 700;
+  background: var(--pc-risk-red-solid);
+  color: var(--pc-on-risk-red);
+  font-weight: 800;
   font-size: 20px;
-  box-shadow: var(--pc-shadow-card);
+  box-shadow: 0 0 0 2px var(--pc-rule);
   cursor: pointer;
 }
-.report-marker--draft { background: var(--pc-brand); }
+.report-marker--draft { background: var(--pc-ink); color: var(--pc-on-ink); }
 .report-marker[aria-pressed="true"], .report-marker:focus-visible {
-  outline: 3px solid var(--pc-brand);
+  outline: 3px solid var(--pc-notice);
   outline-offset: 3px;
 }
+
+/* MapLibre controls in the Signal style */
+.maplibregl-ctrl-group:not(:empty) {
+  border-radius: 0;
+  box-shadow: none;
+  border: var(--pc-rule-width) solid var(--pc-rule);
+}
+.maplibregl-ctrl-attrib { font-family: var(--pc-font-sans); }

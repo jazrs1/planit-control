@@ -80,7 +80,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
     : "Tomorrow's briefing";
 
   return (
-    <article className={`flex flex-col gap-3 rounded-card border bg-surface p-4 shadow-card ${b && !uncertain ? "border-border" : "border-dashed border-border"}`}>
+    <article className={`flex flex-col gap-3 rounded-card border bg-surface p-4 ${b && !uncertain ? "border-border" : "border-dashed border-border"}`}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="break-words text-base font-semibold text-text">{title}</h2>
@@ -94,7 +94,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
         </div>
         {b && (
           <span
-            className={`shrink-0 rounded-pill px-3 py-1 text-sm font-bold uppercase tracking-wide ${go && !uncertain ? GO_STYLE[go] : "bg-bg text-muted"}`}
+            className={`shrink-0 rounded-chip px-3 py-1 text-sm font-bold uppercase tracking-wide ${go && !uncertain ? GO_STYLE[go] : "bg-bg text-muted"}`}
             aria-label={go ? `${GO_LABEL[go]}${uncertain ? ", may be out of date" : ""}` : "No go / no-go decision"}
           >
             {go ? `${GO_LABEL[go]}${uncertain ? "?" : ""}` : "No decision"}
@@ -116,13 +116,13 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
               {b.risks && b.risks.length > 0 && (
                 <section>
                   <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Top risks</h3>
-                  <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm">{b.risks.map((r, i) => <li key={i}>{r}</li>)}</ol>
+                  <ol className="mbs-1 list-decimal space-y-1 ps-5 text-sm">{b.risks.map((r, i) => <li key={i}>{r}</li>)}</ol>
                 </section>
               )}
               {b.actions && b.actions.length > 0 && (
                 <section>
                   <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Actions</h3>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">{b.actions.map((a, i) => <li key={i}>{a}</li>)}</ul>
+                  <ul className="mbs-1 list-disc space-y-1 ps-5 text-sm">{b.actions.map((a, i) => <li key={i}>{a}</li>)}</ul>
                 </section>
               )}
             </>
@@ -141,7 +141,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
                     {missing || v === undefined
                       ? <span className="text-muted" title="No live data behind this number">—<span className="sr-only">no live data</span></span>
                       : key === "hazard_index"
-                        ? <span className={`whitespace-nowrap rounded-pill px-2 ${uncertain ? "" : RISK_BADGE[riskLevel(v)]}`}>{keyValue(key, v)}</span>
+                        ? <span className={`whitespace-nowrap rounded-chip px-2 ${uncertain ? "" : RISK_BADGE[riskLevel(v)]}`}>{keyValue(key, v)}</span>
                         : keyValue(key, v)}
                   </dd>
                 </div>
@@ -157,13 +157,13 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
           {structured && (
             <details className="text-sm">
               <summary className="cursor-pointer text-brand">Full briefing text</summary>
-              <p className="mt-1 whitespace-pre-wrap">{b.text}</p>
+              <p className="mbs-1 whitespace-pre-wrap">{b.text}</p>
             </details>
           )}
         </div>
       )}
 
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted">
+      <footer className="mbs-auto flex flex-wrap items-center justify-between gap-2 border-bs border-border pbs-3 text-xs text-muted">
         <p>
           {b ? (
             <>
@@ -177,7 +177,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
           ) : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
         </p>
         {onRegenerate && entry.kind !== "loading" && (
-          <button type="button" disabled={busy} onClick={() => void regenerate()} className="min-h-11 rounded-card border border-border px-3 text-sm font-semibold text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => void regenerate()} className="min-h-11 rounded-card border-2 border-rule px-3 text-sm font-semibold text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50">
             {busy ? "Regenerating…" : entry.kind === "briefing" ? "Regenerate" : "Generate now"}
           </button>
         )}

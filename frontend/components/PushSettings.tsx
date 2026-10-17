@@ -24,16 +24,16 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
   const missing = chosen.filter(site_id => !sites?.some(site => site.id === site_id));
   const control = "min-h-12 rounded-card border border-border px-3 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50";
 
-  return <section aria-labelledby={`${id}-title`} className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-card">
+  return <section aria-labelledby={`${id}-title`} className="space-y-3 rounded-card border-2 border-rule bg-surface p-4">
     <h2 id={`${id}-title`} className="text-lg font-bold text-brand">Get alerts on this device</h2>
     <p className="text-sm text-muted">Stop-work, approaching lightning, flood alerts and evening briefings for your sites. The role is saved for your device; both roles currently receive the same events.</p>
-    {push.iphoneHint && <p className="rounded-card border border-border bg-bg p-3 text-sm font-semibold">On iPhone Safari, use Share → Add to Home Screen, then open the installed app. Alerts require iOS 16.4 or later.</p>}
-    <details open={!compact} className="rounded-card border border-border bg-bg p-3">
+    {push.iphoneHint && <p className="rounded-card border-2 border-rule bg-bg p-3 text-sm font-semibold">On iPhone Safari, use Share → Add to Home Screen, then open the installed app. Alerts require iOS 16.4 or later.</p>}
+    <details open={!compact} className="rounded-card border-2 border-rule bg-bg p-3">
       <summary className="cursor-pointer font-semibold text-brand">Sites and role · {all ? "All sites" : `${chosen.length} selected`} · {role === "crew" ? "Crew" : "Supervisor"}</summary>
-      <fieldset disabled={disabled} className="mt-3 space-y-3">
+      <fieldset disabled={disabled} className="mbs-3 space-y-3">
         <legend className="sr-only">Alert preferences</legend>
         <label htmlFor={`${id}-role`} className="block text-sm font-semibold">Your role
-          <select id={`${id}-role`} value={role} onChange={event => setRole(event.target.value as PushRole)} className="mt-1 min-h-12 w-full rounded-card border border-border bg-surface px-3 text-text">
+          <select id={`${id}-role`} value={role} onChange={event => setRole(event.target.value as PushRole)} className="mbs-1 min-h-12 w-full rounded-card border-2 border-rule bg-surface px-3 text-text">
             <option value="crew">Crew</option><option value="supervisor">Supervisor</option>
           </select>
         </label>
@@ -41,7 +41,7 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
           <legend className="text-sm font-semibold">Sites to follow</legend>
           <label className="flex min-h-11 items-center gap-2"><input type="radio" name={`${id}-scope`} checked={all} onChange={() => setAll(true)} />All sites</label>
           <label className="flex min-h-11 items-center gap-2"><input type="radio" name={`${id}-scope`} checked={!all} onChange={() => setAll(false)} />Choose sites</label>
-          {!all && <div className="max-h-52 overflow-y-auto rounded-card border border-border bg-surface p-2">
+          {!all && <div className="max-h-52 overflow-y-auto rounded-card border-2 border-rule bg-surface p-2">
             {choices.map(site => <label key={site.id} className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={chosen.includes(site.id)} onChange={event => setChosen(previous => event.target.checked ? [...new Set([...previous, site.id])] : previous.filter(site_id => site_id !== site.id))} />{site.name}</label>)}
             {missing.map(site_id => <label key={site_id} className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" checked onChange={() => setChosen(previous => previous.filter(value => value !== site_id))} />{site_id} · site name unavailable</label>)}
             {sites === null && <p className="p-2 text-sm text-muted">Site list unavailable. Retry loading sites or choose All sites.</p>}
@@ -53,12 +53,12 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
       </fieldset>
     </details>
     <div className="flex flex-wrap gap-2">
-      <button type="button" disabled={disabled || !valid} onClick={() => void push.enable({ site_ids: all ? null : chosen, role })} className={`${control} bg-brand text-surface`}>{push.busy ? "Please wait…" : push.phase === "registered" ? "Save alert preferences" : "Get alerts on this device"}</button>
+      <button type="button" disabled={disabled || !valid} onClick={() => void push.enable({ site_ids: all ? null : chosen, role })} className={`${control} bg-brand text-on-brand`}>{push.busy ? "Please wait…" : push.phase === "registered" ? "Save alert preferences" : "Get alerts on this device"}</button>
       <button type="button" disabled={disabled || push.phase !== "registered"} onClick={() => void push.sendTest()} className={control}>Send test notification</button>
       {push.canUnsubscribe && <button type="button" disabled={push.busy || demo} onClick={() => void push.unsubscribe()} className={control}>Unsubscribe</button>}
     </div>
     <p role="status" className="text-sm font-medium text-muted">{push.message}</p>
     {!demo && connection.level !== "online" && push.phase === "registered" && <p role="status" className="text-sm font-semibold text-muted">? Last confirmed registration · server connection lost.</p>}
-    <p className="rounded-card border-l-4 border-risk-amber bg-bg p-3 text-sm text-muted"><strong>Notifications can be delayed, arrive out of order, or never arrive.</strong> No notification does not mean all clear. Check the app&apos;s current alerts and follow your site&apos;s safety procedures.</p>
+    <p className="rounded-card border-s-4 border-risk-amber bg-bg p-3 text-sm text-muted"><strong>Notifications can be delayed, arrive out of order, or never arrive.</strong> No notification does not mean all clear. Check the app&apos;s current alerts and follow your site&apos;s safety procedures.</p>
   </section>;
 }

@@ -94,16 +94,23 @@ function nav(alerts, status = "live") {
 }
 
 test("navigation breaks down alert types and chooses amber for flood-only alerts", () => {
-  assert.match(nav([flood]), /bg-risk-amber-bg/);
-  assert.doesNotMatch(nav([flood]), /bg-risk-red-bg/);
+  assert.match(nav([flood]), /bg-risk-amber-solid/);
+  assert.doesNotMatch(nav([flood]), /bg-risk-red/);
   assert.match(nav([flood]), /0 stop work · 1 flood risk/);
   assert.match(nav([lightning, flood]), /1 stop work · 1 flood risk/);
   assert.match(nav([lightning, flood]), /Alerts, 2 active/);
-  assert.match(nav([lightning, flood]), /bg-risk-red-bg/);
+  assert.match(nav([lightning, flood]), /bg-risk-red-solid/);
   assert.match(nav(null, "unreachable"), /— stop work · — flood risk/);
   assert.match(nav([flood], "stale"), /0\? stop work · 1\? flood risk/);
-  assert.doesNotMatch(nav([flood], "stale"), /bg-risk-amber-bg/);
+  assert.doesNotMatch(nav([flood], "stale"), /bg-risk-amber/);
   assert.match(nav([flood], "demo"), /Demo data/);
+});
+
+test("navigation counts never include replay alerts", () => {
+  const replayed = { ...lightning, id: "replay-1", replay: true };
+  assert.match(nav([flood, replayed]), /0 stop work · 1 flood risk/);
+  assert.match(nav([flood, replayed]), /Alerts, 1 active/);
+  assert.doesNotMatch(nav([flood, replayed]), /bg-risk-red/);
 });
 
 test("flood reason does not repeat the FLOOD RISK label", () => {

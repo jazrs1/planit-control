@@ -93,12 +93,12 @@ export default function ReportMap({ reports, pin, onPin, selectedId, onSelect }:
 
   return (
     <div className="relative">
-      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card border border-border sm:h-96" />
-      {error && <p role="status" className="absolute top-3 left-3 max-w-56 rounded-card border border-border bg-surface p-2 text-sm text-muted">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
+      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card border-2 border-rule sm:h-96" />
+      {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-56 rounded-card border-2 border-rule bg-surface p-2 text-sm text-muted">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
       {onPin && <button type="button" disabled={!ready} onClick={() => {
         const center = map.current?.getCenter().wrap();
         if (center) onPin({ lat: center.lat, lon: center.lng });
-      }} className="mt-2 min-h-11 rounded-card border border-border bg-surface px-4 text-sm font-semibold text-brand disabled:opacity-50">Use map center as pin</button>}
+      }} className="mbs-2 min-h-11 rounded-card border-2 border-rule bg-surface px-4 text-sm font-semibold text-brand disabled:opacity-50">Use map center as pin</button>}
     </div>
   );
 }

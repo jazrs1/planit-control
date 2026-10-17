@@ -57,14 +57,14 @@ export default function ReplayControl() {
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       {running && offline ? (
         <p role="status" className="flex flex-wrap items-center gap-x-2 text-muted">
-          <span className="rounded-pill bg-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">Replay: last known</span>
+          <span className="rounded-chip bg-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">Replay: last known</span>
           <span className="font-mono tabular-nums">{replay?.simulated_now ? formatSimulated(Date.parse(replay.simulated_now)) : "--"}</span>
           <span>simulated time when last seen · status unknown until the server answers</span>
         </p>
       ) : running ? (
         <>
           <p role="status" className="flex flex-wrap items-center gap-x-2">
-            <span className="rounded-pill bg-risk-amber-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-risk-amber">Replay running</span>
+            <span className="rounded-chip bg-risk-amber-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-risk-amber">Replay running</span>
             <span className="font-mono tabular-nums">{now === null ? "--" : formatSimulated(now)}</span>
             <span className="text-muted">
               simulated · {replay?.speed}× · {replay?.files_done}/{replay?.files_total} files · {replay?.flashes_ingested.toLocaleString()} flashes
@@ -80,7 +80,7 @@ export default function ReplayControl() {
           disabled={busy || unavailable}
           onClick={() => void run(() => startReplay())}
           title={unavailable ? "Needs a connection to the server" : "Play a recorded storm through the live pipeline on a simulated clock"}
-          className="min-h-11 rounded-card bg-brand px-3 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          className="min-h-11 rounded-card bg-brand px-3 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >
           {busy ? "Starting…" : "⚡ Replay storm"}
         </button>

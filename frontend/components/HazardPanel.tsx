@@ -8,10 +8,12 @@ import { formatAgo, formatSiteDateTime } from "@/lib/time";
 // required numbers from a placeholder, so this panel only shows detail rows when the card is live:
 // hazard_status is set and (for polled sources) as_of is set.
 
-const STATUS_STYLES: Record<HazardStatus, { chip: string; border: string; label: string }> = {
-  ok: { chip: "bg-risk-green-bg text-risk-green", border: "border-border", label: "OK" },
-  watch: { chip: "bg-risk-amber-bg text-risk-amber", border: "border-risk-amber", label: "Watch" },
-  danger: { chip: "bg-risk-red-bg text-risk-red", border: "border-risk-red", label: "Danger" },
+// Signal: the card is white with a black rule; the status is a sign band across the top. Danger is
+// the only solid red, watch is solid amber (black type), OK is a quiet green band.
+const STATUS_STYLES: Record<HazardStatus, { band: string; label: string }> = {
+  ok: { band: "bg-risk-green-bg text-risk-green", label: "OK" },
+  watch: { band: "bg-risk-amber-solid text-on-risk-amber", label: "Watch" },
+  danger: { band: "bg-risk-red-solid text-on-risk-red", label: "Danger" },
 };
 
 /** A detail row; a null value renders as an unknown "—", never as zero or "none". */
@@ -47,11 +49,11 @@ export default function HazardPanel({ title, card, rows, freshness, timeZone, no
   const style = status === null ? null : STATUS_STYLES[status];
 
   return (
-    <article className={`flex flex-col gap-3 rounded-card border bg-surface p-4 shadow-card ${style && !uncertain ? style.border : "border-dashed border-border"}`}>
-      <header className="flex items-start justify-between gap-3">
-        <h2 className="text-base font-semibold text-text">{title}</h2>
+    <article className={`flex flex-col gap-3 border-2 bg-surface p-4 pbs-0 ${style && !uncertain ? "border-rule" : "border-dashed border-muted"}`}>
+      <header className={`-mx-4 flex min-h-9 items-center justify-between gap-3 px-4 ${style && !uncertain ? style.band : "border-be-2 border-dashed border-muted text-muted"}`}>
+        <h2 className="pc-label truncate text-xs">{title}</h2>
         <span
-          className={`shrink-0 rounded-pill px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${style && !uncertain ? style.chip : "bg-bg text-muted"}`}
+          className="pc-label shrink-0 text-xs"
           aria-label={status === null ? `${title}: no data` : `${title}: ${style!.label}${uncertain ? ", may be out of date" : ""}`}
         >
           {status === null ? "No data" : `${style!.label}${uncertain ? "?" : ""}`}
@@ -67,7 +69,7 @@ export default function HazardPanel({ title, card, rows, freshness, timeZone, no
           {rows.map((row) => (
             <div key={row.label} className="contents">
               <dt className="text-muted">{row.label}</dt>
-              <dd className="text-right font-medium tabular-nums">
+              <dd className="text-end font-semibold tabular-nums">
                 {row.value ?? <span className="text-muted" title="Not available">—<span className="sr-only">not available</span></span>}
               </dd>
             </div>
@@ -77,7 +79,7 @@ export default function HazardPanel({ title, card, rows, freshness, timeZone, no
 
       {live && children}
 
-      <p className="mt-auto text-xs text-muted">
+      <p className="mbs-auto text-xs text-muted">
         {freshness.kind === "live"
           ? status === null ? "No live reading" : connectionLost ? "Last known before the connection was lost" : "Live"
           : asOf === null

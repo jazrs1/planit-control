@@ -57,11 +57,11 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
           : `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
   return (
-    <div className={`rounded-card px-3 py-2 ${cleared ? "bg-risk-green-bg text-risk-green" : "bg-surface text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
-      <span className="block text-xs font-medium">
+    <div className={`${prominent ? "px-4 py-3" : "border-2 border-current px-3 py-2"} ${cleared ? "bg-risk-green-bg text-risk-green" : "bg-surface text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+      <span className="pc-label block">
         {target === null ? "Stop-work status" : "All-clear countdown"}
       </span>
-      <span role="timer" aria-live="off" className={`block font-mono ${prominent ? "text-4xl" : "text-2xl"} font-bold tabular-nums`}>
+      <span role="timer" aria-live="off" className={`block font-mono ${prominent ? "text-timer leading-none" : "text-2xl leading-tight"} font-bold tabular-nums`}>
         {label}
       </span>
       <span role="status" className={resetting || unconfirmed ? "block text-sm font-semibold" : "sr-only"}>

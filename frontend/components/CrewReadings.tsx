@@ -14,9 +14,9 @@ function Reading({ title, card, value, children, stale, timezone }: { title: str
   const known = hasReading(card);
   return <article className={`min-w-0 rounded-card border p-4 ${stale || !known ? "border-border bg-surface text-muted" : COLORS[card!.hazard_status!]}`}>
     <h3 className="font-semibold">{title}</h3>
-    <p className="mt-2 break-words text-3xl font-bold leading-tight tabular-nums">{known ? value : "No data"}{known && stale ? " ?" : ""}</p>
-    {known && <div className="mt-2 space-y-1 text-sm font-medium">{children}</div>}
-    {known && card?.as_of && <p className="mt-3 text-xs">{stale ? "Not confirmed · " : "Updated "}{formatAlertTime(card.as_of, timezone)}</p>}
+    <p className="mbs-2 break-words text-3xl font-bold leading-tight tabular-nums">{known ? value : "No data"}{known && stale ? " ?" : ""}</p>
+    {known && <div className="mbs-2 space-y-1 text-sm font-medium">{children}</div>}
+    {known && card?.as_of && <p className="mbs-3 text-xs">{stale ? "Not confirmed · " : "Updated "}{formatAlertTime(card.as_of, timezone)}</p>}
   </article>;
 }
 
@@ -26,8 +26,8 @@ export default function CrewReadings({ detail, stale }: { detail: SiteDetail | n
   const finite = (value: number | null | undefined, decimals: number, unit: string) => value !== null && value !== undefined && Number.isFinite(value) ? `${value.toFixed(decimals)} ${unit}` : "No data";
   const timezone = detail?.timezone ?? "UTC";
   return <section aria-labelledby="readings-heading" className={stale ? "grayscale" : ""}>
-    <h2 id="readings-heading" className="mb-3 text-xl font-bold">Today&apos;s key readings</h2>
-    {stale && <p role="status" className="mb-3 font-semibold text-muted">Readings not confirmed · showing the last real readings.</p>}
+    <h2 id="readings-heading" className="mbe-3 text-xl font-bold">Today&apos;s key readings</h2>
+    {stale && <p role="status" className="mbe-3 font-semibold text-muted">Readings not confirmed · showing the last real readings.</p>}
     <div className="grid grid-cols-2 gap-3">
       <Reading title="Heat index" card={heat} stale={stale} timezone={timezone} value={finite(heat?.heat_index_f, 0, "°F")}>
         {/* risk_band is for today's whole-day peak; the card's color is the rest of today. */}

@@ -162,12 +162,12 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
 
   if (!data) {
     return (
-      <section role="status" className="space-y-3 rounded-card border border-border bg-surface p-4">
+      <section role="status" className="space-y-3 rounded-card border-2 border-rule bg-surface p-4">
         <h2 className="font-semibold">Can&apos;t reach the server</h2>
         <p className="text-sm text-muted">Tomorrow&apos;s briefings are unknown. This does not mean conditions are safe. Retrying every 5 seconds.</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void refresh()} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
-          <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border border-border px-4 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
+          <button type="button" onClick={() => void refresh()} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
+          <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border-2 border-rule px-4 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
         </div>
       </section>
     );
@@ -176,7 +176,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
   return (
     <div className="space-y-4">
       {demo && (
-        <div role="status" className="rounded-card border border-border bg-surface p-3 text-sm text-muted">
+        <div role="status" className="rounded-card border-2 border-rule bg-surface p-3 text-sm text-muted">
           <strong>Demo data</strong> · Sample briefings from shared/mocks, not live conditions.
           <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 font-semibold text-brand underline">Exit demo</button>
         </div>
@@ -195,7 +195,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
               type="button"
               aria-pressed={filter === f}
               onClick={() => setFilter(f)}
-              className={`min-h-11 rounded-pill border px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-brand ${filter === f ? (f === "all" ? "border-brand bg-brand text-surface" : `border-transparent ${GO_STYLE[f]} ring-2 ring-brand`) : "border-border bg-surface text-text"}`}
+              className={`min-h-11 rounded-chip border px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-brand ${filter === f ? (f === "all" ? "border-brand bg-brand text-surface" : `border-transparent ${GO_STYLE[f]} ring-2 ring-brand`) : "border-border bg-surface text-text"}`}
             >
               {f === "all" ? "All" : GO_LABEL[f]} <span className="tabular-nums">({counts[f]}{connectionLost ? "?" : ""})</span>
             </button>
@@ -205,11 +205,11 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
           confirming ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span>Regenerate tomorrow&apos;s briefing for all {data.sites.length} sites? This replaces the stored ones.</span>
-              <button type="button" onClick={() => void sendAll()} className="min-h-11 rounded-card bg-brand px-3 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Yes, send now</button>
-              <button type="button" onClick={() => setConfirming(false)} className="min-h-11 rounded-card border border-border px-3 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Cancel</button>
+              <button type="button" onClick={() => void sendAll()} className="min-h-11 rounded-card bg-brand px-3 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Yes, send now</button>
+              <button type="button" onClick={() => setConfirming(false)} className="min-h-11 rounded-card border-2 border-rule px-3 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Cancel</button>
             </div>
           ) : (
-            <button type="button" disabled={sending} onClick={() => setConfirming(true)} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50">
+            <button type="button" disabled={sending} onClick={() => setConfirming(true)} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50">
               {sending ? "Sending…" : "Send briefings now"}
             </button>
           )
@@ -229,7 +229,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
       </p>
 
       {shown.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface p-4 text-muted">No sites match this filter.</p>
+        <p className="rounded-card border-2 border-rule bg-surface p-4 text-muted">No sites match this filter.</p>
       ) : (
         <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {shown.map(({ site, entry }) => (
