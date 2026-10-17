@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Overpass, Overpass_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { APP_COLORS } from "@/lib/branding";
-import { APP_DESCRIPTION, APP_NAME, pageMetadata } from "@/lib/metadata";
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, pageMetadata } from "@/lib/metadata";
 import { AlertsProvider } from "@/components/AlertsProvider";
 import { PushProvider } from "@/components/PushProvider";
 import OutageShell from "@/components/OutageShell";
@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const forwardedProtocol = requestHeaders.get("x-forwarded-proto")?.split(",")[0].trim();
   const protocol = forwardedProtocol === "http" || forwardedProtocol === "https" ? forwardedProtocol : host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
   return {
-    ...pageMetadata(APP_NAME, APP_DESCRIPTION),
+    ...pageMetadata(APP_NAME, APP_DESCRIPTION, { title: APP_NAME, description: APP_TAGLINE }),
     metadataBase: new URL(`${protocol}://${host}`),
     title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
     applicationName: APP_NAME,
