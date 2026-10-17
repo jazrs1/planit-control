@@ -354,6 +354,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         </HazardPanel>
       </section>
 
+      <div id="site-briefing" className="scroll-mt-4" />
       <BriefingCard
         siteId={detail.id}
         siteName={detail.name}

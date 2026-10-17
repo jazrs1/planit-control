@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Alert } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 
-export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_clear_at">) {
+export default function StopWorkCountdown({ all_clear_at, prominent = false }: Pick<Alert, "all_clear_at"> & { prominent?: boolean }) {
   // Start with a placeholder so the server and hydration render agree.
   const [now, setNow] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
@@ -38,7 +38,7 @@ export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_cle
   const seconds = target !== null && Number.isFinite(target) && now !== null
     ? Math.max(0, Math.ceil((target - now) / 1000))
     : null;
-  const unconfirmed = seconds === 0 && offline;
+  const unconfirmed = offline;
   const cleared = seconds === 0 && !offline;
   const label = target === null
     ? "Awaiting all-clear"
@@ -57,7 +57,7 @@ export default function StopWorkCountdown({ all_clear_at }: Pick<Alert, "all_cle
       <span className="block text-xs font-medium">
         {target === null ? "Stop-work status" : "All-clear countdown"}
       </span>
-      <span role="timer" aria-live="off" className="block font-mono text-2xl font-bold tabular-nums">
+      <span role="timer" aria-live="off" className={`block font-mono ${prominent ? "text-4xl" : "text-2xl"} font-bold tabular-nums`}>
         {label}
       </span>
       <span role="status" className={resetting || unconfirmed ? "block text-sm font-semibold" : "sr-only"}>
