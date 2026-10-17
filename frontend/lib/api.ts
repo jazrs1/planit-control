@@ -1,4 +1,4 @@
-import type { Alert, Site } from "@shared/types";
+import type { Alert, ReplayStatus, Site } from "@shared/types";
 import mockAlerts from "@shared/mocks/alerts.json";
 import mockSites from "@shared/mocks/sites.json";
 
@@ -24,3 +24,5 @@ async function get<T>(path: string, fallback: unknown, { fallbackToMocks = true 
 
 export const getSites = (options?: GetOptions) => get<Site[]>("/sites", mockSites, options);
 export const getAlerts = (options?: GetOptions) => get<Alert[]>("/alerts", mockAlerts, options);
+/** Never falls back to mocks: the mock describes a running replay. */
+export const getReplayStatus = () => get<ReplayStatus>("/replay/status", null, { fallbackToMocks: false });

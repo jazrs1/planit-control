@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Alert, Site } from "@shared/types";
+import type { Site } from "@shared/types";
+import { useAlerts } from "@/components/AlertsProvider";
 import SiteCard from "@/components/SiteCard";
 import SiteMap from "@/components/SiteMap";
-import { getAlerts, getSites } from "@/lib/api";
+import { getSites } from "@/lib/api";
 import { riskLevel } from "@/lib/risk";
 
-export default function SupervisorDashboard({ initialSites, initialAlerts }: { initialSites: Site[]; initialAlerts: Alert[] }) {
+export default function SupervisorDashboard({ initialSites }: { initialSites: Site[] }) {
   const [sites, setSites] = useState(initialSites);
-  const [alerts, setAlerts] = useState(initialAlerts);
+  // Same alerts as the nav badge and /alerts (AlertsProvider), so the counts always agree.
+  const alerts = useAlerts();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [staleSince, setStaleSince] = useState<Date | null>(null);
   const rows = useRef(new Map<string, HTMLLIElement>());
@@ -19,8 +21,8 @@ export default function SupervisorDashboard({ initialSites, initialAlerts }: { i
     const timer = window.setInterval(async () => {
       try {
         // No mock fallback here: if the backend is down, keep the last real data and say so.
-        const [nextSites, nextAlerts] = await Promise.all([getSites({ fallbackToMocks: false }), getAlerts({ fallbackToMocks: false })]);
-        if (active) { setSites(nextSites); setAlerts(nextAlerts); setStaleSince(null); lastGood = new Date(); }
+        const nextSites = await getSites({ fallbackToMocks: false });
+        if (active) { setSites(nextSites); setStaleSince(null); lastGood = new Date(); }
       } catch {
         if (active) setStaleSince(lastGood);
       }
@@ -35,9 +37,9 @@ export default function SupervisorDashboard({ initialSites, initialAlerts }: { i
     rows.current.get(id)?.scrollIntoView({ block: "nearest" });
   }, []);
   return (
-    <main className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
+    <main className="flex min-h-[calc(100dvh-var(--pc-nav-height))] flex-col lg:h-[calc(100dvh-var(--pc-nav-height))] lg:overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-5 py-4">
-        <div><p className="text-sm font-bold tracking-wide text-brand">PlanIT Control</p><h1 className="text-xl font-semibold">Supervisor Dashboard</h1></div>
+        <h1 className="text-xl font-semibold">Supervisor Dashboard</h1>
         {staleSince
           ? <p role="status" className="text-sm font-semibold text-risk-red">Connection lost · showing data from {staleSince.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</p>
           : <p className="text-sm text-muted">Florida field operations · Refreshes every 30 seconds</p>}
