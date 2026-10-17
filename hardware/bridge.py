@@ -1,7 +1,7 @@
 """Bridge between the PlanIT Control backend and the Arduino stop-work beacon.
 
-Polls GET {url}/sites/{site_id}/beacon every 3 seconds and writes one line to the
-Arduino over USB serial (see beacon/beacon.ino for the line formats). Any network
+Polls GET {url}/sites/{site_id}/beacon (and GET {url}/replay/status, for the
+countdown speed) every 3 seconds and writes one line to the Arduino over USB serial (see beacon/beacon.ino for the line formats). Any network
 or parsing error sends UNKNOWN, so the beacon never shows green when unsure.
 
     python bridge.py http://localhost:8000 okeechobee-clean-energy-center
@@ -52,14 +52,24 @@ def get_json(url: str):
         return json.load(resp)
 
 
-def beacon_line(beacon: dict, name: str) -> str:
+def replay_speed(status: dict) -> int:
+    """Simulated seconds per real second from a ReplayStatus (shared/types.ts); 1 when live."""
+    speed = status.get("speed")
+    if not status.get("running") or not isinstance(speed, (int, float)):
+        return 1
+    return max(1, round(speed))
+
+
+def beacon_line(beacon: dict, name: str, speed: int = 1) -> str:
     """Turns a Beacon (shared/types.ts) into one serial line."""
     state = beacon.get("state")
     if state == "stop":
         secs = beacon.get("seconds_to_all_clear")
         # No countdown known: "-" makes the beacon show STOP WORK without a time.
         count = str(max(0, int(secs))) if isinstance(secs, (int, float)) else "-"
-        return f"STOP {count} {name}"
+        # During a replay the countdown is in simulated seconds; " x<speed>" tells the
+        # beacon how fast to tick between updates.
+        return f"STOP {count} {name}" + (f" x{speed}" if speed > 1 else "")
     if state == "approaching":
         # minutes_to_arrival is deliberately not sent: arrival estimates run late.
         return f"APPR {name}"
@@ -104,8 +114,9 @@ def run_live(beacon: Beacon, base_url: str, site_id: str) -> None:
         try:
             if name is None:
                 name = lcd_text(get_json(f"{base_url}/sites/{site}")["name"]) or site_id
-            line = beacon_line(get_json(f"{base_url}/sites/{site}/beacon"), name)
-        except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as e:
+            speed = replay_speed(get_json(f"{base_url}/replay/status"))
+            line = beacon_line(get_json(f"{base_url}/sites/{site}/beacon"), name, speed)
+        except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError, AttributeError) as e:
             print(f"Backend error: {e}", file=sys.stderr)
             line = "UNKNOWN"
         beacon.send(line)

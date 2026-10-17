@@ -20,6 +20,7 @@ Real-time job-site safety platform for utility field crews. Built for the Sperry
 | `frontend/` | Frontend teammates | Next.js (App Router), TypeScript, Tailwind v4, MapLibre GL |
 | `backend/` | John Azer | Python 3.11, FastAPI, uvicorn. Config from `backend/.env`. `data/sites.json` + `scripts/load_sites.py` |
 | `shared/` | John Azer | `types.ts` (the API contract) and `mocks/` (sample JSON for every endpoint: contract examples, backend placeholders without a database, and the frontend's labeled demo mode) |
+| `hardware/` | William | Arduino stop-work beacon: `beacon/beacon.ino` (LEDs, buzzer, LCD) and `bridge.py` (polls `GET /sites/{id}/beacon` and writes it over USB serial; pyserial only). See `hardware/README.md` |
 
 Only change files in folders you own. If you need something in another folder (a new field, a new endpoint, a bug fix), ask the owner or open an issue.
 

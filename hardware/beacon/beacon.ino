@@ -30,7 +30,10 @@ enum State { ST_UNKNOWN, ST_STOP, ST_APPR, ST_FLOOD, ST_CLEAR };
 State state = ST_UNKNOWN;
 char siteName[17] = "PlanIT Control";
 bool stopHasTime = false;
-unsigned long stopEndMs = 0;              // millis() when the all-clear countdown reaches 0
+unsigned long stopSyncMs = 0;             // millis() of the last STOP line
+unsigned long stopSyncSecs = 0;           // seconds to all-clear in that line
+unsigned long stopRate = 1;               // countdown seconds per real second (replay speed)
+const unsigned long MAX_RATE = 1000;
 unsigned long lastLineMs = 0;
 bool everReceived = false;
 
@@ -138,11 +141,27 @@ void handleLine(char *line) {
 
   unsigned long now = millis();
   if (startsWithWord(line, "STOP")) {
+    // Optional trailing " x<speed>" during a replay; without it the countdown runs in real time.
+    stopRate = 1;
+    char *speed = strrchr(line, ' ');
+    if (speed && speed[1] == 'x' && speed[2] >= '0' && speed[2] <= '9') {
+      char *speedEnd;
+      long rate = strtol(speed + 2, &speedEnd, 10);
+      if (*speedEnd == '\0') {
+        stopRate = rate < 1 ? 1 : (rate > (long)MAX_RATE ? MAX_RATE : (unsigned long)rate);
+        *speed = '\0';
+      }
+    }
     const char *rest = afterWord(line);
     char *end;
     long secs = strtol(rest, &end, 10);
     stopHasTime = end != rest && secs >= 0;
-    if (stopHasTime) stopEndMs = now + (unsigned long)secs * 1000UL;
+    if (stopHasTime) {
+      stopSyncMs = now;
+      stopSyncSecs = (unsigned long)secs;
+    } else if (*end == '-') {
+      end++;
+    }
     setSiteName(end);
     enterState(ST_STOP);
   } else if (startsWithWord(line, "APPR")) {
@@ -200,7 +219,10 @@ void render(unsigned long now) {
       setLeds(true, false, false);
       if (stopHasTime) {
         // Keep showing 00:00 until the bridge says CLEAR: never assume the all-clear.
-        unsigned long left = (long)(stopEndMs - now) > 0 ? (stopEndMs - now + 999) / 1000 : 0;
+        // Elapsed stays small: a fresh STOP line resyncs every few seconds, and 15 s of
+        // silence switches to NO DATA, so elapsed * MAX_RATE can't overflow.
+        unsigned long counted = (now - stopSyncMs) * stopRate / 1000;
+        unsigned long left = counted < stopSyncSecs ? stopSyncSecs - counted : 0;
         unsigned long mm = left / 60, ss = left % 60;
         if (mm > 99) { mm = 99; ss = 59; }
         snprintf(row1, sizeof(row1), "STOP WORK %02lu:%02lu", mm, ss);

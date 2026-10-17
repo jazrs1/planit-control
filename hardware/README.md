@@ -86,37 +86,45 @@ The site id is the slug from `GET /sites` (e.g. `big-bend`, `vandolah-power-stat
 One line per message, `\n`-terminated, 115200 baud:
 
 ```
-STOP <seconds_until_all_clear> <site name>
+STOP <seconds_until_all_clear> <site name> [x<speed>]
 APPR <site name>
 FLOOD <site name>
 CLEAR <site name>
 UNKNOWN
 ```
 
-`<seconds_until_all_clear>` may be `-` if the backend doesn't know it; the beacon then shows `STOP WORK` with no time. Anything it can't parse counts as `UNKNOWN`.
+`<seconds_until_all_clear>` may be `-` if the backend doesn't know it; the beacon then shows `STOP WORK` with no time. The optional `x<speed>` (e.g. `x30`) is sent only while a replay runs: the countdown is then in simulated seconds, so the beacon counts down that many seconds per real second and resyncs on every line. Without it the countdown runs in real time, so plain `STOP <seconds> <site name>` still works. Anything it can't parse counts as `UNKNOWN`.
 
 ## Judge demo: Aug 4, 2025 storm replay
 
-Before the demo, download the storm once: `cd backend && python -m scripts.find_replay_window`. The replay plays one real hour (6–7 PM Eastern, 22:00–23:00 UTC) at 30× speed, so the whole storm takes about 2 minutes.
+Before the demo, download the storm once: `cd backend && python -m scripts.find_replay_window`. The replay plays one real hour (6–7 PM Eastern, 22:00–23:00 UTC) at 30× speed, so the whole storm takes about 2 minutes. The bridge reads the speed from `GET /replay/status`, so the beacon's countdown runs at the same 30× and stays in step with the dashboard.
 
-1. Start the backend and frontend (repo `README.md`), plug in the beacon, and point the bridge at a site:
+Start the backend and frontend (repo `README.md`) and plug in the beacon. To start a replay, click **⚡ Replay storm** on the dashboard (http://localhost:3000), or:
 
-   ```bash
-   python bridge.py http://localhost:8000 okeechobee-clean-energy-center
-   ```
+```bash
+curl -X POST localhost:8000/replay/start -H "content-type: application/json" -d '{"speed": 30}'
+```
 
-   The beacon shows green `ALL CLEAR` (assuming no live storm right now).
+Stop it with the dashboard button or `curl -X POST localhost:8000/replay/stop`; the beacon goes back to the live state. Flood alerts are live-only, so `FLOOD RISK` never appears during a replay.
 
-2. Start the replay: click **⚡ Replay storm** on the dashboard (http://localhost:3000), or
+### 1. Yellow, then red: Vandolah Power Station
 
-   ```bash
-   curl -X POST localhost:8000/replay/start -H "content-type: application/json" -d '{"speed": 30}'
-   ```
+```bash
+python bridge.py http://localhost:8000 vandolah-power-station
+```
 
-3. **Okeechobee Clean Energy Center** goes red within seconds: its first strike within 10 miles comes 9 seconds into the hour. Three beeps, `STOP WORK 30:00`. It was the busiest site of the storm (the countdown reset 177 times), so the countdown keeps jumping back up as new strikes land, and the site stays red for the whole replay. Press the button to silence the beeps.
+1. The beacon shows green `ALL CLEAR` (assuming no live storm right now).
+2. Start the replay. About 20 seconds in, it turns **yellow**, `STORM NEARBY`, with three beeps: the storm forecast spotted the cell heading for Vandolah about 24 simulated minutes before it hit. (No minutes are shown on purpose: arrival estimates run late.)
+3. About 70 seconds in, the first strike lands within 10 miles: **red**, three beeps, `STOP WORK 30:00`, counting down. Press the button to silence the beeps.
 
-4. **To show yellow then red,** run the bridge for **Vandolah Power Station** instead (`vandolah-power-station`). The storm forecast needs about 15 simulated minutes of lightning to start tracking cells, and Vandolah's storm was spotted about 24 minutes before it hit: around 20 seconds into the replay the beacon turns yellow, `STORM NEARBY`, and around 70 seconds in it turns red, `STOP WORK 30:00`. Northside Generating Station (`northside-generating-station`, 26 min warning) works too. Okeechobee goes red too early in the hour for a warning (see `docs/lightning-forecast.md`).
+The forecast needs about 15 simulated minutes of lightning before it tracks any cell, so only sites hit after that can get a warning. Northside Generating Station (`northside-generating-station`, 26 min warning) also works.
 
-5. Stop the replay with the dashboard button or `curl -X POST localhost:8000/replay/stop`; the beacon returns to the live state.
+### 2. The countdown that resets: Okeechobee Clean Energy Center
 
-During a replay the backend counts the all-clear in **simulated** seconds, while the beacon ticks in real seconds between updates, so at 30× the countdown jumps down by about 90 seconds every 3-second poll. Live, the two match. Flood alerts are live-only, so `FLOOD RISK` never appears during a replay.
+```bash
+python bridge.py http://localhost:8000 okeechobee-clean-energy-center
+```
+
+Okeechobee was the busiest site of the storm. Its first strike within 10 miles comes 9 seconds into the hour, so it goes **red** almost as soon as the replay starts (too early for a yellow warning). Every new strike pushes the all-clear back to 30 minutes after it, and Okeechobee had 177 of those resets, so you can watch the countdown tick down at 30× and jump back up to about `30:00` again and again. It stays red for the rest of the hour.
+
+You can run part 2 in the same replay: once Vandolah is red, Ctrl+C the bridge and start it for Okeechobee (the beacon resets and runs its self-test, then shows Okeechobee within about 5 seconds). Or stop and restart the replay to watch Okeechobee from the start.
