@@ -22,8 +22,13 @@ const QUIET_TAIL_MIN = 31;
 const DEFAULT_WINDOW = "2025-08-04_2200-2300";
 const ZONE = { timeZone: "America/New_York" } as const;
 
-function clock(ms: number, zone = false) {
-  return new Date(ms).toLocaleTimeString("en-US", { ...ZONE, hour: "numeric", minute: "2-digit", ...(zone ? { timeZoneName: "short" } : {}) });
+function clock(ms: number, zone = false, timeZone: string = ZONE.timeZone) {
+  return new Date(ms).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit", ...(zone ? { timeZoneName: "short" } : {}) });
+}
+
+/** An event's time in its site's own zone; the zone is named when it isn't Eastern (the panhandle). */
+function siteClock(ms: number, timeZone: string | undefined) {
+  return timeZone && timeZone !== ZONE.timeZone ? clock(ms, true, timeZone) : clock(ms);
 }
 
 /** "Aug 4, 2025 storm · 6:00–7:31 PM EDT", from the status times or, before any replay, the folder name. */
@@ -91,6 +96,7 @@ type ReplayTimelineProps = {
 export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs, stale }: ReplayTimelineProps) {
   const running = replay?.running ?? false;
   const names = new Map(sites.map((site) => [site.id, site.name]));
+  const zones = new Map(sites.map((site) => [site.id, site.timezone]));
   const replayStops = alerts.filter((alert) => alert.replay && alert.type === "lightning").length;
   const replayFlood = alerts.filter((alert) => alert.replay && alert.type === "flood").length;
   const t0 = replay?.window_start ? Date.parse(replay.window_start) : NaN;
@@ -111,7 +117,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
 
   if (!running) {
     return (
-      <section data-theme="dark" aria-labelledby="replay-heading" className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-instrument px-4 py-2.5 text-text shadow-float">
+      <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 bg-instrument px-4 py-2.5 text-text shadow-float">
         <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
         <p className="min-w-0 flex-1 basis-56 font-mono text-xs text-muted sm:truncate">{replayWindowLabel(replay)} · plays a recorded storm through the live pipeline</p>
         <ReplayControl />
@@ -127,13 +133,13 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
       <li key={event.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 py-1.5 text-[0.8125rem]">
         <span aria-hidden="true" className={`pc-shape ${EVENT[event.kind].mark}`} />
         <span className="min-w-0"><span className="font-semibold">{EVENT[event.kind].label}</span><span className="block truncate text-xs text-muted">{names.get(event.site_id) ?? event.site_id}{distance && ` · ${distance}`}</span></span>
-        <time className="font-mono text-xs text-muted" dateTime={event.at}>{clock(Date.parse(event.at))}</time>
+        <time className="font-mono text-xs text-muted" dateTime={event.at}>{siteClock(Date.parse(event.at), zones.get(event.site_id))}</time>
       </li>
     );
   };
 
   return (
-    <section data-theme="dark" aria-labelledby="replay-heading" className={`grid bg-instrument text-text shadow-float lg:grid-cols-[minmax(0,1fr)_16rem] ${stale ? "grayscale" : ""}`}>
+    <section data-theme="dark" aria-labelledby="replay-heading" className={`pc-reveal grid bg-instrument text-text shadow-float lg:grid-cols-[minmax(0,1fr)_16rem] ${stale ? "grayscale" : ""}`}>
       <div className="grid min-w-0 gap-3 p-4">
         <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h2 id="replay-heading" className="text-sm font-bold">Storm replay</h2>
@@ -148,7 +154,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
           <ReplayControl />
           <div className="grid min-w-0 gap-1">
             <div className="relative h-4 mbe-1" aria-hidden="true">
-              {events.map((event) => <span key={event.id} title={`${EVENT[event.kind].label} · ${names.get(event.site_id) ?? event.site_id} · ${clock(Date.parse(event.at))}`}
+              {events.map((event) => <span key={event.id} title={`${EVENT[event.kind].label} · ${names.get(event.site_id) ?? event.site_id} · ${siteClock(Date.parse(event.at), zones.get(event.site_id))}`}
                 className={`pc-shape ${EVENT[event.kind].mark} absolute inset-bs-0.5 -translate-x-1/2 text-[0.75rem]`} style={{ insetInlineStart: `${at(span, Date.parse(event.at))}%` }} />)}
             </div>
             <div className="relative h-0.5 bg-instrument-line" role="progressbar" aria-label="Replay progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}
@@ -159,7 +165,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
             </div>
             {timed
               ? <div className="relative h-4 font-mono text-[0.6875rem] text-muted" aria-hidden="true">
-                {ticks.map((tick, i) => <span key={tick} className={`absolute whitespace-nowrap ${i === 0 ? "" : i === ticks.length - 1 && at(span, tick) > 92 ? "-translate-x-full" : "-translate-x-1/2"}`} style={{ insetInlineStart: `${at(span, tick)}%` }}>{i === 0 ? clock(tick) : clock(tick).replace(/\s?[AP]M$/, "")}</span>)}
+                {ticks.map((tick, i) => <span key={tick} className={`absolute whitespace-nowrap ${i === 0 ? "" : i === ticks.length - 1 && at(span, tick) > 92 ? "-translate-x-full" : "-translate-x-1/2"}`} style={{ insetInlineStart: `${at(span, tick)}%` }}>{i === 0 ? clock(tick, true) : clock(tick).replace(/\s?[AP]M$/, "")}</span>)}
               </div>
               : <div className="flex justify-between font-mono text-[0.6875rem] text-muted"><span>Storm start</span><span>Storm end</span></div>}
             <p className="font-mono text-xs">{quiet ? "Storm data done · quiet period, countdowns clearing" : timed ? `Storm data until ${clock(tEnd)} · then 31 quiet minutes` : `${Math.round(progress * 100)}% of storm data`}</p>
@@ -181,10 +187,10 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
       <details ref={details} className="group min-w-0 border-bs border-instrument-line p-4 lg:border-bs-0 lg:border-s">
         <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2">
           <span className="text-sm font-bold">Key events</span>
-          <span className="flex items-center gap-2 text-xs text-muted"><span className="font-mono">{events.length}</span><span aria-hidden="true" className="motion-safe:transition-[rotate] group-open:rotate-180">▾</span></span>
+          <span className="flex items-center gap-2 text-xs text-muted"><span className="font-mono">{timeline.events === null ? "…" : events.length}</span><span aria-hidden="true" className="motion-safe:transition-[rotate] group-open:rotate-180">▾</span></span>
         </summary>
         {events.length === 0
-          ? <p className="mbs-2 text-xs text-muted">{timeline.events === null ? "Loading the storm’s events…" : "No stop-work, advisory or all-clear yet."}</p>
+          ? <p className="mbs-2 text-xs text-muted">{timeline.preparing ? "Preparing replay timeline…" : timeline.events === null ? "Loading the storm’s events…" : "No stop-work, advisory or all-clear yet."}</p>
           : <ol className="mbs-1 max-h-44 divide-y divide-instrument-line overflow-y-auto overscroll-contain">{[...events].reverse().map(eventRow)}</ol>}
       </details>
     </section>

@@ -33,7 +33,7 @@ const status = {
   files_total: 180, files_done: 60, flashes_ingested: 5000,
   window_start: "2025-08-04T22:00:00Z", window_end: "2025-08-04T23:00:00Z", quiet_until: "2025-08-04T23:31:00Z",
 };
-const sites = [{ id: "a", name: "Alpha Plant" }, { id: "b", name: "Bravo Plant" }, { id: "c", name: "Charlie Plant" }];
+const sites = [{ id: "a", name: "Alpha Plant", timezone: "America/New_York" }, { id: "b", name: "Bravo Plant", timezone: "America/Chicago" }, { id: "c", name: "Charlie Plant", timezone: "America/New_York" }];
 const events = [
   { id: "e1", at: "2025-08-04T22:05:00Z", kind: "stop_work_start", site_id: "a", distance_mi: 6.58 },
   { id: "e2", at: "2025-08-04T22:10:00Z", kind: "approach_start", site_id: "b", distance_mi: 11.3 },
@@ -62,8 +62,17 @@ test("time ticks come from the window, and the label reads like a person wrote i
   assert.equal(Timeline.replayWindowLabel({ window: null, window_start: null, quiet_until: null }), "Aug 4, 2025 storm · 6:00–7:31 PM EDT");
 });
 
-test("before the timeline is ready (503s retried quietly) the panel says it's loading, never 'Needs data'", () => {
-  const html = render({ timeline: { events: null, series: null, failed: false } });
-  assert.match(html, /Loading the storm/);
-  assert.doesNotMatch(html, /Needs data/);
+test("before the timeline is ready (503s retried quietly) the panel says so, never '0 events' or 'Needs data'", () => {
+  const loading = render({ timeline: { events: null, series: null, failed: false, preparing: false } });
+  assert.match(loading, /Loading the storm/);
+  const preparing = render({ timeline: { events: null, series: null, failed: false, preparing: true } });
+  assert.match(preparing, /Preparing replay timeline…/);
+  assert.match(preparing, /<span class="font-mono">…<\/span>/, "the events count is unknown, not 0");
+  for (const html of [loading, preparing]) assert.doesNotMatch(html, /Needs data/);
+});
+
+test("event times use each site's own timezone, naming it when it isn't Eastern", () => {
+  const html = render();
+  assert.match(html, /6:05 PM</, "an Eastern site's stop-work at 22:05 UTC");
+  assert.match(html, /5:10 PM CDT/, "a panhandle (Central) site's advisory at 22:10 UTC");
 });

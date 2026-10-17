@@ -88,6 +88,8 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   const [ready, setReady] = useState(false);
   const [styleLoaded, setStyleLoaded] = useState(false);
   const [error, setError] = useState(false);
+  // The basemap's first tiles have drawn: until then the map shows "Loading map…" on the land color.
+  const [painted, setPainted] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -102,7 +104,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       map.current = instance;
       instance.addControl(new lib.NavigationControl(), "top-right");
       instance.on("error", () => { lastErrorAt = Date.now(); setError(true); });
-      instance.on("load", () => setError(false));
+      instance.on("load", () => { setError(false); setPainted(true); });
       // Custom layers can be added once the style is parsed; "load" also waits for every initial tile.
       instance.on("style.load", () => { paintBasemap(instance); setStyleLoaded(true); });
       // Clear the notice once basemap tiles load again after an error, without a reload.
@@ -400,12 +402,13 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     });
   }, [styleLoaded, wildlife]);
 
-  return <><div ref={container} className="h-full w-full" />
+  return <><div ref={container} className="h-full w-full bg-(--pc-map-land)" />
     <ul className="sr-only" aria-label="Storm cell motion">
       {cells.map((cell) => <li key={cell.id}>
         {demo && "Demo data · "}Storm cell at {cell.lat.toFixed(2)}, {cell.lon.toFixed(2)}, radius {cell.radius_mi.toFixed(1)} mi. {cell.tracked ? cell.heading_deg !== null && cell.speed_mph !== null && cell.speed_mph >= 2 ? `Moving toward ${cell.moving_toward ?? `${cell.heading_deg} degrees`} at ${Math.round(cell.speed_mph)} mph.` : "Stationary." : "Motion unconfirmed."}
         {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs))) && " Last known · Not confirmed."}
       </li>)}
     </ul>
+    {!painted && !error && <p role="status" className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Loading map…</p>}
     {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-64 rounded-card border-2 border-rule bg-surface p-3 text-sm text-muted">Map tiles unavailable. Site details remain available in the ranked list.</p>}</>;
 }

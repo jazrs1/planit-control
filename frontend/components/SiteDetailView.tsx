@@ -265,7 +265,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       </header>
 
       <SiteAlerts alerts={siteAlerts} timeZone={tz} alertsUnknown={alerts === null} />
-      <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : serverNow()} demo={demo} />
+      <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : detail.lightning_approach?.replay || !replay?.running ? serverNow() : Date.now()} demo={demo} />
       <SiteScoreHistory site={detail} unconfirmed={connectionLost} />
 
       <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4">
