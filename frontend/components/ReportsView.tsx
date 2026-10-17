@@ -56,7 +56,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p role="status" className="text-sm text-muted">{unknown ? "— Reports unknown" : `${sorted.length}${stale ? "? last known" : ""} ${sorted.length === 1 ? "report" : "reports"} · Newest first`}</p>
-        {!demo && <button type="button" disabled={refreshing} className="min-h-11 rounded-card border-2 border-rule bg-surface px-4 font-semibold text-brand disabled:opacity-50" onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>}
+        {!demo && <button type="button" disabled={refreshing} className="pc-btn" onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>}
       </div>
       {demo && <div role="status" className="rounded-card border-2 border-rule bg-surface p-3 text-sm text-muted"><strong>Demo data</strong> · Sample reports, not live conditions. <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 font-semibold text-brand underline">Exit demo</button></div>}
       {unknown && <section role="status" className="space-y-3 rounded-card border-2 border-rule bg-surface p-4">

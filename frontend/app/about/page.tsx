@@ -9,7 +9,7 @@ export default function AboutPage() {
     <section className="space-y-3 rounded-card border-2 border-rule bg-surface p-5">
       <h2 className="text-xl font-bold">Your site, at a glance</h2>
       <p>Check lightning stop-work alerts, flood risk, site readings, crew hazard reports, and next-day briefings. Built for the Sperry Tech challenge at SwampHacks XII.</p>
-      <Link href="/crew" className="inline-flex min-h-12 items-center rounded-card bg-brand px-4 font-semibold text-on-brand">Open crew view</Link>
+      <Link href="/crew" className="pc-btn pc-btn--primary">Open crew view</Link>
     </section>
     <section className="space-y-3 rounded-card border-2 border-rule bg-surface p-5">
       <h2 className="text-xl font-bold">Add to your home screen</h2>

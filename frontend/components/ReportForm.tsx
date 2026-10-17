@@ -131,7 +131,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
       <ReportPhoto key={submitted.photo_url} src={submitted.photo_url} alt="Submitted hazard" className="h-48 w-full" />
       {submitted.note && <p className="break-words whitespace-pre-wrap">{submitted.note}</p>}
       <div className="flex flex-wrap gap-3">
-        <Link href="/reports" className="flex min-h-12 items-center rounded-card bg-brand px-4 font-semibold text-on-brand">View reports</Link>
+        <Link href="/reports" className="pc-btn pc-btn--primary">View reports</Link>
         <button type="button" onClick={() => {
           setSubmitted(null); setFile(null); setCategory(""); setNote(""); uploaded.current = null; setProgress(0);
         }} className="min-h-12 rounded-card border-2 border-rule bg-surface px-4 font-semibold text-brand">Report another hazard</button>
@@ -196,7 +196,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
               <label htmlFor="latitude" className="text-sm">Latitude<input id="latitude" inputMode="decimal" value={coordinates.lat} onChange={(event) => setCoordinates({ ...coordinates, lat: event.target.value })} className={fieldClass} /></label>
               <label htmlFor="longitude" className="text-sm">Longitude<input id="longitude" inputMode="decimal" value={coordinates.lon} onChange={(event) => setCoordinates({ ...coordinates, lon: event.target.value })} className={fieldClass} /></label>
             </div>
-            <button type="button" className="mbs-2 min-h-11 rounded-card border-2 border-rule px-4 font-semibold text-brand" onClick={() => {
+            <button type="button" className="pc-btn mbs-2" onClick={() => {
               const lat = Number(coordinates.lat), lon = Number(coordinates.lon);
               if (!coordinates.lat.trim() || !coordinates.lon.trim() || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
                 setLocationMessage("Enter latitude from -90 to 90 and longitude from -180 to 180."); return;
@@ -211,7 +211,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
         <progress max={100} value={phase === "saving" ? 100 : progress} aria-label="Photo upload progress" className="mbs-2 h-3 w-full accent-brand" />
       </div>}
       {error && <div role="alert" className="rounded-card bg-risk-red-bg p-4 text-risk-red"><p>{error}</p><Link href="/reports" className="mbs-2 inline-flex min-h-11 items-center font-semibold underline">Check reports</Link></div>}
-      <button type="submit" disabled={busy} className="min-h-14 w-full rounded-card bg-brand px-4 text-lg font-semibold text-on-brand disabled:opacity-60">{busy ? "Submitting…" : "Submit hazard report"}</button>
+      <button type="submit" disabled={busy} className="pc-btn pc-btn--primary min-h-14 w-full text-lg">{busy ? "Submitting…" : "Submit hazard report"}</button>
     </form>
   );
 }

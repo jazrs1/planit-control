@@ -9,6 +9,13 @@ import { briefingHeadline } from "@/lib/crew";
 import { formatAlertTime } from "@/lib/alerts";
 import { usePolling } from "@/lib/usePolling";
 
+// The go / caution / no-go call is made in code on the backend, never by the model.
+const GO: Record<NonNullable<Briefing["go_status"]>, { label: string; style: string }> = {
+  go: { label: "GO", style: "pc-chip--clear" },
+  caution: { label: "CAUTION", style: "pc-chip--flood" },
+  no_go: { label: "NO-GO", style: "pc-chip--stop" },
+};
+
 export default function CrewBriefing({ briefing, site, failed, loading }: { briefing: Briefing | null; site: Site; failed: boolean; loading: boolean }) {
   const serverNow = useServerNow();
   // Last night's briefing covers today and stays current until tonight's 6 PM run.
@@ -18,15 +25,26 @@ export default function CrewBriefing({ briefing, site, failed, loading }: { brie
   }, [briefing, serverNow, site.timezone]);
   usePolling(updateDay, 1000);
   const current = !!briefing && (day === "today" || day === "tomorrow");
-  return <section aria-labelledby="briefing-heading" className="rounded-card border-2 border-rule bg-surface p-4">
-    <h2 id="briefing-heading" className="text-xl font-bold">{day === "today" ? "Today\u2019s briefing" : "Tomorrow\u2019s briefing"}</h2>
-    <div className={failed ? "text-muted grayscale" : ""}>
+  const go = briefing?.go_status ? GO[briefing.go_status] : null;
+  const forecast = briefing && Number.isFinite(briefing.key_numbers.hazard_index) ? briefing.key_numbers.hazard_index : null;
+  // Last night's briefing covers today; tonight's (after 6 PM) covers tomorrow.
+  const source = day === "today" ? "Forecast from last night\u2019s briefing" : "Forecast for tomorrow · from tonight\u2019s briefing";
+  return <section aria-labelledby="briefing-heading" className="border-[length:var(--pc-rule-heavy)] border-rule bg-surface">
+    <h2 id="briefing-heading" className="pc-label flex h-9 items-center border-be-2 border-rule bg-surface-2 px-4 text-xs">{day === "today" ? "Today\u2019s briefing" : "Tomorrow\u2019s briefing"}</h2>
+    <div className={`space-y-3 p-4 ${failed ? "text-muted grayscale" : ""}`}>
       {current ? <>
-        <p className="mbs-3 text-2xl font-bold">{briefingHeadline(briefing)}{failed ? " ?" : ""}</p>
-        <p className="mbs-2 text-sm text-muted">{failed ? "Not confirmed · last loaded briefing" : "Covers"} {formatForDate(briefing.for_date)}</p>
-      </> : <p role="status" className="mbs-3 text-lg font-semibold text-muted">{loading ? "Loading briefing…" : "No current briefing"}</p>}
-      {briefing && <p className="mbs-2 text-sm text-muted">Generated {formatAlertTime(briefing.generated_at, site.timezone)}{!current ? ` · Covers ${formatForDate(briefing.for_date)}` : ""}</p>}
+        <p className="flex flex-wrap items-center gap-2">
+          {go && <span className={`pc-chip text-sm ${go.style}`}>{go.label}</span>}
+          <span className="text-sm font-bold">{failed ? "Not confirmed · last loaded briefing" : "Covers"} {formatForDate(briefing.for_date)}</span>
+        </p>
+        <p className="text-2xl font-extrabold leading-snug">{briefingHeadline(briefing)}{failed ? " ?" : ""}</p>
+        {forecast !== null && <div className="flex items-baseline justify-between gap-3 border-bs-2 border-border pbs-3">
+          <span className="pc-label text-muted">{source}</span>
+          <span className="shrink-0 font-mono text-xl font-bold tabular-nums">{forecast.toFixed(1)}<span className="text-sm text-muted"> / 10</span></span>
+        </div>}
+      </> : <p role="status" className="text-lg font-semibold text-muted">{loading ? "Loading briefing…" : "No current briefing"}</p>}
+      {briefing && <p className="text-sm text-muted">Generated {formatAlertTime(briefing.generated_at, site.timezone)}{!current ? ` · Covers ${formatForDate(briefing.for_date)}` : ""}</p>}
+      <Link href={`/briefing/${encodeURIComponent(site.id)}`} className="pc-btn">{current ? "Read full briefing" : "View latest briefing"}</Link>
     </div>
-    <Link href={`/briefing/${encodeURIComponent(site.id)}`} className="mbs-3 inline-flex min-h-12 items-center rounded-card border-2 border-rule px-4 font-semibold text-brand">{current ? "Read full briefing" : "View latest briefing"}</Link>
   </section>;
 }
