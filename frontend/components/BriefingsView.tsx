@@ -44,12 +44,12 @@ function merge(prev: Loaded | null, next: Loaded): { data: Loaded; staleIds: Set
 }
 
 export default function BriefingsView({ initial }: { initial: Loaded | null }) {
-  const { status, setDemo } = useAlertsState();
+  const { status, setDemo, connection } = useAlertsState();
   const serverNow = useServerNow();
   const demo = status === "demo";
   const [live, setLive] = useState<Loaded | null>(initial);
   const [staleIds, setStaleIds] = useState<Set<string>>(new Set());
-  const [connectionLost, setConnectionLost] = useState(false);
+  const [sitesFailed, setSitesFailed] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [followUntil, setFollowUntil] = useState(0);
   const [confirming, setConfirming] = useState(false);
@@ -66,7 +66,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
       generation.current++;
       setLive(null);
       setStaleIds(new Set());
-      setConnectionLost(false);
+      setSitesFailed(false);
       previousDemo.current = demo;
     }
   }, [demo]);
@@ -81,10 +81,10 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
       const merged = merge(liveRef.current, { sites, results });
       setLive(merged.data);
       setStaleIds(merged.staleIds);
-      setConnectionLost(false);
+      setSitesFailed(false);
     } catch {
       // Sites unreachable: keep the last real briefings, greyed and marked last known.
-      if (current === generation.current) setConnectionLost(true);
+      if (current === generation.current) setSitesFailed(true);
     }
   }, [demo]);
 
@@ -105,6 +105,9 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
     const timer = window.setInterval(tick, 60_000);
     return () => window.clearInterval(timer);
   }, [demo, serverNow]);
+
+  // Last known as soon as any request fails (shared connection), or when this page's own refresh failed.
+  const connectionLost = !demo && live !== null && (sitesFailed || connection.level !== "online");
 
   const data: Loaded | null = demo ? { sites: DEMO_DATA.sites, results: DEMO_DATA.briefings } : live;
 

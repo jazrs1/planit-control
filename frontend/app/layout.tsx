@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AlertsProvider } from "@/components/AlertsProvider";
+import OutageShell from "@/components/OutageShell";
 import TopNavigation from "@/components/TopNavigation";
 import { getAlerts, orNull } from "@/lib/api";
 import "./globals.css";
@@ -21,7 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen pb-[calc(env(safe-area-inset-bottom)+5rem)] antialiased sm:pb-0">
         <AlertsProvider initialAlerts={alerts}>
           <TopNavigation />
-          {children}
+          <OutageShell>{children}</OutageShell>
         </AlertsProvider>
       </body>
     </html>

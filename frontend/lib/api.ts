@@ -6,6 +6,7 @@ import mockSiteDetails from "@shared/mocks/site_details.json";
 import mockSites from "@shared/mocks/sites.json";
 
 import mockReports from "@shared/mocks/reports.json";
+import { markFailure, markSuccess } from "@/lib/connection";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -19,7 +20,18 @@ export class ApiRequestError extends Error {
 /** Request the backend and throw if it's unreachable or returns an error. Never falls back to mocks:
  *  safety data the UI can't verify must show as unknown, not as sample values. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
+  // Reads report failures to the shared connection state; a failed write (e.g. a 503 from a POST)
+  // is the action's error, not proof the backend is down.
+  const read = (init?.method ?? "GET") === "GET";
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
+  } catch (err) {
+    if (read) markFailure();
+    throw err;
+  }
+  if (res.status < 500) markSuccess();
+  else if (read) markFailure();
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null;
     throw new ApiRequestError(body?.detail ?? `${res.status} ${res.statusText}`, res.status);

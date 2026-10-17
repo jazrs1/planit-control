@@ -117,12 +117,14 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   const [missing, setMissing] = useState(false);
   const [staleSince, setStaleSince] = useState<Date | null>(null);
   const lastGood = useRef(new Date());
-  const { alerts, status: alertsStatus, replay, setDemo, refresh: refreshAlerts } = useAlertsState();
+  const { alerts, status: alertsStatus, replay, setDemo, refresh: refreshAlerts, connection } = useAlertsState();
   const serverNow = useServerNow();
 
   const demo = alertsStatus === "demo";
   const detail = demo ? DEMO_DATA.siteDetails[siteId] ?? null : liveDetail;
-  const connectionLost = !demo && staleSince !== null && liveDetail !== null;
+  // Greyed "last known" as soon as any request fails (shared connection), not only after this page's poll.
+  const connectionLost = !demo && liveDetail !== null && (staleSince !== null || connection.level !== "online");
+  const lostSince = staleSince ?? (connection.lastSuccessAt !== null ? new Date(connection.lastSuccessAt) : new Date());
 
   const poll = useCallback(async () => {
     try {
@@ -231,7 +233,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         )}
         {connectionLost && (
           <p role="status" className="mt-2 rounded-card border border-risk-red bg-risk-red-bg p-3 text-sm font-semibold text-risk-red">
-            Connection lost · showing last known conditions from {timeOfDay(staleSince!)} · ? = may be out of date
+            Connection lost · showing last known conditions from {timeOfDay(lostSince)} · ? = may be out of date
           </p>
         )}
       </div>
