@@ -278,6 +278,39 @@
   outline-offset: 3px;
 }
 
+/* Map callouts for stop-work and flood sites (SiteMap). A rule toward the site on the near side. */
+.site-callout {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.35rem 0.55rem;
+  inline-size: max-content;
+  max-inline-size: 15rem;
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border: var(--pc-rule-width) solid var(--pc-rule);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  pointer-events: none;
+  box-shadow: var(--pc-shadow-float);
+}
+.site-callout::before {
+  content: "";
+  position: absolute;
+  background: var(--pc-rule);
+}
+.site-callout[data-side="east"]::before { inset-inline-end: 100%; inset-block-start: 50%; inline-size: 18px; block-size: 2px; }
+.site-callout[data-side="west"]::before { inset-inline-start: 100%; inset-block-start: 50%; inline-size: 18px; block-size: 2px; }
+.site-callout[data-side="north"]::before { inset-block-start: 100%; inset-inline-start: 50%; inline-size: 2px; block-size: 18px; }
+.site-callout[data-side="south"]::before { inset-block-end: 100%; inset-inline-start: 50%; inline-size: 2px; block-size: 18px; }
+.site-callout__row { display: grid; padding-inline-start: 0.45rem; border-inline-start: 4px solid var(--pc-risk-red-solid); }
+.site-callout__row b { font-weight: 800; overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
+.site-callout__row > span { display: flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--pc-risk-red); }
+.site-callout__row--replay { border-inline-start: 4px dashed var(--pc-notice); }
+.site-callout__row--replay > span { color: var(--pc-text); }
+.site-callout__row--flood { border-inline-start-color: var(--pc-risk-amber-solid); }
+.site-callout__row--flood > span { color: var(--pc-risk-amber); }
+.site-callout__more { font-weight: 700; color: var(--pc-text-muted); }
+
 /* MapLibre controls in the Signal style */
 .maplibregl-ctrl-group:not(:empty) {
   border-radius: 0;

@@ -86,6 +86,10 @@ The layers panel shows these three as "Needs data" (disabled) until they exist:
 | Wildlife | `GET /wildlife/recent` → sightings with coordinates: `{ lat, lon, species, seen_at, source: "inaturalist" \| "crew" }`, last 30 days. `WildlifeSighting` today only has `distance_mi` from one site. |
 | Flood zones | Either FEMA flood-zone polygons near sites (`GET /flood-zones?bbox=` → GeoJSON with `zone`) or, cheaper, `fema_flood_zone` and `in_special_flood_hazard_area` on `Site` so the map can mark sites in a special flood hazard area. Today they're only on `SiteDetail.conditions.flood`. |
 
-## 6. The new `storm` hazard type
+## 6. A `replay` flag on approach advisories
+
+During a replay, `Site.lightning_approach` merges real and replay advisories (`hazards/snapshot.py`), and `LightningApproach` doesn't say which one it is. The dashboard needs that to keep replay advisories off real counts and to put them on the replay timeline. For now it guesses from `issued_at`: a replay advisory is issued on the replay clock, hours away from real time. Add `replay: boolean` to `LightningApproach`, the same as `Alert.replay`.
+
+## 7. The new `storm` hazard type
 
 When the backend adds `"storm"` to `HazardType`, `HAZARD_LABEL` in `frontend/lib/risk.ts` must get a `storm` entry in the same PR. It's a `Record<HazardType, string>`, so the frontend type check fails without it. Proposed label: `"Storm"`.

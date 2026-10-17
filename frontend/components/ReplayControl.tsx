@@ -53,26 +53,30 @@ export default function ReplayControl() {
     }
   }
 
+  const stopIcon = <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" fill="currentColor" /></svg>;
+  const playIcon = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor" /></svg>;
+  const simulated = (label: string, time: string, detail: string, muted = false) => (
+    <p role="status" className={`grid leading-tight ${muted ? "text-muted" : ""}`}>
+      <span className="pc-label text-muted">{label}</span>
+      <span className="font-mono text-xl font-bold tabular-nums">{time}</span>
+      <span className="text-xs text-muted">{detail}</span>
+    </p>
+  );
+
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
       {running && offline ? (
-        <p role="status" className="flex flex-wrap items-center gap-x-2 text-muted">
-          <span className="rounded-chip bg-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">Replay: last known</span>
-          <span className="font-mono tabular-nums">{replay?.simulated_now ? formatSimulated(Date.parse(replay.simulated_now)) : "--"}</span>
-          <span>simulated time when last seen · status unknown until the server answers</span>
-        </p>
+        <>
+          <span className="pc-chip pc-chip--unknown">Replay: last known</span>
+          {simulated("Simulated time when last seen", replay?.simulated_now ? formatSimulated(Date.parse(replay.simulated_now)) : "--", "Status unknown until the server answers", true)}
+        </>
       ) : running ? (
         <>
-          <p role="status" className="flex flex-wrap items-center gap-x-2">
-            <span className="rounded-chip bg-risk-amber-bg px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-risk-amber">Replay running</span>
-            <span className="font-mono tabular-nums">{now === null ? "--" : formatSimulated(now)}</span>
-            <span className="text-muted">
-              simulated · {replay?.speed}× · {replay?.files_done}/{replay?.files_total} files · {replay?.flashes_ingested.toLocaleString()} flashes
-            </span>
-          </p>
-          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="min-h-11 rounded-card border border-risk-red px-3 font-semibold text-risk-red hover:bg-risk-red-bg focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50">
-            {busy ? "Stopping…" : "Stop replay"}
+          <button type="button" disabled={busy} onClick={() => void run(stopReplay)} className="pc-btn pc-btn--danger">
+            {stopIcon}{busy ? "Stopping…" : "Stop replay"}
           </button>
+          <span className="pc-chip pc-chip--quiet text-[0.8125rem]" title="Simulated seconds per real second">{replay?.speed}×</span>
+          {simulated("Simulated time", now === null ? "--" : formatSimulated(now), `${replay?.files_done}/${replay?.files_total} files · ${replay?.flashes_ingested.toLocaleString()} flashes`)}
         </>
       ) : (
         <button
@@ -80,13 +84,13 @@ export default function ReplayControl() {
           disabled={busy || unavailable}
           onClick={() => void run(() => startReplay())}
           title={unavailable ? "Needs a connection to the server" : "Play a recorded storm through the live pipeline on a simulated clock"}
-          className="min-h-11 rounded-card bg-brand px-3 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          className="pc-btn pc-btn--primary"
         >
-          {busy ? "Starting…" : "⚡ Replay storm"}
+          {playIcon}{busy ? "Starting…" : "Replay storm"}
         </button>
       )}
       {demoCode.form}
-      {message && <p role="alert" className="w-full text-risk-red">Replay: {message}</p>}
+      {message && <p role="alert" className="w-full font-semibold text-risk-red">Replay: {message}</p>}
     </div>
   );
 }

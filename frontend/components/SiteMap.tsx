@@ -69,12 +69,27 @@ type SiteMapProps = {
   onSelect: (id: string) => void;
   /** Which layers to draw; all of them unless the dashboard's layers panel hides some. */
   layers?: MapLayers;
+  /** Label stop-work and flood sites on the map. Labels never cover [data-map-avoid] panels or leave the map. */
+  callouts?: boolean;
 };
 
-export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS }: SiteMapProps) {
+const PLACEMENTS = [
+  { side: "east", anchor: "left", offset: [20, 0] },
+  { side: "west", anchor: "right", offset: [-20, 0] },
+  { side: "north", anchor: "bottom", offset: [0, -20] },
+  { side: "south", anchor: "top", offset: [0, 20] },
+] as const;
+
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+}
+
+export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirmed, demo, nowMs, flashNowMs, selectedId, onSelect, layers = ALL_LAYERS, callouts = false }: SiteMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const markers = useRef(new Map<string, Marker>());
+  const labels = useRef<Marker[]>([]);
+  const fitted = useRef(false);
   const [ready, setReady] = useState(false);
   const [styleLoaded, setStyleLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -217,6 +232,81 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     show(LIGHTNING_SOURCE, layers.lightning);
     for (const part of ["fill", "outline", "arrows"]) show(`${CELLS_SOURCE}-${part}`, layers.cells);
   }, [styleLoaded, layers.lightning, layers.cells, flashes, cells]);
+
+  // Frame every site once, clear of the panels laid over the map (layers top-left, legend at the bottom).
+  useEffect(() => {
+    const instance = map.current;
+    if (!ready || !instance || fitted.current || sites.length === 0 || !container.current) return;
+    fitted.current = true;
+    const lons = sites.map((site) => site.lon), lats = sites.map((site) => site.lat);
+    const wide = container.current.clientWidth > 700;
+    instance.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], {
+      padding: wide ? { top: 40, bottom: 110, left: 280, right: 70 } : { top: 64, bottom: 96, left: 24, right: 48 },
+      animate: false,
+    });
+  }, [ready, sites]);
+
+  // Callouts: one label per cluster of alert sites, placed east, west, north or south of it, whichever
+  // fits inside the map without covering a panel. If none fits, the label is left out (the marker stays).
+  useEffect(() => {
+    const instance = map.current;
+    if (!ready || !instance || !callouts) return;
+    let disposed = false;
+    let MarkerClass: typeof Marker | null = null;
+    const clear = () => { labels.current.forEach((label) => label.remove()); labels.current = []; };
+    const layout = () => {
+      if (disposed || !MarkerClass || !container.current) return;
+      clear();
+      if (!layers.sites) return;
+      const box = container.current.getBoundingClientRect();
+      const avoid = [...(container.current.parentElement?.querySelectorAll("[data-map-avoid], .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right") ?? [])].map((el) => el.getBoundingClientRect());
+      const placed: DOMRect[] = [];
+      const byId = new Map(sites.map((site) => [site.id, site]));
+      const rows = new Map<string, { site: Site; text: string; tone: "stop" | "replay" | "flood" }>();
+      for (const alert of alerts) {
+        const site = byId.get(alert.site_id);
+        if (!site || (alert.type !== "lightning" && alert.type !== "flood")) continue;
+        if (rows.get(site.id)?.tone === "stop") continue;
+        const distance = alert.last_strike_distance_mi;
+        rows.set(site.id, alert.type === "flood" ? { site, text: "Flood risk", tone: "flood" }
+          : alert.replay ? { site, text: "Stop work", tone: "replay" }
+          : { site, text: distance !== null && Number.isFinite(distance) ? `Stop work · ${(Math.floor(distance * 10) / 10).toFixed(1)} mi` : "Stop work", tone: "stop" });
+      }
+      // Cluster in screen space so nearby sites share one label.
+      const groups: { x: number; y: number; items: typeof rows extends Map<string, infer V> ? V[] : never }[] = [];
+      for (const row of rows.values()) {
+        const point = instance.project([row.site.lon, row.site.lat]);
+        if (point.x < 0 || point.y < 0 || point.x > box.width || point.y > box.height) continue;
+        const group = groups.find((g) => Math.hypot(g.x - point.x, g.y - point.y) < 90);
+        if (group) group.items.push(row); else groups.push({ x: point.x, y: point.y, items: [row] });
+      }
+      for (const group of groups) {
+        const lead = group.items[0].site;
+        const el = document.createElement("div");
+        el.className = "site-callout";
+        el.innerHTML = group.items.slice(0, 4).map((row) => `<span class="site-callout__row site-callout__row--${row.tone}"><b>${escapeHtml(row.site.name)}</b><span>${row.tone === "replay" ? '<span class="pc-chip pc-chip--replay">REPLAY</span>' : ""}${row.text}</span></span>`).join("")
+          + (group.items.length > 4 ? `<span class="site-callout__more">+${group.items.length - 4} more</span>` : "");
+        let fitted = false;
+        for (const placement of PLACEMENTS) {
+          el.dataset.side = placement.side;
+          const label = new MarkerClass({ element: el, anchor: placement.anchor, offset: [...placement.offset] as [number, number] }).setLngLat([lead.lon, lead.lat]).addTo(instance);
+          const rect = el.getBoundingClientRect();
+          const inside = rect.left >= box.left + 4 && rect.right <= box.right - 4 && rect.top >= box.top + 4 && rect.bottom <= box.bottom - 4;
+          const hits = (other: DOMRect) => rect.left < other.right + 4 && rect.right > other.left - 4 && rect.top < other.bottom + 4 && rect.bottom > other.top - 4;
+          if (inside && !avoid.some(hits) && !placed.some(hits)) { labels.current.push(label); placed.push(rect); fitted = true; break; }
+          label.remove();
+        }
+        if (!fitted) el.remove();
+      }
+    };
+    void import("maplibre-gl").then(({ Marker }) => { MarkerClass = Marker; layout(); });
+    instance.on("moveend", layout);
+    instance.on("resize", layout);
+    // The layers panel opens and closes: its size changes what a label may cover.
+    const observer = new ResizeObserver(() => layout());
+    container.current?.parentElement?.querySelectorAll("[data-map-avoid]").forEach((el) => observer.observe(el));
+    return () => { disposed = true; instance.off("moveend", layout); instance.off("resize", layout); observer.disconnect(); clear(); };
+  }, [ready, callouts, sites, alerts, layers.sites]);
 
   useEffect(() => {
     if (!ready || !selectedId) return;
