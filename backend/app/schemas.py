@@ -387,6 +387,7 @@ class LightningCell(BaseModel):
     heading_deg: float | None
     moving_toward: str | None
     last_flash_at: datetime
+    replay: bool = False
 
 
 # ---------- GET /sites/{id}/beacon ----------
