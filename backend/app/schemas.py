@@ -36,6 +36,8 @@ class Site(BaseModel):
     county: str
     timezone: str
     hazard_index: HazardIndex
+    hazard_index_live: HazardIndex
+    replay_override: bool = False
     top_hazard: HazardType
     lightning_approach: LightningApproach | None = None
 
