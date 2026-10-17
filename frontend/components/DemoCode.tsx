@@ -25,12 +25,12 @@ export function DemoCodeForm({ wrong, onSubmit, onCancel }: { wrong: boolean; on
         autoFocus
         value={code}
         onChange={(e) => setCode(e.target.value)}
-        className="min-h-11 w-40 rounded-card border-2 border-rule bg-surface px-3 text-text focus-visible:outline-2 focus-visible:outline-brand"
+        className="min-h-11 w-40 rounded-card border border-border bg-surface px-3 text-text focus-visible:outline-2 focus-visible:outline-brand"
       />
       <button type="submit" disabled={!code.trim()} className="pc-btn pc-btn--primary">
         Continue
       </button>
-      <button type="button" onClick={onCancel} className="pc-btn">
+      <button type="button" onClick={onCancel} className="pc-btn pc-btn--quiet">
         Cancel
       </button>
       <p role={wrong ? "alert" : "status"} className={`w-full ${wrong ? "text-risk-red" : "text-muted"}`}>

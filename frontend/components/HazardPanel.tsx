@@ -8,12 +8,12 @@ import { formatAgo, formatSiteDateTime } from "@/lib/time";
 // required numbers from a placeholder, so this panel only shows detail rows when the card is live:
 // hazard_status is set and (for polled sources) as_of is set.
 
-// Signal: the card is white with a black rule; the status is a sign band across the top. Danger is
-// the only solid red, watch is solid amber (black type), OK is a quiet green band.
-const STATUS_STYLES: Record<HazardStatus, { band: string; label: string }> = {
-  ok: { band: "bg-risk-green-bg text-risk-green", label: "OK" },
-  watch: { band: "bg-risk-amber-solid text-on-risk-amber", label: "Watch" },
-  danger: { band: "bg-risk-red-solid text-on-risk-red", label: "Danger" },
+// Calm card with a status band across the top: OK and Watch are quiet tints; Danger is a safety state,
+// so it gets the sign treatment (solid red band, heavy rule).
+const STATUS_STYLES: Record<HazardStatus, { band: string; border: string; label: string }> = {
+  ok: { band: "bg-risk-green-bg text-risk-green", border: "border border-border", label: "OK" },
+  watch: { band: "bg-risk-amber-bg text-risk-amber", border: "border border-border", label: "Watch" },
+  danger: { band: "bg-risk-red-solid text-on-risk-red", border: "border-2 border-rule", label: "Danger" },
 };
 
 /** A detail row; a null value renders as an unknown "—", never as zero or "none". */
@@ -49,8 +49,8 @@ export default function HazardPanel({ title, card, rows, freshness, timeZone, no
   const style = status === null ? null : STATUS_STYLES[status];
 
   return (
-    <article className={`flex flex-col gap-3 border-2 bg-surface p-4 pbs-0 ${style && !uncertain ? "border-rule" : "border-dashed border-muted"}`}>
-      <header className={`-mx-4 flex min-h-9 items-center justify-between gap-3 px-4 ${style && !uncertain ? style.band : "border-be-2 border-dashed border-muted text-muted"}`}>
+    <article className={`flex flex-col gap-3 bg-surface p-4 pbs-0 ${style && !uncertain ? style.border : "border-2 border-dashed border-muted"}`}>
+      <header className={`-mx-4 flex min-h-9 items-center justify-between gap-3 px-4 ${style && !uncertain ? style.band : "border-be border-dashed border-muted text-muted"}`}>
         <h2 className="pc-label truncate text-xs">{title}</h2>
         <span
           className="pc-label shrink-0 text-xs"

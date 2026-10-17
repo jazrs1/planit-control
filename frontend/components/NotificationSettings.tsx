@@ -21,6 +21,6 @@ export default function NotificationSettings({ initialSites }: { initialSites: S
     <h1 className="pc-title">Notification settings</h1>
     <p className="text-sm text-muted">These settings apply to this browser on this device.</p>
     <PushSettings sites={demo ? DEMO_DATA.sites : sites} sitesUnconfirmed={!demo && failed} />
-    {failed && !demo && <button type="button" onClick={() => void refresh()} className="min-h-12 rounded-card border-2 border-rule px-4 font-semibold text-brand">Retry loading sites</button>}
+    {failed && !demo && <button type="button" onClick={() => void refresh()} className="min-h-12 rounded-card border border-border px-4 font-semibold text-brand">Retry loading sites</button>}
   </main>;
 }

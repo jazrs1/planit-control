@@ -47,7 +47,7 @@ const BAND_EXAMPLES: HazardIndex[] = [2, 5, 8];
 
 function Section({ id, title, takeaway, children }: { id: string; title: string; takeaway: string; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-4 rounded-card border-2 border-rule bg-surface p-4 sm:p-6">
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-4 rounded-card border border-border bg-surface p-4 sm:p-6">
       <h2 id={`${id}-title`} className="text-xl font-bold text-brand">{title}</h2>
       <p className="mbs-1 font-semibold text-text">{takeaway}</p>
       <div className="mbs-4 space-y-4 text-sm leading-relaxed text-text sm:text-base">{children}</div>
@@ -57,7 +57,7 @@ function Section({ id, title, takeaway, children }: { id: string; title: string;
 
 /** A box in a flow diagram. */
 function Box({ title, children, tone = "plain" }: { title: string; children?: ReactNode; tone?: "plain" | "brand" | "muted" }) {
-  const toneCls = tone === "brand" ? "border-brand bg-brand text-surface" : tone === "muted" ? "border-dashed border-border bg-bg text-muted" : "border-border bg-bg text-text";
+  const toneCls = tone === "brand" ? "border-brand bg-brand text-on-brand" : tone === "muted" ? "border-dashed border-border bg-bg text-muted" : "border-border bg-bg text-text";
   return (
     <div className={`flex-1 rounded-card border p-3 text-sm ${toneCls}`}>
       <p className="font-semibold">{title}</p>
@@ -94,7 +94,7 @@ export default async function HowItWorksPage() {
         <p className="mbs-2 text-muted">PlanIT Control pulls live hazard data for 55 real Florida power plants, stops work when lightning gets close, and tells supervisors each evening whether tomorrow is go, caution or no-go.</p>
       </header>
 
-      <aside aria-labelledby="sixty-title" className="rounded-card border-2 border-brand bg-surface p-4">
+      <aside aria-labelledby="sixty-title" className="rounded-card border border-border bg-surface bg-surface p-4">
         <h2 id="sixty-title" className="font-bold text-brand">In 60 seconds</h2>
         <ul className="mbs-2 list-disc space-y-1 ps-5 text-sm sm:text-base">
           <li><strong>9 data sources</strong>, from satellite lightning every 20 seconds to FEMA flood maps, joined per site.</li>
@@ -132,7 +132,7 @@ export default async function HowItWorksPage() {
       </Section>
 
       <Section id="sources" title="Data sources" takeaway="Nine sources, each checked as often as it actually changes.">
-        <div className="overflow-hidden rounded-card border-2 border-rule">
+        <div className="overflow-hidden rounded-card border border-border">
           <div className="hidden grid-cols-[10rem_1fr_7rem] gap-3 border-be border-border bg-bg px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted sm:grid">
             <span>Source</span><span>What it gives us</span><span className="text-end">How often</span>
           </div>
@@ -160,7 +160,7 @@ export default async function HowItWorksPage() {
           <li>The check runs every 20 seconds <strong>even with no lightning</strong>, because the all-clear is triggered by silence.</li>
         </ul>
 
-        <figure className="rounded-card border-2 border-rule bg-bg p-3">
+        <figure className="rounded-card border border-border bg-bg p-3">
           <figcaption className="mbe-3 text-sm font-semibold">Example: three strikes near one site</figcaption>
           <div className="space-y-3">
             {TIMELINE.map((row) => (
@@ -221,7 +221,7 @@ export default async function HowItWorksPage() {
           <li><strong>Lightning stop-work overrides today&apos;s index to at least 9.0.</strong> The stop-work engine runs independently; no model forecast can shorten or clear its wait.</li>
           <li>Tomorrow uses tomorrow&apos;s forecast, peak heat, and watches or warnings in effect then. Today&apos;s crew-report floors, advisories and lightning stop-work do not carry over. If the model cannot score, safety rules still run.</li>
         </ol>
-        {modelInfo && <details className="rounded-card border-2 border-rule bg-bg p-3">
+        {modelInfo && <details className="rounded-card border border-border bg-bg p-3">
           <summary className="cursor-pointer font-semibold text-brand">Hybrid rules from the model service</summary>
           <p className="mbs-2 text-sm text-muted">{modelInfo.hybrid}</p>
         </details>}

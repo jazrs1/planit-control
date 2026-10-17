@@ -5,7 +5,7 @@ import { modelCalibrationUrl } from "@/lib/api";
 const count = (value: number) => value.toLocaleString("en-US");
 
 function MetricsTable({ results, horizon, testYear }: { results: ModelComparison[]; horizon: "same_day" | "day_ahead"; testYear: ModelInfo["training"]["test_year"] }) {
-  return <div className="overflow-x-auto rounded-card border-2 border-rule">
+  return <div className="overflow-x-auto rounded-card border border-border">
     <table className="w-full text-start text-sm">
       <caption className="p-3 text-start font-semibold">{testYear} test results · {horizon === "same_day" ? "same-day forecasts" : "forecasts issued a day earlier"}</caption>
       <thead className="border-y border-border bg-bg text-xs text-muted">
@@ -30,7 +30,7 @@ export default function ModelExplanation({ info }: { info: ModelInfo | null }) {
   const model = info?.results[0]; // Contract: model first, followed by baselines.
   const comparisons = info?.results.slice(1).filter((baseline) => baseline.same_day.pr_auc > 0);
 
-  return <section id="model" aria-labelledby="ml-title" className="scroll-mt-4 space-y-4 rounded-card border-2 border-brand p-4">
+  return <section id="model" aria-labelledby="ml-title" className="scroll-mt-4 space-y-4 rounded-card border border-border bg-surface p-4">
     <h3 id="ml-title" className="text-lg font-bold text-brand">Machine learning model</h3>
     <p>A model estimates the chance of a <strong>crew-relevant hazardous weather day</strong>: NOAA Storm Events logs a storm, flood or other hazardous weather near the site. It mainly learns storms and floods; it does not predict injuries or the time of a lightning strike.</p>
     <p>It learns from <strong>archived Open-Meteo forecasts matched against NOAA Storm Events</strong>, using the same kind of forecast it receives live.</p>
@@ -48,7 +48,7 @@ export default function ModelExplanation({ info }: { info: ModelInfo | null }) {
         <p className="text-xs text-muted">PR-AUC and ROC-AUC measure ranking; higher is better. Brier measures probability error; lower is better. Reported hazards occurred on {(info.test.base_rate * 100).toFixed(2)}% of test site-days ({count(info.test.events)} of {count(info.test.site_days)}).</p>
       </div>
 
-      <details className="rounded-card border-2 border-rule bg-bg p-3">
+      <details className="rounded-card border border-border bg-bg p-3">
         <summary className="cursor-pointer font-semibold text-brand">Day-ahead results and label definition</summary>
         <MetricsTable results={info.results} horizon="day_ahead" testYear={info.training.test_year} />
         <p className="mbs-2 text-xs text-muted">— = not evaluated. A site-day is one site on one local calendar day.</p>
@@ -61,7 +61,7 @@ export default function ModelExplanation({ info }: { info: ModelInfo | null }) {
         <ModelCalibrationPlot key={info.calibration.plot_url} src={modelCalibrationUrl(info.calibration.plot_url)} />
         <p className="text-sm text-muted">The diagonal is a perfect match between predicted and observed chances. The model is better at ranking days than estimating exact probabilities; the highest probabilities can be overconfident.</p>
       </figure>
-      <details className="rounded-card border-2 border-rule bg-bg p-3">
+      <details className="rounded-card border border-border bg-bg p-3">
         <summary className="cursor-pointer font-semibold text-brand">Model evaluation limits</summary>
         <ul className="mbs-2 list-disc space-y-2 ps-5 text-sm text-muted">{info.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
       </details>

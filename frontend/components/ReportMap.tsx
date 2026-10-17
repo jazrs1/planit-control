@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CreateReportRequest, HazardReport } from "@shared/types";
 import type { Map as LibreMap, Marker } from "maplibre-gl";
 import { REPORT_LABEL } from "@/lib/reports";
+import { paintBasemap } from "@/lib/mapStyle";
 
 type ReportMapProps = {
   reports: HazardReport[];
@@ -32,6 +33,7 @@ export default function ReportMap({ reports, pin, onPin, selectedId, onSelect }:
       // Same worker URL and basemap as the dashboard.
       lib.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
       const instance = new lib.Map({ container: container.current, style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", center: [-83.5, 28.2], zoom: 5.5, attributionControl: { compact: false } });
+      instance.on("style.load", () => paintBasemap(instance));
       map.current = instance;
       instance.addControl(new lib.NavigationControl(), "top-right");
       instance.on("click", (event) => callbacks.current.onPin?.({ lat: event.lngLat.lat, lon: event.lngLat.wrap().lng }));
@@ -93,12 +95,12 @@ export default function ReportMap({ reports, pin, onPin, selectedId, onSelect }:
 
   return (
     <div className="relative">
-      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card border-2 border-rule sm:h-96" />
-      {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-56 rounded-card border-2 border-rule bg-surface p-2 text-sm text-muted">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
+      <div ref={container} role="region" aria-label={onPin ? "Tap the map to choose the hazard location" : "Crew hazard reports map"} className="h-80 w-full overflow-hidden rounded-card border border-border sm:h-96" />
+      {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-56 rounded-card border border-border bg-surface p-2 text-sm text-muted">Map tiles unavailable. {onPin ? "Use your location or enter coordinates below." : "Report details are still available in the list."}</p>}
       {onPin && <button type="button" disabled={!ready} onClick={() => {
         const center = map.current?.getCenter().wrap();
         if (center) onPin({ lat: center.lat, lon: center.lng });
-      }} className="mbs-2 min-h-11 rounded-card border-2 border-rule bg-surface px-4 text-sm font-semibold text-brand disabled:opacity-50">Use map center as pin</button>}
+      }} className="mbs-2 min-h-11 rounded-card border border-border bg-surface px-4 text-sm font-semibold text-brand disabled:opacity-50">Use map center as pin</button>}
     </div>
   );
 }

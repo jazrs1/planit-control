@@ -59,7 +59,7 @@ export default function ScoreSparkline({ history, site, compact = false, unconfi
         <circle cx={x(latest)} cy={y(latest.hazard_index)} r={4.5} className={`${unconfirmed ? "fill-muted" : POINT_COLOR[riskLevel(latest.hazard_index)]} stroke-surface`} strokeWidth={2} vectorEffect="non-scaling-stroke" />
         {selected && <circle cx={x(selected)} cy={y(selected.hazard_index)} r={5} fill="none" className="stroke-text" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
       </svg>
-      {selected && <div id={tooltipId} role="tooltip" className="pointer-events-none absolute inset-x-1 inset-be-full z-10 rounded-card border-2 border-rule bg-surface px-2 py-1 text-xs text-text">{describe(selected)}</div>}
+      {selected && <div id={tooltipId} role="tooltip" className="pointer-events-none absolute inset-x-1 inset-be-full z-10 rounded-card border border-border bg-surface px-2 py-1 text-xs text-text">{describe(selected)}</div>}
     </div>
     <div className="flex justify-between gap-2 text-xs text-muted"><span>{formatSiteDateTime(new Date(start).toISOString(), site.timezone)}</span><span>{formatSiteDateTime(latest.scored_at, site.timezone)}</span></div>
     <p className="text-xs text-muted">{unconfirmed ? "? Last known history · Not confirmed. " : ""}Green &lt; 4 · amber 4–&lt;7 · red ≥ 7. Gaps mark long breaks in scoring.</p>

@@ -123,7 +123,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
 
   if (submitted) return (
     <section className="space-y-4">
-      <div role="status" className="rounded-card border-2 border-rule bg-risk-green-bg p-4 text-risk-green">
+      <div role="status" className="rounded-card border border-border bg-risk-green-bg p-4 text-risk-green">
         <h2 ref={confirmation} tabIndex={-1} className="text-xl font-bold">Report submitted</h2>
         <p>Your hazard report has been saved. Its location is pinned below.</p>
       </div>
@@ -134,7 +134,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
         <Link href="/reports" className="pc-btn pc-btn--primary">View reports</Link>
         <button type="button" onClick={() => {
           setSubmitted(null); setFile(null); setCategory(""); setNote(""); uploaded.current = null; setProgress(0);
-        }} className="min-h-12 rounded-card border-2 border-rule bg-surface px-4 font-semibold text-brand">Report another hazard</button>
+        }} className="min-h-12 rounded-card border border-border bg-surface px-4 font-semibold text-brand">Report another hazard</button>
       </div>
     </section>
   );
@@ -143,7 +143,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
     <form onSubmit={submit} className="space-y-5" aria-busy={busy}>
       <fieldset disabled={busy} className="min-w-0 space-y-5 disabled:opacity-70">
         <legend className="sr-only">Hazard details</legend>
-        <div className="rounded-card border-2 border-rule bg-surface p-4">
+        <div className="rounded-card border border-border bg-surface p-4">
           <label htmlFor="photo" className="block font-semibold">1. Take or choose a photo</label>
           <p id="photo-help" className="mbs-1 text-sm text-muted">JPEG, PNG, WebP, or HEIC. Up to 10 MB.</p>
           <input id="photo" type="file" accept="image/*" capture="environment" required aria-describedby="photo-help photo-error" aria-invalid={!!photoError} className="mbs-3 block min-h-12 w-full min-w-0 text-sm file:me-3 file:min-h-12 file:rounded-card file:border-0 file:bg-brand file:px-3 file:font-semibold file:text-on-brand" onChange={(event) => {
@@ -156,7 +156,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
           {preview && <ReportPhoto key={preview} src={preview} alt="Selected hazard photo" className="mbs-3 h-48 w-full" />}
         </div>
 
-        <div className="space-y-4 rounded-card border-2 border-rule bg-surface p-4">
+        <div className="space-y-4 rounded-card border border-border bg-surface p-4">
           <label className="block font-semibold" htmlFor="category">2. What did you see?
             <select id="category" required value={category} onChange={(event) => setCategory(event.target.value)} className={fieldClass}>
               <option value="">Choose a hazard</option>
@@ -183,10 +183,10 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
           </div>
         </div>
 
-        <section aria-labelledby="location-heading" className="space-y-3 rounded-card border-2 border-rule bg-surface p-4">
+        <section aria-labelledby="location-heading" className="space-y-3 rounded-card border border-border bg-surface p-4">
           <h2 id="location-heading" className="font-semibold">3. Pin the hazard location</h2>
           <p className="text-sm text-muted">Tap the map where you saw the hazard. Adjust the pin if it is away from your current location.</p>
-          <button type="button" disabled={locating} onClick={() => locate()} className="min-h-12 rounded-card border-2 border-rule px-4 font-semibold text-brand disabled:opacity-50">{locating ? "Finding location…" : "Use my location"}</button>
+          <button type="button" disabled={locating} onClick={() => locate()} className="min-h-12 rounded-card border border-border px-4 font-semibold text-brand disabled:opacity-50">{locating ? "Finding location…" : "Use my location"}</button>
           <p role="status" className="text-sm text-muted">{locationMessage}</p>
           <ReportMap reports={NO_REPORTS} pin={pin} onPin={busy ? undefined : choosePin} />
           <p className="text-sm text-muted">{pin ? `Pin: ${pin.lat.toFixed(6)}, ${pin.lon.toFixed(6)}` : "No pin selected yet."}</p>
@@ -196,7 +196,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
               <label htmlFor="latitude" className="text-sm">Latitude<input id="latitude" inputMode="decimal" value={coordinates.lat} onChange={(event) => setCoordinates({ ...coordinates, lat: event.target.value })} className={fieldClass} /></label>
               <label htmlFor="longitude" className="text-sm">Longitude<input id="longitude" inputMode="decimal" value={coordinates.lon} onChange={(event) => setCoordinates({ ...coordinates, lon: event.target.value })} className={fieldClass} /></label>
             </div>
-            <button type="button" className="pc-btn mbs-2" onClick={() => {
+            <button type="button" className="pc-btn pc-btn--quiet mbs-2" onClick={() => {
               const lat = Number(coordinates.lat), lon = Number(coordinates.lon);
               if (!coordinates.lat.trim() || !coordinates.lon.trim() || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
                 setLocationMessage("Enter latitude from -90 to 90 and longitude from -180 to 180."); return;
@@ -206,7 +206,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
           </details>
         </section>
       </fieldset>
-      {busy && <div role="status" className="rounded-card border-2 border-rule bg-surface p-4">
+      {busy && <div role="status" className="rounded-card border border-border bg-surface p-4">
         <p className="font-medium">{phase === "uploading" ? `Uploading photo… ${progress}%` : "Photo uploaded. Saving report…"}</p>
         <progress max={100} value={phase === "saving" ? 100 : progress} aria-label="Photo upload progress" className="mbs-2 h-3 w-full accent-brand" />
       </div>}

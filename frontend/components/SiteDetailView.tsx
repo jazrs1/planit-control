@@ -195,7 +195,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
             <>
               <h1 className="text-lg font-semibold">No demo data for this site</h1>
               <p className="text-sm text-muted">Demo data covers only the six sample sites.</p>
-              <button type="button" onClick={() => setDemo(false)} className="min-h-11 rounded-card border-2 border-rule bg-surface px-4 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
+              <button type="button" onClick={() => setDemo(false)} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
             </>
           ) : missing ? (
             <h1 className="text-lg font-semibold">Site not found</h1>
@@ -206,7 +206,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" onClick={() => { void poll(); void refreshAlerts(); }} className="min-h-11 rounded-card bg-brand px-4 font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Retry now</button>
                 {siteId in DEMO_DATA.siteDetails && (
-                  <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border-2 border-rule bg-surface px-4 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
+                  <button type="button" onClick={() => setDemo(true)} className="min-h-11 rounded-card border border-border bg-surface px-4 font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">Show demo data</button>
                 )}
               </div>
             </>
@@ -230,7 +230,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <div>
         {backLink}
         {demo && (
-          <p role="status" className="mbs-2 flex flex-wrap items-center gap-2 rounded-card border-2 border-rule bg-surface p-3 text-sm font-semibold text-muted">
+          <p role="status" className="mbs-2 flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-3 text-sm font-semibold text-muted">
             <span className="rounded-chip border border-border px-2 py-0.5 text-xs">Demo data</span>
             Sample conditions from shared/mocks · not live
             <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-2 text-brand underline focus-visible:outline-2 focus-visible:outline-brand">Exit demo</button>
@@ -268,7 +268,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <LightningApproachChip approach={detail.lightning_approach} stopWork={siteAlerts.some((alert) => alert.type === "lightning")} unconfirmed={connectionLost || alerts === null || alertsStatus === "stale"} nowMs={nowMs === null ? null : serverNow()} demo={demo} />
       <SiteScoreHistory site={detail} unconfirmed={connectionLost} />
 
-      <section aria-labelledby="nws-heading" className="rounded-card border-2 border-rule bg-surface p-4">
+      <section aria-labelledby="nws-heading" className="rounded-card border border-border bg-surface p-4">
         <h2 id="nws-heading" className="text-base font-semibold">National Weather Service alerts</h2>
         {nws == null ? (
           <p className="mbs-2 text-sm text-muted">NWS alerts unavailable for this site.</p>
@@ -372,7 +372,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         onRegenerate={demo ? undefined : regenerateBriefing}
       />
 
-      <section aria-labelledby="factors-heading" className="rounded-card border-2 border-rule bg-surface p-4">
+      <section aria-labelledby="factors-heading" className="rounded-card border border-border bg-surface p-4">
         <h2 id="factors-heading" className="text-base font-semibold">What drives today&apos;s index</h2>
         {detail.top_factors.length === 0 ? (
           <p className="mbs-2 text-sm text-muted">No contributing factors.</p>

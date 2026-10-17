@@ -177,7 +177,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
           ) : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
         </p>
         {onRegenerate && entry.kind !== "loading" && (
-          <button type="button" disabled={busy} onClick={() => void regenerate()} className="min-h-11 rounded-card border-2 border-rule px-3 text-sm font-semibold text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => void regenerate()} className="min-h-11 rounded-card border border-border px-3 text-sm font-semibold text-brand hover:bg-bg focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50">
             {busy ? "Regenerating…" : entry.kind === "briefing" ? "Regenerate" : "Generate now"}
           </button>
         )}
