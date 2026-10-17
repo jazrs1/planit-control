@@ -98,7 +98,6 @@ export default function TopNavigation() {
           {LINKS.map((link) => <li key={link.href}><Link href={link.href} onClick={() => setOpen(false)} aria-current={pathname === link.href ? "page" : undefined} className={`flex min-h-14 items-center px-4 text-base font-bold focus-visible:outline-2 ${link.href === "/report" ? "bg-brand text-on-brand" : pathname === link.href ? "border-s-4 border-text bg-surface-2" : ""}`}>{link.label}</Link></li>)}
         </ul>
       </div>}
-      {!open && pathname !== "/report" && pathname !== "/crew" && <Link href="/report" className="pc-btn pc-btn--primary pc-btn--large fixed inset-x-4 inset-be-[calc(env(safe-area-inset-bottom,0px)+1rem)] z-50 shadow-float sm:hidden">Report hazard</Link>}
     </nav>
   );
 }
