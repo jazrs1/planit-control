@@ -142,8 +142,20 @@ def latest(conn: Connection, now: datetime) -> dict[str, dict[str, dict]]:
     for r in rows:
         out.setdefault(r["site_id"], {})[r["for_date"].isoformat()] = {
             "probability": r["model_probability"], "score": rescore(r["model_probability"], r["model_score"]),
-            "factors": r["model_factors"] or []}
+            "factors": current_hazards(r["model_factors"] or [])}
     return out
+
+
+def current_hazards(factors: list[dict]) -> list[dict]:
+    """Stored model factors with their hazard re-derived from the feature (ml/model.FACTOR_HAZARD), so
+    rows scored before a mapping change (e.g. gusts: lightning -> storm) read like new ones."""
+    from ml.model import DEFAULT_HAZARD, FACTOR_GROUPS, FACTOR_HAZARD
+
+    weather = [f["factor"] for f in factors
+               if FACTOR_HAZARD.get(f.get("factor")) and f.get("factor") not in FACTOR_GROUPS.values()]
+    fallback = FACTOR_HAZARD[weather[0]] if weather else DEFAULT_HAZARD
+    return [{**f, "hazard": FACTOR_HAZARD.get(f["factor"]) or fallback} if f.get("factor") in FACTOR_HAZARD else f
+            for f in factors]
 
 
 def rescore(probability: float | None, stored_score: float) -> float:

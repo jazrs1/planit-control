@@ -135,4 +135,4 @@ def test_location_factor_wording_and_fallback_hazard():
     contrib = pd.Series({"lat": 0.5, "lon": 0.2, "cape_max": -0.1, "doy_sin": 0.0, "doy_cos": 0.0})
     factors = top_factors(contrib, pd.Series({"cape_max": 100.0}), date(2025, 1, 4))
     assert factors == [{"factor": "location", "label": "Area with frequent past severe-weather reports",
-                        "hazard": "lightning", "weight": 1.0}]
+                        "hazard": "storm", "weight": 1.0}]

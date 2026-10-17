@@ -54,8 +54,8 @@ CHRONIC_MAX = 3.0      # wildlife sightings and fires 10-25 mi away count at mos
 MAX_FACTORS = 4
 
 # NWS event -> (family, hazard, floor). Each family gives one floor, from its most severe alert, so a
-# Hurricane Warning doesn't hide a Tornado Warning. Storm and tropical alerts use the `lightning`
-# hazard, like the model's storm factors (the contract has no wind or storm type).
+# Hurricane Warning doesn't hide a Tornado Warning. Storm and tropical alerts use the `storm` hazard,
+# like the model's storm factors (`lightning` means satellite-detected strikes only).
 NWS_FLOORS = {
     "Flood Warning": ("flood", "flood", WARNING_FLOOR),
     "Flash Flood Warning": ("flood", "flood", WARNING_FLOOR),
@@ -65,14 +65,14 @@ NWS_FLOORS = {
     "Coastal Flood Watch": ("flood", "flood", WATCH_FLOOR),
     "Flood Advisory": ("flood", "flood", WATCH_FLOOR),
     "Coastal Flood Advisory": ("flood", "flood", WATCH_FLOOR),
-    "Severe Thunderstorm Warning": ("storm", "lightning", WARNING_FLOOR),
-    "Tornado Warning": ("storm", "lightning", WARNING_FLOOR),
-    "Severe Thunderstorm Watch": ("storm", "lightning", WATCH_FLOOR),
-    "Tornado Watch": ("storm", "lightning", WATCH_FLOOR),
-    "Hurricane Warning": ("tropical", "lightning", HURRICANE_FLOOR),
-    "Tropical Storm Warning": ("tropical", "lightning", WARNING_FLOOR),
-    "Hurricane Watch": ("tropical", "lightning", WATCH_FLOOR),
-    "Tropical Storm Watch": ("tropical", "lightning", WATCH_FLOOR),
+    "Severe Thunderstorm Warning": ("storm", "storm", WARNING_FLOOR),
+    "Tornado Warning": ("storm", "storm", WARNING_FLOOR),
+    "Severe Thunderstorm Watch": ("storm", "storm", WATCH_FLOOR),
+    "Tornado Watch": ("storm", "storm", WATCH_FLOOR),
+    "Hurricane Warning": ("tropical", "storm", HURRICANE_FLOOR),
+    "Tropical Storm Warning": ("tropical", "storm", WARNING_FLOOR),
+    "Hurricane Watch": ("tropical", "storm", WATCH_FLOOR),
+    "Tropical Storm Watch": ("tropical", "storm", WATCH_FLOOR),
     "Excessive Heat Warning": ("heat", "heat", WARNING_FLOOR),
     "Extreme Heat Warning": ("heat", "heat", WARNING_FLOOR),  # NWS renamed Excessive to Extreme in 2025
     "Excessive Heat Watch": ("heat", "heat", WATCH_FLOOR),
@@ -103,7 +103,7 @@ def _model_component(model: dict | None) -> Component | None:
     if not model:
         return None
     factors = [(f["hazard"], f["label"], f["weight"]) for f in model.get("factors") or []]
-    return Component("model", factors[0][0] if factors else "lightning", float(model["score"]), factors)
+    return Component("model", factors[0][0] if factors else "storm", float(model["score"]), factors)
 
 
 def _rule(hazard: str | None, score: float, label: str, urgent: bool = False) -> Component | None:
