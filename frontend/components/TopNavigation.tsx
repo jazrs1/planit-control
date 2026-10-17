@@ -62,7 +62,7 @@ export default function TopNavigation() {
       <div className="flex h-full items-center gap-3 px-3 sm:px-4">
         <Link href="/" className="flex min-h-12 shrink-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="PlanIT Control dashboard">
           <img src="/icon.svg" width={30} height={30} alt="" className="shrink-0" />
-          <span className="text-base font-extrabold tracking-[-0.01em]">PlanIT<span className="hidden font-medium text-muted sm:inline"> Control</span></span>
+          <span className="text-base font-semibold tracking-[-0.01em]">PlanIT<span className="hidden font-normal text-muted sm:inline"> Control</span></span>
         </Link>
         <div className="ms-auto hidden items-center gap-0.5 xl:flex">
           {LINKS.filter((link) => link.href !== "/alerts").map((link) => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} className={linkStyle(link.href)}>{link.label}</Link>)}
@@ -76,7 +76,7 @@ export default function TopNavigation() {
           aria-label={`${badge.label}, ${breakdown}${replayNote ? ", replay alerts counted separately" : ""}`}
         >
           <span className="flex flex-wrap items-center gap-x-1.5">
-          <span className="text-[0.8125rem] font-bold">Alerts</span>
+          <span className="text-sm font-semibold">Alerts</span>
           <span aria-hidden="true" className={`pc-chip min-w-7 justify-center text-[0.8125rem] tabular-nums ${badge.style}`}>
             {badge.text}
           </span>
@@ -88,7 +88,7 @@ export default function TopNavigation() {
           {status === "demo" && <span aria-hidden="true" className="pc-chip pc-chip--unknown">Demo data</span>}
           {replayNote && <span aria-hidden="true" title="Replay alerts are counted on the dashboard's replay panel" className="pc-chip pc-chip--replay max-sm:hidden">+ replay</span>}
           </span>
-          <span aria-hidden="true" className="text-[0.6875rem] text-muted">{breakdown}</span>
+          <span aria-hidden="true" className="text-xs text-muted">{breakdown}</span>
         </Link>
         <button ref={toggle} type="button" aria-expanded={open} aria-controls="main-menu" onClick={() => setOpen((value) => !value)} className="pc-btn pc-btn--quiet min-h-11 shrink-0 px-3 text-sm xl:hidden">{open ? "Close" : "Menu"}</button>
         </div>

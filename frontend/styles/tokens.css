@@ -17,21 +17,22 @@
   color-scheme: light;
 
   /* Read literally by lib/branding.ts for the web manifest and browser chrome, so plain hex. */
-  --pc-brand: #141414;
-  --pc-bg: #f4f4f2;
+  --pc-brand: #23221f;
+  --pc-bg: #f6f5f1;
 
   /* Surfaces */
   --pc-page: light-dark(var(--pc-bg), oklch(0.15 0 none));
   --pc-surface: light-dark(oklch(1 0 none), oklch(0.2 0 none));
-  --pc-surface-2: light-dark(oklch(0.95 0 none), oklch(0.255 0 none));
+  --pc-surface-2: light-dark(oklch(0.96 0.003 85), oklch(0.255 0 none));
   /* Hairline between rows; --pc-rule is the black sign rule around panels. */
-  --pc-border: light-dark(oklch(0.9 0 none), oklch(0.32 0 none));
+  --pc-border: light-dark(oklch(0.91 0.004 85), oklch(0.32 0 none));
   --pc-border-strong: light-dark(oklch(0.8 0 none), oklch(0.42 0 none));
   --pc-rule: light-dark(oklch(0.16 0 none), oklch(0.9 0 none));
 
   /* Text */
-  --pc-text: light-dark(oklch(0.16 0 none), oklch(0.97 0 none));
-  --pc-text-muted: light-dark(oklch(0.43 0 none), oklch(0.74 0 none));
+  /* Soft contrast: near-black on off-white, never pure black on white. */
+  --pc-text: light-dark(oklch(0.25 0.006 85), oklch(0.95 0.004 85));
+  --pc-text-muted: light-dark(oklch(0.5 0.008 85), oklch(0.74 0.006 85));
 
   /* Ink: primary buttons and the top bar. Flips to white on black in dark mode. */
   --pc-ink: light-dark(var(--pc-brand), oklch(0.97 0 none));
@@ -81,8 +82,9 @@
   --pc-map-label: light-dark(oklch(0.3 0 none), oklch(0.8 0.005 250));
   --pc-map-water-label: light-dark(oklch(0.45 0.05 240), oklch(0.6 0.04 240));
 
-  /* Shape. Signs have square corners; --pc-radius-pill is only for true circles (dots, markers). */
-  --pc-radius-card: 0px;
+  /* Shape. Panels and buttons have a small radius; safety badges and the crew view's stop-work sign
+     keep square corners (--pc-radius-chip, pc-panel--heavy). */
+  --pc-radius-card: 8px;
   --pc-radius-chip: 0px;
   --pc-radius-pill: 999px;
   /* Dashboard rules are 2px for long reading; the crew view uses the heavy rule. */
@@ -94,12 +96,22 @@
   /* Width of the site list docked over the dashboard map. */
   --pc-rail-width: 25rem;
   /* Panels over the map float with a soft shadow; panels on the page are separated by hairlines. */
-  --pc-shadow-card: none;
-  --pc-shadow-float: 0 1px 2px light-dark(oklch(0 0 none / 0.06), oklch(0 0 none / 0.4)), 0 8px 24px light-dark(oklch(0 0 none / 0.08), oklch(0 0 none / 0.45));
+  --pc-shadow-card: 0 1px 2px light-dark(oklch(0.3 0.02 70 / 0.05), oklch(0 0 none / 0.3)), 0 4px 14px light-dark(oklch(0.3 0.02 70 / 0.05), oklch(0 0 none / 0.3));
+  --pc-shadow-float: 0 1px 2px light-dark(oklch(0.3 0.02 70 / 0.06), oklch(0 0 none / 0.4)), 0 10px 30px light-dark(oklch(0.3 0.02 70 / 0.1), oklch(0 0 none / 0.45));
 
   /* Type: Overpass, from the Highway Gothic lineage of US road signs. Loaded in app/layout.tsx. */
   --pc-font-sans: var(--font-overpass), ui-sans-serif, system-ui, sans-serif;
   --pc-font-mono: var(--font-overpass-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Type scale: four sizes, two weights (400, 600). Labels 12px grey, body 15px at 1.5 line height,
+     values 20px, headline numbers 32px. Tailwind: text-xs, text-sm (15px here), text-xl, text-[2rem].
+     Mono only for clocks and countdowns; tabular numbers everywhere. Times read "4:03 PM EDT" in the
+     site's zone (lib/time.ts), distances "9.6 mi" / "12 mi" (lib/alerts.ts formatMiles). */
+  --pc-text-label: 0.75rem;
+  --pc-text-body: 0.9375rem;
+  --pc-text-value: 1.25rem;
+  --pc-text-number: 2rem;
+  /* Spacing: one 8px scale (Tailwind's 2 = 8px). Separate with space, not borders; at most three
+     levels of hierarchy per panel (label, value, supporting text). */
   /* Fluid display sizes (320px to 1240px): headings, the crew sign and its countdown. */
   --pc-text-title: clamp(1.5rem, 1.33rem + 0.87vw, 2rem);
   --pc-text-sign: clamp(2.25rem, 1.82rem + 2.17vw, 3.5rem);

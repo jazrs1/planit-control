@@ -30,3 +30,13 @@ export function historySegments(points: ScorePoint[]): ScorePoint[][] {
   }
   return segments;
 }
+
+/** Tomorrow's index from the latest scoring run that scored tomorrow, or null. */
+export function latestTomorrow(history: ScoreHistory | null): ScorePoint | null {
+  let best: ScorePoint | null = null;
+  for (const point of history?.points ?? []) {
+    if (point.horizon !== "tomorrow" || !Number.isFinite(point.hazard_index) || !Number.isFinite(Date.parse(point.scored_at))) continue;
+    if (!best || Date.parse(point.scored_at) > Date.parse(best.scored_at)) best = point;
+  }
+  return best;
+}

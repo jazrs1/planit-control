@@ -44,11 +44,12 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
 
   // Crew view: the whole alert is a sign. Solid red (or amber) header, white body.
   if (prominent) {
-    const header = unconfirmed ? "bg-surface-2 text-muted grayscale" : lightning ? "bg-risk-red-solid text-on-risk-red" : "bg-risk-amber-solid text-on-risk-amber";
+    // A replay alert is never drawn as a real sign: blue, not red or amber.
+    const header = unconfirmed ? "bg-surface-2 text-muted grayscale" : alert.replay ? "bg-notice text-on-notice" : lightning ? "bg-risk-red-solid text-on-risk-red" : "bg-risk-amber-solid text-on-risk-amber";
     return (
       <article className={`pc-panel pc-panel--heavy ${unconfirmed ? "pc-panel--unknown" : ""}`}>
         <header className={`flex items-center gap-4 p-4 ${header}`}>
-          {lightning && !unconfirmed && <StopSign />}
+          {lightning && !unconfirmed && !alert.replay && <StopSign />}
           <div className="min-w-0">
             <p className="text-sign font-black leading-none tracking-[0.02em]">
               {alert.replay && <ReplayTag />}{label}
@@ -78,8 +79,8 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
     <article className={`flex flex-col gap-3 border-2 border-s-[6px] p-3 ${style} ${compact ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {alert.replay && <ReplayTag />}
-          <span className={`pc-chip ${tag} text-xs`}>{label}</span>
+          {alert.replay && !lightning && <ReplayTag />}
+          <span className={`pc-chip ${tag} text-xs`}>{alert.replay && lightning ? "REPLAY STOP WORK" : label}</span>
           {unconfirmed && <span className="pc-label">Last known · connection lost</span>}
         </p>
         {!compact && <h2 className="mbs-1.5 break-words text-lg font-extrabold">{site?.name ?? alert.site_id}</h2>}
