@@ -1,0 +1,23 @@
+[
+  {
+    "lat": 26.184,
+    "lon": -80.912,
+    "detected_at": "2026-10-17T07:12:00Z",
+    "confidence": "nominal",
+    "passes_24h": 2
+  },
+  {
+    "lat": 26.191,
+    "lon": -80.905,
+    "detected_at": "2026-10-16T18:40:00Z",
+    "confidence": "high",
+    "passes_24h": 2
+  },
+  {
+    "lat": 29.514,
+    "lon": -82.301,
+    "detected_at": "2026-10-16T18:38:00Z",
+    "confidence": "low",
+    "passes_24h": 1
+  }
+]

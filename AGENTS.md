@@ -49,6 +49,8 @@ Only change files in folders you own. If you need something in another folder (a
 | POST | `/replay/stop`, GET `/replay/status` | `ReplayStatus` | `replay_status.json` |
 | GET | `/replay/events` | `ReplayEvent[]` (the replay storm's stop-work starts, approach starts and all clears, simulated times; the whole storm from the start) | `replay_events.json` |
 | GET | `/replay/series` | `ReplaySeries` (flashes and sites in stop-work per 5 min, through simulated now) | `replay_series.json` |
+| GET | `/fires/recent` | `FireDetection[]` (map layer: FIRMS detections, last 24 h, plant hot spots removed, with `passes_24h`) | `fires_recent.json` |
+| GET | `/wildlife/recent` | `WildlifeSightingPoint[]` (map layer: iNaturalist + crew wildlife reports, last 30 days, no notes) | `wildlife_recent.json` |
 | GET | `/briefing/{site_id}` | `Briefing` (latest) | `briefings.json` (keyed by site id) |
 | GET | `/briefings` | `BriefingsResponse` (latest per site, cached) | `briefings.json` (values) |
 | POST | `/briefing/send-now` | body `SendBriefingRequest` (one site or all), returns `SendBriefingResponse` | — |

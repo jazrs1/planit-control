@@ -449,3 +449,21 @@ class PushNotification(BaseModel):
     url: str
     tag: str
     sent_at: datetime
+
+
+# ---------- GET /fires/recent, GET /wildlife/recent (map layers) ----------
+
+class FireDetection(BaseModel):
+    lat: float
+    lon: float
+    detected_at: datetime
+    confidence: Literal["low", "nominal", "high"]
+    passes_24h: int
+
+
+class WildlifeSightingPoint(BaseModel):
+    lat: float
+    lon: float
+    species: str | None
+    seen_at: datetime
+    source: Literal["inaturalist", "crew"]

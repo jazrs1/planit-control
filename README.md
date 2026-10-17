@@ -117,6 +117,7 @@ Other commands: `npm run typecheck`, `npm run build`.
 | GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
 | GET | `/sites/{id}/beacon` | Tiny alarm state: stop / unknown / approaching / flood / clear, with countdowns |
 | GET | `/replay/events`, `/replay/series` | The replay storm's events and 5-minute charts for the timeline ([`docs/replay-timeline.md`](docs/replay-timeline.md)) |
+| GET | `/fires/recent`, `/wildlife/recent` | Map points: fire detections (last 24 h, plant hot spots removed) and wildlife sightings (last 30 days) |
 | GET | `/push/public-key` | VAPID public key for web push |
 | POST | `/push/subscribe`, `/push/unsubscribe`, `/push/test` | Web push subscriptions (sites or all, crew or supervisor) and a test notification; see [`docs/push-notifications.md`](docs/push-notifications.md) |
 

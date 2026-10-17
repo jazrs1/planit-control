@@ -633,6 +633,34 @@ export interface PushNotification {
   sent_at: string;
 }
 
+// ---------- GET /fires/recent, GET /wildlife/recent (map layers) ----------
+
+/** GET /fires/recent: FireDetection[], newest first. Satellite (VIIRS) fire detections over Florida
+ * from the last 24 h, without the hot spots the wildfire cards ignore (within 1 km of our sites or of
+ * any Florida thermal plant). */
+export interface FireDetection {
+  lat: number;
+  lon: number;
+  detected_at: string;
+  confidence: "low" | "nominal" | "high";
+  /** Separate satellite passes that saw fire within 5 mi of this point in the 24 h (itself included).
+   * 2+ is what the wildfire card calls confirmed; 1 can be a one-off (a flare, a hot roof). */
+  passes_24h: number;
+}
+
+export type WildlifeSource = "inaturalist" | "crew";
+
+/** GET /wildlife/recent: WildlifeSightingPoint[], newest first. Alligator and venomous-snake
+ * sightings near our sites (iNaturalist) plus crew wildlife reports, last 30 days. */
+export interface WildlifeSightingPoint {
+  lat: number;
+  lon: number;
+  /** e.g. "American Alligator"; null for a crew report that didn't name one. */
+  species: string | null;
+  seen_at: string;
+  source: WildlifeSource;
+}
+
 // ---------- Errors ----------
 
 export interface ApiError {
