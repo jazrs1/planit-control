@@ -1,6 +1,7 @@
 fastapi==0.143.3
 uvicorn[standard]==0.54.0
 pydantic-settings==2.16.0
+anthropic==1.15.0
 psycopg[binary,pool]==3.3.6
 psycopg-pool==3.3.3
 xarray==2026.9.0

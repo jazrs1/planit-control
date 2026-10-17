@@ -25,13 +25,15 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from functools import lru_cache
+
+import anthropic
 
 from app.config import get_settings
 
 log = logging.getLogger(__name__)
 
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-CLAUDE_API = "https://api.anthropic.com/v1/messages"
 MAX_WORDS = 150
 HEADLINE_WORD = {"go": "GO", "caution": "CAUTION", "no_go": "NO-GO"}
 _NUMBER = re.compile(r"\d{1,2}:\d{2}|\d+(?:\.\d+)?")
@@ -50,7 +52,7 @@ Crew reports in "crew_reports_last_48_h_within_2_mi" are what crews saw on site:
 downed line or heat illness among the risks, with how long ago it was reported, and give the
 matching action (stay clear of the line and treat it as energized; check on the crew, water, shade
 and rest). If there is little risk, say so plainly instead of inventing risks. The whole briefing must be
-under {MAX_WORDS} words."""
+under {MAX_WORDS} words, so aim for about 110: the headline and each risk and action under 20 words."""
 
 # Gemini's schema dialect (upper-case types).
 GEMINI_SCHEMA = {
@@ -148,7 +150,7 @@ def problems(text: str, inputs: dict) -> list[str]:
     if (claims := unsupported_claims(text, inputs)):
         issues.append(f"these hazards are not in the JSON: {'; '.join(claims)}")
     if (words := len(text.split())) >= MAX_WORDS:
-        issues.append(f"{words} words; must be under {MAX_WORDS}")
+        issues.append(f"{words} words; must be under {MAX_WORDS}, so cut at least {words - MAX_WORDS + 15} words")
     return issues
 
 
@@ -245,47 +247,38 @@ CLAUDE_TIMEOUT_SECONDS = 120
 # Short structured writing from a small JSON: medium effort keeps calls fast; the grounding check
 # (with one retry) catches what slips through.
 CLAUDE_EFFORT = "medium"
-# A 429 or overload asking us to wait longer than this sends the site on to Gemini instead.
-CLAUDE_MAX_WAIT_SECONDS = 30
 
 
 class Refused(Exception):
     pass
 
 
+@lru_cache
+def _claude_client(key: str) -> anthropic.Anthropic:
+    """One thread-safe client per key. The SDK retries 429, 5xx, overloads and connection errors
+    twice with backoff (honouring retry-after) before raising."""
+    return anthropic.Anthropic(api_key=key, timeout=CLAUDE_TIMEOUT_SECONDS, max_retries=2)
+
+
 def _call_claude(inputs: dict, key: str, model: str, feedback: str | None) -> tuple[dict, str]:
     """(headline/risks/actions, the model that answered). The server-side fallback re-runs a
     request a safety classifier declines on Anthropic's recommended model for that category, so
     the answering model can differ from `model`."""
-    body = {
-        "model": model,
-        "max_tokens": 16000,
-        "system": SYSTEM,
-        "messages": [{"role": "user", "content": _prompt(inputs, feedback)}],
-        "output_config": {"effort": CLAUDE_EFFORT,
-                          "format": {"type": "json_schema", "schema": CLAUDE_SCHEMA}},
-        "fallbacks": "default",
-    }
-    request = urllib.request.Request(
-        CLAUDE_API, data=json.dumps(body).encode(), method="POST",
-        headers={"Content-Type": "application/json", "x-api-key": key,
-                 "anthropic-version": "2023-06-01",
-                 "anthropic-beta": "server-side-fallback-2026-07-01"})
-    with urllib.request.urlopen(request, timeout=CLAUDE_TIMEOUT_SECONDS) as resp:
-        data = json.load(resp)
-    if data.get("stop_reason") == "refusal":
-        raise Refused((data.get("stop_details") or {}).get("category"))
-    if data.get("stop_reason") != "end_turn":
-        raise ValueError(f"Claude stop_reason {data.get('stop_reason')}")
-    text = next(b["text"] for b in data["content"] if b["type"] == "text")
-    return json.loads(text), data.get("model") or model
-
-
-def _retry_after(err: urllib.error.HTTPError) -> float | None:
-    try:
-        return float(err.headers.get("retry-after"))
-    except (TypeError, ValueError):
-        return None
+    response = _claude_client(key).beta.messages.create(
+        model=model,
+        max_tokens=16000,
+        system=SYSTEM,
+        messages=[{"role": "user", "content": _prompt(inputs, feedback)}],
+        output_config={"effort": CLAUDE_EFFORT, "format": {"type": "json_schema", "schema": CLAUDE_SCHEMA}},
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+    )
+    if response.stop_reason == "refusal":
+        raise Refused(response.stop_details.category if response.stop_details else None)
+    if response.stop_reason != "end_turn":
+        raise ValueError(f"Claude stop_reason {response.stop_reason}")
+    text = next(b.text for b in response.content if b.type == "text")
+    return json.loads(text), response.model or model
 
 
 def _try_claude(inputs: dict) -> Written | None:
@@ -297,31 +290,18 @@ def _try_claude(inputs: dict) -> Written | None:
     for attempt in range(2):
         try:
             out, model = _call_claude(inputs, settings.anthropic_api_key, settings.claude_model, feedback)
-        except urllib.error.HTTPError as err:
-            # 429 rate limit, 529 overloaded, 5xx: wait once if the wait is short.
-            if (err.code == 429 or err.code >= 500) and attempt == 0:
-                delay = _retry_after(err)
-                if delay is None or delay <= CLAUDE_MAX_WAIT_SECONDS:
-                    time.sleep(delay if delay is not None else 5)
-                    continue
-            log.warning("Claude HTTP %s for %s; trying the next writer", err.code, name)
+            written, feedback = _checked(inputs, out, "claude", model)
+        except anthropic.APIStatusError as err:       # after the SDK's own retries
+            log.warning("Claude HTTP %s for %s; trying the next writer", err.status_code, name)
             return None
-        except (TimeoutError, urllib.error.URLError) as err:
-            if attempt == 0:
-                log.info("Claude %s for %s; retrying once", type(err).__name__, name)
-                continue
-            log.warning("Claude failed twice for %s (%s); trying the next writer", name, type(err).__name__)
+        except anthropic.APIConnectionError as err:   # includes APITimeoutError
+            log.warning("Claude unreachable for %s (%s); trying the next writer", name, type(err).__name__)
             return None
         except Refused as err:
             log.warning("Claude declined %s (%s); trying the next writer", name, err)
             return None
-        except Exception as err:  # noqa: BLE001 - bad JSON, unexpected shape: next writer
+        except Exception as err:  # noqa: BLE001 - bad JSON, missing fields: next writer
             log.warning("Claude failed for %s (%s); trying the next writer", name, type(err).__name__)
-            return None
-        try:
-            written, feedback = _checked(inputs, out, "claude", model)
-        except (KeyError, TypeError) as err:
-            log.warning("Claude answer for %s missing fields (%s); trying the next writer", name, err)
             return None
         if written:
             return written
