@@ -39,7 +39,7 @@ const SUB_SCORES: { hazard: HazardType; rules: string }[] = [
   { hazard: "heat", rules: "OSHA heat index band: lower 0–2, moderate 5, high 7.5, very high 9.5 · NWS Heat Advisory 6, Heat Warning 8" },
   { hazard: "flood", rules: "High-risk FEMA zone 1 · rain in past 24 h: 1 in → 3, 2 in → 6 (+1 in a flood zone or near a river) · next 24 h: 1 in → 3, 2 in → 5 · NWS advisory 4, watch 5, warning 8 · flood-risk alert 7" },
   { hazard: "soil_saturation", rules: "Dry 0 · moist 2 · saturated 5 (+2 after 2 in of rain in 24 h)" },
-  { hazard: "wildfire", rules: "Fire within 5 mi 8, 10 mi 6, 25 mi 4 · Fire Weather Watch 3 · Red Flag Warning 5" },
+  { hazard: "wildfire", rules: "Fire within 5 mi 8 if seen on 2+ satellite passes in 24 h or high confidence, else 6 · 10 mi 6 · 25 mi 4 · Fire Weather Watch 3 · Red Flag Warning 5" },
   { hazard: "wildlife", rules: "Crew report nearby 5 · venomous snake 4 · alligator 2 · +1 with 5 or more sightings (max 6)" },
 ];
 
@@ -296,7 +296,7 @@ export default function HowItWorksPage() {
         </div>
         <ul className="list-disc space-y-1 pl-5">
           <li><strong>Why the real pipeline:</strong> it proves the code that protects crews actually works, and it gives exactly the alerts crews would have seen that evening. The alert engine has no clock of its own; it runs on whatever time it&apos;s given.</li>
-          <li>Replay alerts are stored separately and <strong>never mix with live ones</strong>.</li>
+          <li>Replay alerts are stored separately and <strong>never mix with live ones</strong>. Real lightning keeps being tracked during a replay: real alerts stay on screen next to the replay&apos;s, which are tagged REPLAY.</li>
           <li>After the last file, replay runs 31 quiet simulated minutes so every countdown can finish.</li>
           <li>Heat, rain, fire and wildlife stay live during a replay; only lightning is replayed.</li>
         </ul>

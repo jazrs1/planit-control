@@ -20,7 +20,9 @@ from hazards.sources.nws import FIRE_LEVELS, FLOOD_LEVELS, HEAT_LEVELS, STORM_LE
 from hazards.store import write_readings
 
 ENSEMBLE_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
-PERIODS = [("morning", 6, 12), ("afternoon", 12, 18), ("evening", 18, 24)]
+# The periods cover the whole calendar day, so rain_total_in is the same window as the index's
+# "in of rain forecast tomorrow" factor (hazards/scoring.py, rain_tomorrow_in).
+PERIODS = [("early morning", 0, 6), ("morning", 6, 12), ("afternoon", 12, 18), ("evening", 18, 24)]
 WORK_HOURS = (6, 20)
 THUNDERSTORM_LIKELY_PCT = 30
 THUNDERSTORM_CODES = range(95, 100)   # WMO weather codes 95-99

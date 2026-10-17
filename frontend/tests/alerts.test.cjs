@@ -116,3 +116,9 @@ test("a factor with no hazard type (a downed-line crew report) is labeled Crew h
   assert.equal(risk.factorHazardLabel(null), "Crew hazard");
   assert.equal(risk.factorHazardLabel("lightning"), "Lightning");
 });
+
+test("replay alerts carry a REPLAY tag; real alerts don't", () => {
+  assert.match(render(Banner, { alert: { ...lightning, replay: true }, site }), /REPLAY/);
+  assert.doesNotMatch(render(Banner, { alert: { ...lightning, replay: false }, site }), /REPLAY/);
+  assert.match(render(Banner, { alert: { ...flood, replay: true }, site, flood: conditions }), /REPLAY[\s\S]*FLOOD RISK/);
+});

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
+import { useDemoCode } from "@/components/DemoCode";
 import { startReplay, stopReplay } from "@/lib/api";
 
 function formatSimulated(ms: number) {
@@ -24,6 +25,7 @@ export default function ReplayControl() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
+  const demoCode = useDemoCode();
   const running = replay?.running ?? false;
   // Offline, the replay may have finished or been stopped: show what was last seen, not "running".
   const offline = connection.level !== "online";
@@ -41,7 +43,8 @@ export default function ReplayControl() {
     setBusy(true);
     setMessage(null);
     try {
-      await action();
+      // Starting or stopping a replay needs the demo code: on a 401 this asks for it, then retries.
+      await demoCode.call(action, () => void run(action));
     } catch (err) {
       setMessage((err as Error).message);
     } finally {
@@ -82,6 +85,7 @@ export default function ReplayControl() {
           {busy ? "Starting…" : "⚡ Replay storm"}
         </button>
       )}
+      {demoCode.form}
       {message && <p role="alert" className="w-full text-risk-red">Replay: {message}</p>}
     </div>
   );

@@ -3,16 +3,21 @@
 A model writes a headline, the top 3 risks with times, and concrete actions, as structured JSON,
 from the input JSON only. Every answer is checked: every number in it must appear in the input
 JSON, hazard words must match it (no "saturated" soil that is only moist, no NWS alert that isn't
-in effect, no thunderstorms at 0% chance), and the whole briefing must be under 150 words. A
-rejected answer gets one retry with the problems listed. Writers, in order:
+in effect, no thunderstorms at 0% chance), and the whole briefing must be under 150 words. An
+answer that passes those checks is then reread against the same JSON by a second model
+(CLAUDE_REVIEW_MODEL, default claude-haiku-5-5), which flags contradictory, garbled or wrongly
+labeled statements (e.g. a time attached to the wrong event). A rejected answer gets one retry with
+the problems listed. Writers, in order:
 
   1. Claude (CLAUDE_MODEL, default claude-sonnet-5-5), if ANTHROPIC_API_KEY is set;
   2. Gemini (GEMINI_MODEL, default gemini-3.8-flash), if GEMINI_API_KEY is set and its free-tier
      quota isn't used up;
   3. a template built from the same JSON (always grounded by construction).
 
-Each writer is used when the one before it is not configured, fails, or is rejected twice. The
-briefing records which one wrote it (`generator`) and the model that answered (`model`).
+Each writer is used when the one before it is not configured, fails, or is rejected twice. But
+once the reviewer has flagged a writer's answer and the retry doesn't pass, the briefing goes
+straight to the template. The briefing records which one wrote it (`generator`) and the model that
+answered (`model`).
 
 The go / caution / no-go decision is never the writer's: it comes from the input (briefing/inputs.py).
 """
@@ -233,14 +238,85 @@ def _parts(out: dict) -> tuple[str, list[str], list[str]]:
     return out["headline"], list(out["risks"])[:3], list(out["actions"])[:4]
 
 
-def _checked(inputs: dict, out: dict, generator: str, model: str) -> tuple[Written | None, str | None]:
-    """The composed briefing if it passes the grounding and word checks, else (None, problems)."""
+def _checked(inputs: dict, out: dict, generator: str, model: str) -> tuple[Written | None, str | None, bool]:
+    """(briefing, None, False) if it passes the grounding and word checks and then the review;
+    otherwise (None, problems, flagged), where flagged means the reviewer rejected it."""
     headline, risks, actions = _parts(out)
     text = compose(inputs["go_status"], inputs["day"], headline, risks, actions)
     issues = problems(text, inputs)
     if issues:
-        return None, "; ".join(issues)
-    return Written(headline, risks, actions, text, generator, model), None
+        return None, "; ".join(issues), False
+    if (flags := review(inputs, text)):
+        return None, f"a reviewer found these statements wrong or garbled: {'; '.join(flags)}", True
+    return Written(headline, risks, actions, text, generator, model), None, False
+
+
+# A writer whose answer the reviewer flagged, and whose retry still didn't pass: use the template.
+REVIEW_FAILED = object()
+
+
+def _give_up(flagged: bool):
+    return REVIEW_FAILED if flagged else None
+
+
+# ---------- review (second check) ----------
+
+REVIEW_SYSTEM = """You proofread a next-day safety briefing for a utility crew supervisor in Florida.
+Another model wrote it from the JSON of facts you are given. A program has already checked that
+every number in it appears somewhere in the JSON and that it names no hazard the JSON lacks.
+Find statements a crew could misread or act on wrongly:
+- a statement that contradicts the JSON (wrong period or day, wrong level, a risk called low when
+  the JSON makes it high, or the reverse);
+- a number or time attached to the wrong thing (e.g. the sunset time given as when rain starts, a
+  PM time written as AM, one period's rain given as the whole day's);
+- a garbled, self-contradictory or nonsensical sentence.
+Don't flag: style, wording or tone; anything left out; rounding that keeps the meaning; the
+GO / CAUTION / NO-GO word and the day at the start (set by the program); general safety advice that
+states no fact (e.g. "bring water", "check for snakes before staging"); loose timing such as "all
+day" or "through the shift" for a hazard the JSON doesn't time (wildlife, fires, flood zones, soil).
+Return JSON {"problems": [...]}: one short entry per problem that quotes the words and says what is
+wrong. Return an empty list when there is nothing to flag."""
+
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {"problems": {"type": "array", "items": {"type": "string"}}},
+    "required": ["problems"],
+    "additionalProperties": False,
+}
+REVIEW_EFFORT = "medium"
+
+
+def _call_review(inputs: dict, text: str, key: str, model: str) -> list[str]:
+    """The reviewer's problems with `text` ([] = none). Raises on API errors or a refusal."""
+    response = _claude_client(key).messages.create(
+        model=model,
+        max_tokens=8000,
+        system=REVIEW_SYSTEM,
+        messages=[{"role": "user", "content": f"Input JSON:\n{json.dumps(inputs, ensure_ascii=False)}\n\nBriefing:\n{text}"}],
+        output_config={"effort": REVIEW_EFFORT, "format": {"type": "json_schema", "schema": REVIEW_SCHEMA}},
+    )
+    if response.stop_reason != "end_turn":
+        raise ValueError(f"review stop_reason {response.stop_reason}")
+    answer = next(b.text for b in response.content if b.type == "text")
+    return [p.strip() for p in json.loads(answer)["problems"] if p.strip()]
+
+
+def review(inputs: dict, text: str) -> list[str]:
+    """Statements in a briefing that contradict its input JSON, are garbled, or attach a number to the
+    wrong thing. Skipped ([]) without ANTHROPIC_API_KEY or CLAUDE_REVIEW_MODEL, and if the review call
+    fails: the briefing has already passed the number and word checks. Never raises."""
+    settings = get_settings()
+    if not settings.anthropic_api_key or not settings.claude_review_model:
+        return []
+    try:
+        flags = _call_review(inputs, text, settings.anthropic_api_key, settings.claude_review_model)
+    except Exception as err:  # noqa: BLE001 - API error, refusal, bad JSON: keep the checked briefing
+        log.warning("Briefing review failed for %s (%s); using the briefing unreviewed",
+                    inputs["site"]["name"], type(err).__name__)
+        return []
+    if flags:
+        log.info("Briefing review flagged %s: %s", inputs["site"]["name"], "; ".join(flags))
+    return flags
 
 
 # ---------- Claude ----------
@@ -283,33 +359,35 @@ def _call_claude(inputs: dict, key: str, model: str, feedback: str | None) -> tu
     return json.loads(text), response.model or model
 
 
-def _try_claude(inputs: dict) -> Written | None:
-    """Claude's briefing if it passes the checks (one retry), else None. Never raises."""
+def _try_claude(inputs: dict):
+    """Claude's briefing if it passes the checks (one retry); REVIEW_FAILED if the reviewer flagged an
+    answer and the retry didn't pass; else None (try the next writer). Never raises."""
     settings = get_settings()
     if not settings.anthropic_api_key:
         return None
-    name, feedback = inputs["site"]["name"], None
+    name, feedback, flagged = inputs["site"]["name"], None, False
     for attempt in range(2):
         try:
             out, model = _call_claude(inputs, settings.anthropic_api_key, settings.claude_model, feedback)
-            written, feedback = _checked(inputs, out, "claude", model)
+            written, feedback, was_flagged = _checked(inputs, out, "claude", model)
         except anthropic.APIStatusError as err:       # after the SDK's own retries
             log.warning("Claude HTTP %s for %s; trying the next writer", err.status_code, name)
-            return None
+            return _give_up(flagged)
         except anthropic.APIConnectionError as err:   # includes APITimeoutError
             log.warning("Claude unreachable for %s (%s); trying the next writer", name, type(err).__name__)
-            return None
+            return _give_up(flagged)
         except Refused as err:
             log.warning("Claude declined %s (%s); trying the next writer", name, err)
-            return None
+            return _give_up(flagged)
         except Exception as err:  # noqa: BLE001 - bad JSON, missing fields: next writer
             log.warning("Claude failed for %s (%s); trying the next writer", name, type(err).__name__)
-            return None
+            return _give_up(flagged)
         if written:
             return written
+        flagged = flagged or was_flagged
         log.info("Claude briefing for %s rejected (%s)%s", name, feedback,
-                 ", retrying" if attempt == 0 else "; trying the next writer")
-    return None
+                 ", retrying" if attempt == 0 else "; using the template" if flagged else "; trying the next writer")
+    return _give_up(flagged)
 
 
 # ---------- Gemini ----------
@@ -380,17 +458,18 @@ def _wait_turn(min_interval: float) -> None:
         _last_call = time.monotonic()
 
 
-def _try_gemini(inputs: dict) -> Written | None:
-    """Gemini's briefing if it passes the checks (one retry), else None. Never raises."""
+def _try_gemini(inputs: dict):
+    """Gemini's briefing if it passes the checks (one retry); REVIEW_FAILED or None otherwise (both
+    mean the template). Never raises."""
     settings = get_settings()
     if not settings.gemini_api_key or gemini_paused_seconds() > 0:
         return None
-    feedback = None
+    feedback, flagged = None, False
     for attempt in range(2):
         _wait_turn(settings.gemini_min_interval_seconds)  # stay under the per-minute rate limit
         try:
             out = _call_gemini(inputs, settings.gemini_api_key, settings.gemini_model, feedback)
-            written, feedback = _checked(inputs, out, "gemini", settings.gemini_model)
+            written, feedback, was_flagged = _checked(inputs, out, "gemini", settings.gemini_model)
         except urllib.error.HTTPError as err:
             if err.code == 429:
                 delay = _retry_delay_seconds(err)
@@ -415,11 +494,18 @@ def _try_gemini(inputs: dict) -> Written | None:
             return None
         if written:
             return written
+        flagged = flagged or was_flagged
         log.info("Gemini briefing for %s rejected (%s)%s", inputs["site"]["name"], feedback,
                  ", retrying" if attempt == 0 else "; using the template")
-    return None
+    return _give_up(flagged)
 
 
 def write(inputs: dict) -> Written:
     """Claude, then Gemini, then the template (see the module docstring). Never raises."""
-    return _try_claude(inputs) or _try_gemini(inputs) or template(inputs)
+    for writer in (_try_claude, _try_gemini):
+        written = writer(inputs)
+        if written is REVIEW_FAILED:
+            return template(inputs)
+        if written:
+            return written
+    return template(inputs)

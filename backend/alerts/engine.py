@@ -228,7 +228,7 @@ def active_alerts(conn: Connection, now: datetime, replay: bool, site_id: str | 
     """Alerts in effect at `now` (any type), newest first. Also checks all_clear_at against
     `now`, so an alert whose countdown ended between engine cycles is already hidden."""
     return conn.execute(
-        """SELECT id, site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi
+        """SELECT id, site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay
            FROM alerts
            WHERE status = 'active' AND replay = %(replay)s
              AND (all_clear_at IS NULL OR all_clear_at > %(now)s)
@@ -236,6 +236,16 @@ def active_alerts(conn: Connection, now: datetime, replay: bool, site_id: str | 
            ORDER BY started_at DESC""",
         {"replay": replay, "now": now, "site": site_id},
     ).fetchall()
+
+
+def alerts_for_api(conn: Connection, real_now: datetime, replay_now: datetime | None,
+                   site_id: str | None = None) -> list[dict]:
+    """What GET /alerts shows: live alerts in effect at real time, plus, while a replay runs
+    (`replay_now` is its simulated time), replay alerts in effect at that time. Each row has
+    `replay`, so the frontend can label them. Real alerts never disappear during a replay.
+    Replay alerts first, then live; newest first within each."""
+    rows = active_alerts(conn, replay_now, replay=True, site_id=site_id) if replay_now else []
+    return rows + active_alerts(conn, real_now, replay=False, site_id=site_id)
 
 
 # ---------- 6. One engine cycle ----------

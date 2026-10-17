@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Alert } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 
-export default function StopWorkCountdown({ all_clear_at, prominent = false }: Pick<Alert, "all_clear_at"> & { prominent?: boolean }) {
+export default function StopWorkCountdown({ all_clear_at, replay, prominent = false }: Pick<Alert, "all_clear_at"> & Partial<Pick<Alert, "replay">> & { prominent?: boolean }) {
   // Start with a placeholder so the server and hydration render agree.
   const [now, setNow] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
-  // Backend clock, so replayed alerts count down in simulated time (and at replay speed).
-  const serverNow = useServerNow();
+  // Backend clock, so replayed alerts count down in simulated time (and at replay speed). A real
+  // alert shown during a replay (replay === false) counts down on real time.
+  const backendNow = useServerNow();
+  const alertsState = useAlertsState();
+  const realDuringReplay = replay === false && alertsState.replay?.running === true;
+  const serverNow = useCallback(() => (realDuringReplay ? Date.now() : backendNow()), [realDuringReplay, backendNow]);
   // Offline (last known alerts): reaching zero can't confirm the all-clear; a new strike may have reset it.
-  const offline = useAlertsState().status === "stale";
+  const offline = alertsState.status === "stale";
   const previousTarget = useRef(all_clear_at === null ? null : Date.parse(all_clear_at));
   const target = all_clear_at === null ? null : Date.parse(all_clear_at);
 
