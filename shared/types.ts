@@ -264,8 +264,10 @@ export interface Briefing {
   actions?: string[] | null;
   /** Tomorrow's top contributing factors behind key_numbers.hazard_index. */
   top_factors?: ContributingFactor[] | null;
-  /** "gemini" when the model wrote it and it passed the grounding check, else "template". */
-  generator?: "gemini" | "template" | null;
+  /** Which writer produced it: "claude" or "gemini" when that model wrote it and it passed the
+   *  grounding check (tried in that order), else "template". */
+  generator?: "claude" | "gemini" | "template" | null;
+  /** The model that answered, e.g. "claude-sonnet-5-5"; null for the template. */
   model?: string | null;
   /** key_numbers fields with no live data behind them (their value is 0), e.g. wildfire without a FIRMS key. */
   unavailable?: (keyof BriefingKeyNumbers)[] | null;

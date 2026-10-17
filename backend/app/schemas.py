@@ -191,7 +191,7 @@ class Briefing(BaseModel):
     risks: list[str] | None = None
     actions: list[str] | None = None
     top_factors: list[ContributingFactor] | None = None
-    generator: Literal["gemini", "template"] | None = None
+    generator: Literal["claude", "gemini", "template"] | None = None
     model: str | None = None
     unavailable: list[str] | None = None
 

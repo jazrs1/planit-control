@@ -12,14 +12,15 @@ import ReportPhoto from "@/components/ReportPhoto";
 const NO_REPORTS: HazardReport[] = [];
 const fieldClass = "mt-1 min-h-12 w-full rounded-card border border-border bg-surface px-3 py-2 text-base text-text focus-visible:outline-2 focus-visible:outline-brand";
 
-export default function ReportForm({ sites }: { sites: Site[] | null }) {
+export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[] | null; initialSiteId?: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [photoError, setPhotoError] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [role, setRole] = useState<ReporterRole>("crew_member");
-  const [siteId, setSiteId] = useState("");
+  const [siteId, setSiteId] = useState(initialSiteId);
+  const validSiteId = sites?.some((site) => site.id === siteId) ? siteId : "";
   const [pin, setPin] = useState<Pick<CreateReportRequest, "lat" | "lon"> | null>(null);
   const [coordinates, setCoordinates] = useState({ lat: "", lon: "" });
   const [locationMessage, setLocationMessage] = useState("");
@@ -101,7 +102,7 @@ export default function ReportForm({ sites }: { sites: Site[] | null }) {
       }
       setPhase("saving");
       const body: CreateReportRequest = {
-        site_id: sites === null ? null : siteId || null,
+        site_id: validSiteId || null,
         photo_url: photo.photo_url,
         category: selected.category,
         note: note.trim(),
@@ -172,7 +173,7 @@ export default function ReportForm({ sites }: { sites: Site[] | null }) {
               </select>
             </label>
             <label htmlFor="site" className="block text-sm font-medium">Site (optional)
-              <select id="site" disabled={sites === null} value={sites === null ? "" : siteId} onChange={(event) => setSiteId(event.target.value)} className={fieldClass}>
+              <select id="site" disabled={sites === null} value={validSiteId} onChange={(event) => setSiteId(event.target.value)} className={fieldClass}>
                 <option value="">Away from a site / unknown</option>
                 {/* Alphabetical: 55 plants in capacity order are hard to find on a phone. */}
                 {sites && [...sites].sort((a, b) => a.name.localeCompare(b.name)).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}

@@ -9,9 +9,10 @@ type AlertBannerProps = {
   flood?: FloodConditions;
   compact?: boolean;
   unconfirmed?: boolean;
+  prominent?: boolean;
 };
 
-export default function AlertBanner({ alert, site, flood, compact = false, unconfirmed = false }: AlertBannerProps) {
+export default function AlertBanner({ alert, site, flood, compact = false, unconfirmed = false, prominent = false }: AlertBannerProps) {
   const lightning = alert.type === "lightning";
   const distance = formatStrikeDistance(alert.last_strike_distance_mi);
   const style = unconfirmed ? "border-border bg-bg text-muted grayscale" : lightning
@@ -19,7 +20,7 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
   return (
     <article className={`flex flex-col gap-3 rounded-card border p-4 shadow-card ${style} ${compact ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
       <div className="min-w-0">
-        <p className="text-sm font-bold uppercase tracking-wide">{lightning ? "STOP WORK" : alert.type === "flood" ? "FLOOD RISK" : `${HAZARD_LABEL[alert.type]} alert`}{unconfirmed ? " · Not confirmed" : ""}</p>
+        <p className={`${prominent ? "text-3xl" : "text-sm"} font-bold uppercase tracking-wide`}>{lightning ? "STOP WORK" : alert.type === "flood" ? "FLOOD RISK" : `${HAZARD_LABEL[alert.type]} alert`}{unconfirmed ? " · Not confirmed" : ""}</p>
         {!compact && <h2 className="break-words text-lg font-semibold">{site?.name ?? alert.site_id}</h2>}
         <p className="mt-1 text-sm">
           {lightning
@@ -34,7 +35,7 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
         )}
       </div>
       {lightning && <div className="shrink-0 sm:max-w-64">
-        <StopWorkCountdown all_clear_at={alert.all_clear_at} />
+        <StopWorkCountdown all_clear_at={alert.all_clear_at} prominent={prominent} />
       </div>}
     </article>
   );
