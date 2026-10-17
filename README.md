@@ -112,6 +112,8 @@ Other commands: `npm run typecheck`, `npm run build`.
 | GET | `/briefing/{site_id}` | Latest next-day briefing (generated 6 PM site time) and key numbers |
 | GET | `/briefings` | Latest briefing for every site in one response |
 | POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`) or all |
+| GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
+| GET | `/sites/{id}/beacon` | Tiny alarm state: stop / approaching / flood / clear, with countdowns |
 
 Shapes: [`shared/types.ts`](shared/types.ts).
 

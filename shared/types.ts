@@ -18,6 +18,27 @@ export type HazardType =
 
 // ---------- GET /sites ----------
 
+/** "Lightning approaching": a tracked storm cell's leading edge is expected to reach the site's
+ * 10-mile stop-work ring within 60 minutes. An advisory, never a stop-work order. */
+export interface LightningApproach {
+  /** Estimated time the leading edge reaches the 10-mile ring. */
+  arrival_at: string;
+  /** Whole minutes from the server's now (simulated during replay); 0 = arriving now. An optimistic
+   * estimate (on the replay, lightning usually came sooner): show as "lightning possible within N min",
+   * never as a countdown. See docs/lightning-forecast.md. */
+  minutes_to_arrival: number;
+  /** Where the storm is, seen from the site: 16-point compass, e.g. "WSW". */
+  from_direction: string;
+  from_bearing_deg: number;
+  /** Direction the storm is moving, degrees clockwise from north. */
+  heading_deg: number;
+  speed_mph: number;
+  /** Leading edge to the site, now. */
+  distance_mi: number;
+  issued_at: string;
+  updated_at: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -28,6 +49,9 @@ export interface Site {
   timezone: string;
   hazard_index: HazardIndex;
   top_hazard: HazardType;
+  /** Sent by the live backend (null when no storm is approaching or the site is in stop-work);
+   * absent in older mocks. */
+  lightning_approach?: LightningApproach | null;
 }
 
 export type SitesResponse = Site[];
@@ -309,6 +333,48 @@ export interface LightningFlash {
 }
 
 export type LightningRecentResponse = LightningFlash[];
+
+// ---------- GET /lightning/cells ----------
+
+/** A storm cell: a cluster of flashes from the last 20 minutes. Ids are per response (not stable). */
+export interface LightningCell {
+  id: string;
+  lat: number;
+  lon: number;
+  /** Flashes in the last 20 minutes. */
+  flash_count: number;
+  /** Flashes in the last 5 minutes. */
+  recent_flashes: number;
+  /** 90th-percentile distance of the last 5 minutes' flashes from the center. */
+  radius_mi: number;
+  /** true when the motion is reliable enough to forecast with. */
+  tracked: boolean;
+  /** null when not tracked; 0 when tracked but nearly stationary. */
+  speed_mph: number | null;
+  /** Direction of motion, degrees clockwise from north; null when not tracked or stationary. */
+  heading_deg: number | null;
+  /** 16-point compass of heading_deg, e.g. "NE". */
+  moving_toward: string | null;
+  last_flash_at: string;
+}
+
+export type LightningCellsResponse = LightningCell[];
+
+// ---------- GET /sites/{id}/beacon ----------
+
+/** Tiny state for a hardware alarm. Priority: stop > approaching > flood > clear. */
+export type BeaconState = "stop" | "approaching" | "flood" | "clear";
+
+export interface Beacon {
+  site_id: string;
+  state: BeaconState;
+  /** Only when state is "stop": seconds until the lightning all-clear (if no new strikes). */
+  seconds_to_all_clear: number | null;
+  /** Only when state is "approaching": whole minutes until the storm reaches the 10-mile ring
+   * (optimistic: lightning can come sooner; not a countdown). */
+  minutes_to_arrival: number | null;
+  as_of: string;
+}
 
 // ---------- POST /replay/start, POST /replay/stop, GET /replay/status ----------
 

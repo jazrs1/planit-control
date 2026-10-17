@@ -13,6 +13,18 @@ HazardType = Literal["heat", "lightning", "flood", "soil_saturation", "wildfire"
 HazardIndex = Annotated[float, Field(ge=0, le=10)]
 
 
+class LightningApproach(BaseModel):
+    arrival_at: datetime
+    minutes_to_arrival: int
+    from_direction: str
+    from_bearing_deg: float
+    heading_deg: float
+    speed_mph: float
+    distance_mi: float
+    issued_at: datetime
+    updated_at: datetime
+
+
 class Site(BaseModel):
     id: str
     name: str
@@ -22,6 +34,7 @@ class Site(BaseModel):
     timezone: str
     hazard_index: HazardIndex
     top_hazard: HazardType
+    lightning_approach: LightningApproach | None = None
 
 
 class HazardCard(BaseModel):
@@ -320,3 +333,29 @@ class ModelInfo(BaseModel):
     top_features: list[ModelFeature]
     limitations: list[str]
     last_scored_at: datetime | None
+
+
+# ---------- GET /lightning/cells ----------
+
+class LightningCell(BaseModel):
+    id: str
+    lat: float
+    lon: float
+    flash_count: int
+    recent_flashes: int
+    radius_mi: float
+    tracked: bool
+    speed_mph: float | None
+    heading_deg: float | None
+    moving_toward: str | None
+    last_flash_at: datetime
+
+
+# ---------- GET /sites/{id}/beacon ----------
+
+class Beacon(BaseModel):
+    site_id: str
+    state: Literal["stop", "approaching", "flood", "clear"]
+    seconds_to_all_clear: int | None
+    minutes_to_arrival: int | None
+    as_of: datetime

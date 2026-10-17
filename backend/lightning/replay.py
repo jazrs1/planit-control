@@ -16,6 +16,7 @@ import logging
 from datetime import timedelta
 from pathlib import Path
 
+import psycopg
 from psycopg_pool import ConnectionPool
 
 from app import clock
@@ -129,10 +130,15 @@ class ReplayRunner:
 
 
 def _reset_window(pool: ConnectionPool, names: list[str], start, end) -> None:
-    """Remove earlier replay runs (this window's flashes and all replay alerts) so every replay
+    """Remove earlier replay runs (this window's flashes, all replay alerts and advisories) so every replay
     starts clean and re-ingests the storm as new."""
     with pool.connection() as conn:
         conn.execute("DELETE FROM alerts WHERE replay")  # alert_events cascade
+        try:
+            with conn.transaction():  # savepoint: the table doesn't exist until migration 008
+                conn.execute("DELETE FROM lightning_advisories WHERE replay")
+        except psycopg.errors.UndefinedTable:
+            pass
         conn.execute(
             "DELETE FROM lightning_flashes WHERE ts BETWEEN %s AND %s AND source_file = ANY(%s)",
             (start - timedelta(minutes=1), end + timedelta(minutes=1), names),
