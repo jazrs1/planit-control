@@ -173,7 +173,8 @@ export default function ReportForm({ sites }: { sites: Site[] | null }) {
             <label htmlFor="site" className="block text-sm font-medium">Site (optional)
               <select id="site" disabled={sites === null} value={sites === null ? "" : siteId} onChange={(event) => setSiteId(event.target.value)} className={fieldClass}>
                 <option value="">Away from a site / unknown</option>
-                {sites?.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+                {/* Alphabetical: 55 plants in capacity order are hard to find on a phone. */}
+                {sites && [...sites].sort((a, b) => a.name.localeCompare(b.name)).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
               </select>
               {sites === null && <span role="status" className="mt-2 block text-sm text-muted">Site data unavailable. Retrying automatically. You can submit with a map pin and no associated site.</span>}
             </label>

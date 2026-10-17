@@ -8,6 +8,8 @@ export const REPORT_OPTIONS = [
   { label: "Flooding or washout", category: "flooding" },
   { label: "Downed line", category: "downed_line" },
   { label: "Heat illness", category: "heat_illness" },
+  { label: "Fire or smoke", category: "fire_smoke" },
+  { label: "Unsafe ground", category: "unsafe_ground" },
   { label: "Other", category: "other" },
 ] as const satisfies ReadonlyArray<{ label: string; category: ReportCategory }>;
 
