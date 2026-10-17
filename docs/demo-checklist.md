@@ -5,8 +5,8 @@
 | Real time after **Replay storm** | Simulated | What happens |
 |---|---|---|
 | 0:00 | 6:00 PM | **Okeechobee** goes to stop-work (strike 6.6 mi away) |
-| ≈ 0:21 | 6:10 PM | **Vandolah: lightning possible.** Beacon **yellow**, `STORM NEARBY`, 3 beeps |
-| ≈ 1:09 | 6:34 PM | **Vandolah: stop-work.** Beacon **red**, `STOP WORK 30:00` counting down at 30×, 3 beeps |
+| ≈ 0:21 | 6:10 PM | **Vandolah: lightning possible.** Beacon **yellow**, `STORM NEARBY`, 3 beeps (LCD text pending A's REPLAY label) |
+| ≈ 1:09 | 6:34 PM | **Vandolah: stop-work.** Beacon **red**, `STOP WORK 30:00` counting down at 30×, 3 beeps (LCD text pending A's REPLAY label) |
 | 2:00 | 7:00 PM | Last satellite file. Quiet period; countdowns finish |
 | ≈ 2:49 | 7:24 PM | Vandolah all clear: beacon **green** |
 | ≈ 2:59 | 7:29:36 PM | **Okeechobee clears**, exactly 30 min after its last strike |
@@ -18,7 +18,7 @@
 - **Counts:** **High risk**, **Stop work** and the nav badge count real alerts only. The replay's counts are on the dark replay panel.
 - **Index:** the score shown is the live one (`hazard_index_live`). A replay-raised score gets a dashed blue outline, never a real red.
 
-The beacon's yellow, red and green are the only ones that change color for the replay: it shows the site's combined state, and a real stop-work always wins.
+**Replay alerts are blue on screen and labeled REPLAY on the beacon; only the beacon's LEDs go yellow then red.** _(Pending A's change: until the beacon firmware adds the REPLAY label, its LCD shows the same text as for a real alert.)_ The beacon shows the site's combined state, and a real stop-work always wins.
 
 ## 1. Preflight (15 minutes before)
 
@@ -44,7 +44,7 @@ The beacon's yellow, red and green are the only ones that change color for the r
 
 **0:05. The storm comes in.**
 - **Watch:** flashes fill the map, and Okeechobee is already in stop-work.
-- **Say:** "This is the real satellite record of a real storm, going through the same code as live. Replay alerts are blue and tagged so nobody mistakes them for a real one."
+- **Say:** "This is the real satellite record of a real storm, going through the same code as live. Replay alerts are blue on screen and labeled REPLAY on the beacon, so nobody mistakes them for a real one." _(Beacon label pending A's change.)_
 
 **≈ 0:21. Vandolah: yellow.**
 - **Beacon:** yellow, `STORM NEARBY`, three beeps.
