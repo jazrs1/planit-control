@@ -30,7 +30,17 @@ uvicorn app.main:app --reload --port 8000
 - Interactive docs: http://localhost:8000/docs
 - Health check: `curl localhost:8000/health`
 
-Every route currently returns data from `shared/mocks/`. `POST /reports` keeps new reports in memory until restart.
+`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json`; their hazard values are still placeholders (see the `TODO(...)` markers in `app/site_data.py`). Alerts, reports, and briefings come from `shared/mocks/`. `POST /reports` keeps new reports in memory until restart.
+
+### Rebuilding the site list
+
+`backend/data/sites.json` is generated from the EIA-860M monthly generator inventory and committed, so you only need this when you want fresher EIA data:
+
+```bash
+cd backend
+pip install -r scripts/requirements.txt
+python -m scripts.load_sites        # downloads the newest workbook to data/raw/ (gitignored)
+```
 
 ## Frontend
 

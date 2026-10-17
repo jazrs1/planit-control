@@ -21,8 +21,9 @@ out/
 next-env.d.ts
 npm-debug.log*
 
-# Downloaded datasets (FIRMS, NOAA, USGS, etc.)
-data/
+# Downloaded datasets (EIA, FIRMS, NOAA, USGS, etc.). Generated files we commit are re-included below.
+**/data/*
+!backend/data/sites.json
 
 # OS / editors
 .DS_Store
