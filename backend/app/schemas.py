@@ -163,6 +163,23 @@ class Briefing(BaseModel):
     top_hazard: HazardType
     text: str
     key_numbers: BriefingKeyNumbers
+    go_status: Literal["go", "caution", "no_go"] | None = None
+    headline: str | None = None
+    risks: list[str] | None = None
+    actions: list[str] | None = None
+    top_factors: list[ContributingFactor] | None = None
+    generator: Literal["gemini", "template"] | None = None
+    model: str | None = None
+    unavailable: list[str] | None = None
+
+
+class SendBriefingRequest(BaseModel):
+    site_id: str | None = None
+
+
+class SendBriefingResponse(BaseModel):
+    generated: list[Briefing]
+    queued: int
 
 
 class LightningFlash(BaseModel):

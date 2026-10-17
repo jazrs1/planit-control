@@ -286,6 +286,8 @@ def score_site(inp: Inputs, species_counts: dict[str, int]) -> dict:
              "soil_saturation": soil(inp), "wildfire": wildfire(inp), "wildlife": wildlife(inp, species_counts)}
     today, top, factors = combine({h: (p.today, p.label_today) for h, p in parts.items()},
                                   stop_work=inp.lightning_alert is not None)
-    tomorrow, _, _ = combine({h: (p.tomorrow, p.label_tomorrow) for h, p in parts.items()}, stop_work=False)
+    tomorrow, top_tomorrow, factors_tomorrow = combine(
+        {h: (p.tomorrow, p.label_tomorrow) for h, p in parts.items()}, stop_work=False)
     return {"cards": {h: p.card for h, p in parts.items()}, "hazard_index_today": today,
-            "hazard_index_tomorrow": tomorrow, "top_hazard": top, "top_factors": factors}
+            "hazard_index_tomorrow": tomorrow, "top_hazard": top, "top_factors": factors,
+            "top_hazard_tomorrow": top_tomorrow, "top_factors_tomorrow": factors_tomorrow}

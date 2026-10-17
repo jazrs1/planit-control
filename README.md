@@ -106,7 +106,8 @@ Other commands: `npm run typecheck`, `npm run build`.
 | GET | `/reports` | Crew hazard reports |
 | POST | `/reports` | Create a hazard report |
 | POST | `/uploads` | Upload a report photo (raw image body); returns `photo_url` |
-| GET | `/briefing/{site_id}` | Next-day briefing text and key numbers |
+| GET | `/briefing/{site_id}` | Latest next-day briefing (generated 6 PM site time) and key numbers |
+| POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`) or all |
 
 Shapes: [`shared/types.ts`](shared/types.ts).
 

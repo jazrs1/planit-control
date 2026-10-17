@@ -23,10 +23,12 @@ SOIL_LAYERS = ["0_to_1cm", "1_to_3cm", "3_to_9cm", "9_to_27cm", "27_to_81cm"]
 SURFACE_WEIGHTS = {"0_to_1cm": 1, "1_to_3cm": 2, "3_to_9cm": 6}  # layer thickness in cm
 
 
-def fetch(sites: list[dict]) -> list[dict]:
+def fetch(sites: list[dict], extra_hourly: tuple[str, ...] = (), daily: tuple[str, ...] = ()) -> list[dict]:
     """One request for all sites; Open-Meteo returns one forecast per coordinate, in order."""
     hourly = ["temperature_2m", "relative_humidity_2m", "precipitation"] + [f"soil_moisture_{l}" for l in SOIL_LAYERS]
-    data = http.get_json(URL, {
+    hourly += list(extra_hourly)
+    extra = {"daily": ",".join(daily)} if daily else {}
+    data = http.get_json(URL, {**extra,
         "latitude": ",".join(f"{s['lat']:.4f}" for s in sites),
         "longitude": ",".join(f"{s['lon']:.4f}" for s in sites),
         "hourly": ",".join(hourly),

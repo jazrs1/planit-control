@@ -22,7 +22,8 @@ from psycopg_pool import ConnectionPool
 from app import clock, mocks
 from app.config import BACKEND_DIR
 from hazards import snapshot
-from hazards.scoring import score_site, soil_level
+from hazards.risk import predict
+from hazards.scoring import soil_level
 
 SITES_FILE = BACKEND_DIR / "data" / "sites.json"
 
@@ -78,7 +79,7 @@ def _reading(inputs, hazard: str, metric: str) -> float | None:
 
 def _build(site: dict, snap: snapshot.Snapshot, lightning: dict, detail: bool) -> dict:
     inputs = snap.inputs[site["id"]]
-    scored = score_site(inputs, snap.species_counts[site["id"]])
+    scored = predict(inputs, snap.species_counts[site["id"]])
     cards = scored["cards"]
     mock = _placeholder_for(site)["conditions"]
 
