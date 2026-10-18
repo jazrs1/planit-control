@@ -15,6 +15,8 @@ type SiteListFinderProps = {
   sites: Site[];
   /** Sites whose row shows a lightning stop-work in this view: real only in Live view. */
   stops: ReadonlySet<string>;
+  /** Sites never folded into the low-risk group: a real alert or a real lightning advisory. */
+  unfold?: ReadonlySet<string>;
   /** Whether the stop-work set is confirmed: "stale" shows "?" on its count, "unknown" shows "—". */
   alertsState: "known" | "stale" | "unknown";
   /** One row of the list (the dashboard's SiteCard). */
@@ -32,29 +34,29 @@ function SearchIcon() {
   return <svg viewBox="0 0 20 20" aria-hidden="true" className="pointer-events-none absolute inset-s-3 top-1/2 size-4 -translate-y-1/2 text-muted"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 }
 
-export default function SiteListFinder({ sites, stops, alertsState, renderSite, revealId = null, itemRef, listClassName = "" }: SiteListFinderProps) {
+export default function SiteListFinder({ sites, stops, unfold, alertsState, renderSite, revealId = null, itemRef, listClassName = "" }: SiteListFinderProps) {
   const id = useId();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<SiteFilter>("all");
   const [lowOpen, setLowOpen] = useState(false);
   const counts = useMemo(() => filterCounts(sites, stops), [sites, stops]);
-  const view = useMemo(() => siteListView(sites, { query, filter, stops }), [sites, query, filter, stops]);
+  const view = useMemo(() => siteListView(sites, { query, filter, stops, unfold }), [sites, query, filter, stops, unfold]);
   const searching = query.trim() !== "";
 
   // A site picked elsewhere (the map) is never hidden: not by a search or filter, nor inside the folded
   // group. Only when the pick changes, so typing a new search afterwards isn't undone.
-  const latest = useRef({ sites, stops, view });
-  useEffect(() => { latest.current = { sites, stops, view }; });
+  const latest = useRef({ sites, stops, unfold, view });
+  useEffect(() => { latest.current = { sites, stops, unfold, view }; });
   useEffect(() => {
     if (!revealId) return;
-    const { sites: all, stops: stopped, view: current } = latest.current;
+    const { sites: all, stops: stopped, unfold: unfolded, view: current } = latest.current;
     const site = all.find((s) => s.id === revealId);
     if (!site) return;
     if (current.low.includes(site)) { setLowOpen(true); return; }
     if (current.shown.includes(site)) return;
     setQuery("");
     setFilter("all");
-    if (siteBand(site) === "low" && !stopped.has(site.id)) setLowOpen(true);
+    if (siteBand(site) === "low" && !stopped.has(site.id) && !unfolded?.has(site.id)) setLowOpen(true);
   }, [revealId]);
 
   const countText = (f: SiteFilter) => f !== "stop" || alertsState === "known" ? String(counts[f]) : alertsState === "stale" ? `${counts[f]}?` : "—";

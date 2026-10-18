@@ -63,6 +63,13 @@ test("a real stop-work site is never folded away, even on a low live index", () 
   assert.ok(!ids(view.low).includes("crystal-river"));
 });
 
+test("a low-risk site with a real alert or real advisory stays out of the folded group; the Low filter still lists it", () => {
+  const view = finder.siteListView(sites, { query: "", filter: "all", stops: none, unfold: new Set(["crystal-river"]) });
+  assert.deepEqual(ids(view.shown), ["deerhaven-generating-station", "crystal-river", "big-bend", "martin", "turkey-point"]);
+  assert.deepEqual(ids(view.low), ["gulf-clean-energy-center"]);
+  assert.deepEqual(ids(finder.siteListView(sites, { query: "", filter: "low", stops: none, unfold: new Set(["crystal-river"]) }).shown), ["gulf-clean-energy-center", "crystal-river"]);
+});
+
 test("nearest plant is computed on the device with great-circle miles", () => {
   // Tampa, about 7 mi from Big Bend.
   const nearest = finder.nearestSite(sites, 27.95, -82.46);

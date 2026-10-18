@@ -192,6 +192,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // The list's "Stop work" filter: the sites whose row shows a stop-work in this view (real in Live; the
   // replay's in Replay, and every real one too, so live safety is never filtered away).
   const viewStops = useMemo(() => new Set([...realStops, ...lightning.keys()]), [realStops, lightning]);
+  // Never folded into the low-risk group, in either view: a real alert of any kind or a real advisory.
+  const realActive = useMemo(() => new Set([...real.map((a) => a.site_id), ...(sites ?? []).filter((s) => s.lightning_approach && !s.lightning_approach.replay).map((s) => s.id)]), [real, sites]);
   // Real stop-work first, then replay stop-work, then the live index (without replay overrides).
   const sorted = useMemo(() => [...(viewSites ?? [])].sort((a, b) =>
     Number(realStops.has(b.id)) - Number(realStops.has(a.id)) || Number(lightning.has(b.id)) - Number(lightning.has(a.id))
@@ -401,7 +403,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 list keeps this order and these rows; it only decides which rows show. Its relative list
                 contains the cards' absolutely positioned screen-reader text (otherwise the desktop page
                 scrolled into blank space). */}
-            {sites.length > 0 && <SiteListFinder sites={sorted} stops={viewStops} alertsState={!alertsKnown ? "unknown" : alertsStale ? "stale" : "known"} revealId={selectedId} itemRef={rowRef}
+            {sites.length > 0 && <SiteListFinder sites={sorted} stops={viewStops} unfold={realActive} alertsState={!alertsKnown ? "unknown" : alertsStale ? "stale" : "known"} revealId={selectedId} itemRef={rowRef}
               listClassName="lg:overflow-y-auto lg:overscroll-contain"
               renderSite={(site) => <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
                 onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />} />}

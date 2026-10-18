@@ -46,13 +46,14 @@ export function filterCounts(sites: Site[], stops: ReadonlySet<string>): Record<
 }
 
 /** What the list shows. `shown` keeps the incoming order (the dashboard's ranking). By default (All, no
- *  search) low-risk sites without a stop-work collapse into `low`; a search or another filter shows
+ *  search) low-risk sites without a stop-work collapse into `low`, except sites in `unfold` (a real alert
+ *  or a real lightning advisory: live safety is never folded away); a search or another filter shows
  *  every match. */
-export function siteListView(sites: Site[], options: { query: string; filter: SiteFilter; stops: ReadonlySet<string> }) {
+export function siteListView(sites: Site[], options: { query: string; filter: SiteFilter; stops: ReadonlySet<string>; unfold?: ReadonlySet<string> }) {
   const searching = fold(options.query) !== "";
   const matches = sites.filter((site) => inFilter(site, options.filter, options.stops) && siteMatches(site, options.query));
   if (searching || options.filter !== "all") return { shown: matches, low: [] as Site[] };
-  const isLow = (site: Site) => siteBand(site) === "low" && !options.stops.has(site.id);
+  const isLow = (site: Site) => siteBand(site) === "low" && !options.stops.has(site.id) && !options.unfold?.has(site.id);
   return { shown: matches.filter((site) => !isLow(site)), low: matches.filter(isLow) };
 }
 
