@@ -47,6 +47,11 @@ type HazardPanelProps = {
   children?: ReactNode;
 };
 
+/** "3 hours", "90 minutes", "18 hours". */
+function overMinutes(min: number) {
+  return min >= 120 && min % 60 === 0 ? `${min / 60} hours` : `${min} minutes`;
+}
+
 export default function HazardPanel({ title, card, value, caption, note = null, rows, freshness, timeZone, nowMs, connectionLost, children }: HazardPanelProps) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
@@ -90,7 +95,7 @@ export default function HazardPanel({ title, card, value, caption, note = null, 
         )}
 
         <p className={`max-w-[68ch] ${live && !uncertain ? "text-text" : "text-muted"}`}>
-          {card?.reading ?? (status === null ? "No data from this source yet." : "No summary available.")}
+          {card?.reading ?? (status === null ? "No data from this source yet." : "The source sent numbers but no summary.")}
         </p>
 
         {hasDetails && open && (
@@ -122,7 +127,7 @@ export default function HazardPanel({ title, card, value, caption, note = null, 
               : asOf === null
                 ? "No live reading yet"
                 : <span>As of {formatPageTime(asOf, timeZone, nowMs)}{ageMs !== null && `, ${formatAgo(ageMs)}`}</span>}
-            {oldReading && <span className="font-semibold">Old reading: the source hasn&apos;t updated since.</span>}
+            {oldReading && freshness.kind === "polled" && <span className="font-semibold">Old reading: no update in over {overMinutes(freshness.staleAfterMin)}.</span>}
           </p>
         </footer>
       </div>

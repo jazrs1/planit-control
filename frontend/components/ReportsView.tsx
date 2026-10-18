@@ -55,7 +55,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
-        <p role="status" className="text-xs text-muted">{unknown ? "— Reports unknown" : `${sorted.length}${stale ? "? last known" : ""} ${sorted.length === 1 ? "report" : "reports"} · Newest first`}</p>
+        <p role="status" className="text-xs text-muted">{unknown ? "Reports unknown" : `${sorted.length}${stale ? "?" : ""} ${sorted.length === 1 ? "report" : "reports"}${stale ? " (last known)" : ""}, newest first`}</p>
         {!demo && <button type="button" disabled={refreshing} className="pc-link text-xs disabled:opacity-50" onClick={() => void refresh()}>{refreshing ? "Refreshing…" : "Refresh"}</button>}
       </div>
       {demo && <p role="status" className="flex flex-wrap items-center gap-x-3 text-muted"><span className="pc-chip pc-chip--unknown">Demo data</span>Sample reports, not live conditions.<button type="button" onClick={() => setDemo(false)} className="pc-link">Exit demo</button></p>}
@@ -64,7 +64,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
         <p className="max-w-[68ch] text-muted">Crew reports are unknown. This does not mean there are no reported hazards. Retrying automatically.</p>
         <button type="button" onClick={() => setDemo(true)} className="pc-link self-start">Show demo data</button>
       </section>}
-      {stale && <p role="alert" className="rounded-card border-2 border-dashed border-muted px-4 py-3 font-semibold text-muted">Connection lost · Reports not confirmed. Showing the last real reports; new reports may be missing.</p>}
+      {stale && <p role="alert" className="rounded-card border-2 border-dashed border-muted px-4 py-3 font-semibold text-muted">Connection lost. Showing the last loaded reports; new ones may be missing.</p>}
       {!unknown && <div className={`flex flex-col gap-6 ${stale ? "grayscale opacity-60" : ""}`}>
       <ReportMap reports={sorted} selectedId={selectedId} onSelect={selectFromMap} emptyText={sorted.length === 0 && !stale ? "No reports yet" : undefined} />
       {sorted.length === 0 ? <p className="pc-panel p-6 text-muted">{stale ? "The last loaded list was empty. Current reports are unknown." : "No crew hazard reports yet."}</p> : (
@@ -78,7 +78,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
                   <ReportPhoto key={report.photo_url} src={report.photo_url} alt={`${REPORT_LABEL[report.category]} reported by crew`} className="size-22 shrink-0" />
                   <div className="flex min-w-0 flex-col">
                     <h2 className="break-words text-xl font-semibold">{REPORT_LABEL[report.category]}{report.species ? ` · ${report.species}` : ""}</h2>
-                    <p className="break-words text-xs text-muted">{site?.name ?? (report.site_id ? `${report.site_id} · site details unavailable` : "Site unknown / not associated")}</p>
+                    <p className="break-words text-xs text-muted">{site?.name ?? (report.site_id ? `${report.site_id} · site details unavailable` : "No site chosen")}</p>
                     <time dateTime={report.created_at} className="text-xs text-muted">{time}</time>
                   </div>
                 </div>

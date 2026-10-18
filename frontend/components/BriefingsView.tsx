@@ -206,7 +206,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
           confirming ? (
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <span>Regenerate tomorrow&apos;s briefing for all {data.sites.length} sites? This replaces the stored ones.</span>
-              <button type="button" onClick={() => void sendAll()} className="pc-btn pc-btn--primary">Yes, send now</button>
+              <button type="button" onClick={() => void sendAll()} className="pc-btn pc-btn--primary">Regenerate all {data.sites.length}</button>
               <button type="button" onClick={() => setConfirming(false)} className="pc-link">Cancel</button>
             </div>
           ) : (
@@ -224,13 +224,13 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
       )}
 
       <p role="status" className="text-xs text-muted">
-        {shown.length} {shown.length === 1 ? "site" : "sites"}{" · "}Highest hazard index tomorrow first
-        {missing > 0 && <>{" · "}{missing} without a briefing</>}
-        {undecided > 0 && <>{" · "}{undecided} without a go / no-go decision (shown under All)</>}
+        {shown.length} {shown.length === 1 ? "site" : "sites"}, highest hazard index tomorrow first.
+        {missing > 0 && ` ${missing} ${missing === 1 ? "has" : "have"} no briefing yet.`}
+        {undecided > 0 && ` ${undecided} ${undecided === 1 ? "has" : "have"} no go / no-go decision and ${undecided === 1 ? "shows" : "show"} only under All.`}
       </p>
 
       {shown.length === 0 ? (
-        <p className="pc-panel p-6 text-muted">No sites match this filter.</p>
+        <p className="pc-panel p-6 text-muted">No briefings with this decision.</p>
       ) : (
         // Row by row, highest first: the riskiest card is always top left.
         <ul className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">

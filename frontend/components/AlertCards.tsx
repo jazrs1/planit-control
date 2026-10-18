@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Alert } from "@shared/types";
 import { ReplayTag } from "@/components/AlertBanner";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { formatStrikeDistance, replayCleared, replayClearedLabel } from "@/lib/alerts";
+import { formatStrikeDistance, replayCleared } from "@/lib/alerts";
 import { HAZARD_LABEL } from "@/lib/risk";
 
 // Alert cards for the site detail page and /alerts. A real stop-work gets the one hard edge on the page
@@ -22,7 +22,7 @@ export function StopWorkCard({ alert, siteName, lastKnown }: { alert: Alert; sit
         <header className="flex flex-wrap items-center gap-2 px-6 pbs-5 max-sm:px-5">
           {alert.replay && <ReplayTag />}
           <span className={`pc-chip ${lastKnown ? "pc-chip--unknown" : "pc-chip--replay-stop"}`}>Stop work</span>
-          {lastKnown && <span className="text-xs font-semibold">Last known · connection lost</span>}
+          {lastKnown && <span className="text-xs font-semibold">Last known, connection lost</span>}
         </header>
       ) : (
         <header className="flex items-center gap-2 bg-risk-red-solid px-6 py-3 text-on-risk-red max-sm:px-5">
@@ -56,7 +56,7 @@ export function NoticeCard({ alert, siteName, started, lastKnown, children }: { 
       <p className="flex flex-wrap items-center gap-2">
         {alert.replay && <ReplayTag />}
         <span className={`pc-chip ${chip}`}>{alertLabel(alert)}</span>
-        {lastKnown && <span className="text-xs font-semibold">Last known · connection lost</span>}
+        {lastKnown && <span className="text-xs font-semibold">Last known, connection lost</span>}
         {started && <span className="ms-auto text-xs text-muted">Started <time dateTime={alert.started_at}>{started}</time></span>}
       </p>
       {(siteName || children) && <div className="flex flex-col gap-1">
@@ -67,9 +67,16 @@ export function NoticeCard({ alert, siteName, started, lastKnown, children }: { 
   );
 }
 
+/** A finished replay alert in plain words: "Replay stop work cleared at 7:31 PM". */
+export function replayClearedText(alert: Alert, timeZone?: string) {
+  const end = alert.all_clear_at ? new Date(alert.all_clear_at) : null;
+  const time = end && Number.isFinite(end.getTime()) ? end.toLocaleTimeString("en-US", { timeZone: timeZone ?? "UTC", hour: "numeric", minute: "2-digit" }) : null;
+  return `Replay ${alertLabel(alert).toLowerCase()} cleared${time ? ` at ${time}` : ""}`;
+}
+
 /** A replay alert on the site page: a secondary blue tag, or grey once it has cleared on the replay clock. */
 export function ReplayLine({ alert, timeZone, replayNowMs }: { alert: Alert; timeZone: string; replayNowMs: number | null }) {
-  if (replayCleared(alert, replayNowMs)) return <p className="text-xs text-muted">{replayClearedLabel(alert, timeZone)}</p>;
+  if (replayCleared(alert, replayNowMs)) return <p className="text-xs text-muted">{replayClearedText(alert, timeZone)}</p>;
   return (
     <p className="flex flex-wrap items-center gap-2 text-xs">
       <span className="pc-chip pc-chip--replay">Replay</span>

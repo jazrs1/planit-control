@@ -16,7 +16,7 @@ export default async function BriefingsPage() {
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
       <header className="flex flex-col gap-2">
         <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em]">Tomorrow&apos;s briefings</h1>
-        <p className="max-w-[68ch] text-muted">Next-day safety briefing for every site, generated at 6 PM site time.</p>
+        <p className="max-w-[68ch] text-muted">Written at 6 PM site time from that evening&apos;s data.</p>
       </header>
       <BriefingsView initial={initial} />
     </main>

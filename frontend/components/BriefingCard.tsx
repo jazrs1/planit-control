@@ -109,11 +109,13 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
   const structured = (b?.risks?.length ?? 0) > 0 || (b?.actions?.length ?? 0) > 0;
   const index = typeof b?.key_numbers?.hazard_index === "number" && !unavailable.has("hazard_index") ? b.key_numbers.hazard_index : null;
   const ago = b && nowMs !== null ? formatAgo(Math.max(0, nowMs - Date.parse(b.generated_at))) : null;
-  // "Sun, Oct 18 · Tomorrow", or last night's briefing: "Sat, Oct 17 · Today · Next briefing at 6 PM".
+  // "Tomorrow, Sun, Oct 18", or last night's briefing: "Today, Sat, Oct 17 · Next briefing at 6 PM".
+  // At most one middle dot per line.
   const when = b && <>
+    {day === "tomorrow" && "Tomorrow, "}
+    {day === "today" && "Today, "}
     {formatForDate(b.for_date)}
-    {day === "tomorrow" && <>{" · "}Tomorrow</>}
-    {day === "today" && <>{" · "}Today{" · "}Next briefing at 6 PM</>}
+    {day === "today" && <>{" · "}Next briefing at 6 PM</>}
   </>;
 
   // Risks and actions side by side on the site page, stacked in the list.
@@ -158,7 +160,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
 
   const factors = b?.top_factors && b.top_factors.length > 0 && (
     <p className="text-xs text-muted">
-      Main factors: {b.top_factors.map((f, i) => <span key={i}>{i > 0 && " · "}{factorHazardLabel(f.hazard)} {Math.round(f.weight * 100)}%</span>)}
+      Main factors: {b.top_factors.map((f, i) => <span key={i}>{i > 0 && ", "}{factorHazardLabel(f.hazard)} {Math.round(f.weight * 100)}%</span>)}
     </p>
   );
 
@@ -184,7 +186,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
   const status = <>
     {entry.kind === "none" && <p className="text-muted">No briefing yet. Briefings are generated at 6 PM site time.</p>}
     {entry.kind === "loading" && <p role="status" className="text-muted">Loading briefing…</p>}
-    {entry.kind === "unknown" && <p className="font-semibold text-muted">Briefing unknown: couldn&apos;t load it from the server.</p>}
+    {entry.kind === "unknown" && <p className="font-semibold text-muted">Couldn&apos;t load this briefing from the server.</p>}
   </>;
 
   const article = `flex flex-col gap-6 rounded-card bg-surface p-6 max-sm:p-5 ${b && !uncertain ? "shadow-card" : "border-2 border-dashed border-border"}`;
@@ -216,7 +218,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
             {regenerateLink}
           </span>
           <p className="text-xs text-muted">
-            {b ? <>Generated {ago ?? formatPageTime(b.generated_at, timeZone, nowMs)}{connectionLost && <>{" · "}last known</>}</> : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
+            {b ? <>Generated {ago ?? formatPageTime(b.generated_at, timeZone, nowMs)}{connectionLost && " (last known)"}</> : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
           </p>
         </footer>
         {b && open && (
@@ -224,7 +226,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
             {numbers}
             {lists}
             {factors}
-            {structured && <button type="button" aria-expanded={fullText} onClick={() => setFullText((v) => !v)} className="pc-link self-start text-xs">{fullText ? "Hide full briefing text" : "Full briefing text"}</button>}
+            {structured && <button type="button" aria-expanded={fullText} onClick={() => setFullText((v) => !v)} className="pc-link self-start text-xs">{fullText ? "Hide full text" : "Full briefing text"}</button>}
             {fullTextBlock}
             {source}
           </div>
@@ -242,7 +244,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xs text-muted">
             {day === "today" ? "Today’s briefing" : day === "tomorrow" || !b ? "Tomorrow’s briefing" : "Briefing"}
-            {b && <>{" · "}{formatForDate(b.for_date)}</>}
+            {b && <>, {formatForDate(b.for_date)}</>}
             {day === "today" && <>{" · "}Next briefing at 6 PM</>}
           </h2>
           {badge}
@@ -264,8 +266,8 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
         <p className="text-xs text-muted">
           {b ? (
             <>
-              Generated <span className="whitespace-nowrap">{formatPageTime(b.generated_at, timeZone, nowMs)}{ago && `, ${ago}`}</span>
-              {connectionLost && <>{" · "}last known</>}
+              Generated <span className="whitespace-nowrap">{formatPageTime(b.generated_at, timeZone, nowMs)}{ago && ` (${ago})`}</span>
+              {connectionLost && ", last known"}
             </>
           ) : entry.kind === "none" ? "No briefing stored" : entry.kind === "loading" ? "Loading…" : "Not loaded"}
         </p>

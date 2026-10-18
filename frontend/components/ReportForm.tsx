@@ -48,7 +48,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
 
   const locate = useCallback((onlyIfEmpty = false) => {
     if (!navigator.geolocation) {
-      setLocationMessage("Location is unavailable. Tap the map or enter coordinates to place your pin.");
+      setLocationMessage("This browser can't share your location. Tap the map or enter coordinates to place your pin.");
       return;
     }
     const sequence = ++locationRequest.current;
@@ -63,7 +63,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
     }, () => {
       if (sequence !== locationRequest.current) return;
       setLocating(false);
-      setLocationMessage("Could not access your location. Tap the map or enter coordinates to place your pin.");
+      setLocationMessage("Couldn't get your location. Tap the map or enter coordinates to place your pin.");
     }, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
   }, [choosePin]);
 
@@ -117,7 +117,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
       const report = await createReport(body, controller.signal);
       if (!controller.signal.aborted) setSubmitted(report);
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not submit the report. Please try again.");
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Couldn't submit the report. Try again.");
     } finally {
       request.current = null;
       if (!controller.signal.aborted) setPhase("idle");
@@ -185,7 +185,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
                 {/* Alphabetical: 55 plants in capacity order are hard to find on a phone. */}
                 {sites && [...sites].sort((a, b) => a.name.localeCompare(b.name)).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
               </select>
-              {sites === null && <span role="status" className="mbs-2 block text-sm text-muted">Site data unavailable. Retrying automatically. You can submit with a map pin and no associated site.</span>}
+              {sites === null && <span role="status" className="mbs-2 block text-sm text-muted">Couldn&apos;t load sites; retrying. You can still submit with a map pin and no site.</span>}
             </label>
           </div>
         </div>
