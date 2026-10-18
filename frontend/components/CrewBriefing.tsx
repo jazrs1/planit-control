@@ -28,7 +28,7 @@ export default function CrewBriefing({ briefing, site, failed, loading }: { brie
   const go = briefing?.go_status ? GO[briefing.go_status] : null;
   const forecast = briefing && Number.isFinite(briefing.key_numbers.hazard_index) ? briefing.key_numbers.hazard_index : null;
   // Last night's briefing covers today; tonight's (after 6 PM) covers tomorrow.
-  const source = day === "today" ? "Forecast from last night\u2019s briefing" : "Forecast for tomorrow · from tonight\u2019s briefing";
+  const source = day === "today" ? "Forecast from last night\u2019s briefing" : "Forecast for tomorrow, from tonight\u2019s briefing";
   return <section aria-labelledby="briefing-heading" className="pc-panel overflow-clip">
     <h2 id="briefing-heading" className="pc-label flex h-9 items-center border-be border-border px-4 text-xs text-muted">{day === "today" ? "Today\u2019s briefing" : "Tomorrow\u2019s briefing"}</h2>
     <div className={`space-y-3 p-4 ${failed ? "text-muted grayscale" : ""}`}>

@@ -29,7 +29,7 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
     <p className="text-sm text-muted">Stop-work, approaching lightning, flood alerts and evening briefings for your sites. The role is saved for your device; both roles currently receive the same events.</p>
     {push.iphoneHint && <p className={`rounded-card bg-bg p-3 text-sm font-semibold ${"border border-border"}`}>On iPhone Safari, use Share → Add to Home Screen, then open the installed app. Alerts require iOS 16.4 or later.</p>}
     <details open={!compact} className={`rounded-card bg-bg p-3 ${"border border-border"}`}>
-      <summary className="cursor-pointer font-semibold text-brand">Sites and role · {all ? "All sites" : `${chosen.length} selected`} · {role === "crew" ? "Crew" : "Supervisor"}</summary>
+      <summary className="cursor-pointer font-semibold text-brand">Sites and role: {all ? "All sites" : `${chosen.length} selected`}, {role === "crew" ? "crew" : "supervisor"}</summary>
       <fieldset disabled={disabled} className="mbs-3 space-y-3">
         <legend className="sr-only">Alert preferences</legend>
         <label htmlFor={`${id}-role`} className="block text-sm font-semibold">Your role
@@ -49,7 +49,7 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
           </div>}
         </fieldset>
         {!valid && <p className="text-sm text-muted">Choose at least one site or select All sites.</p>}
-        {sitesUnconfirmed && <p className="text-sm text-muted">Site list not confirmed · showing last loaded names.</p>}
+        {sitesUnconfirmed && <p className="text-sm text-muted">Site list not confirmed. Showing last loaded names.</p>}
       </fieldset>
     </details>
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -58,7 +58,7 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
       {push.canUnsubscribe && <button type="button" disabled={push.busy || demo} onClick={() => void push.unsubscribe()} className="pc-link disabled:cursor-not-allowed disabled:opacity-50">Unsubscribe</button>}
     </div>
     <p role="status" className="text-sm font-medium text-muted">{push.message}</p>
-    {!demo && connection.level !== "online" && push.phase === "registered" && <p role="status" className="text-sm font-semibold text-muted">? Last confirmed registration · server connection lost.</p>}
+    {!demo && connection.level !== "online" && push.phase === "registered" && <p role="status" className="text-sm font-semibold text-muted">? Last confirmed registration. Server connection lost.</p>}
     <p className="text-sm text-muted"><strong className="font-semibold text-text">Notifications can be delayed, arrive out of order, or never arrive.</strong> No notification does not mean all clear. Check the app&apos;s current alerts and follow your site&apos;s safety procedures.</p>
   </section>;
 }

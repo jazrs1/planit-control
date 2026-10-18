@@ -27,6 +27,6 @@ export default function LightningApproachChip({ approach, stopWork, unconfirmed,
       {unconfirmed && <span className="pc-label">Last known · connection lost</span>}
     </p>
     <p className="text-sm">{motion}</p>
-    <p className="text-xs text-muted">{demo ? "Demo data · " : ""}{unconfirmed ? "Not confirmed · " : ""}Lightning can arrive sooner. Stay alert for stop-work orders.</p>
+    <p className="text-xs text-muted">{demo ? "Demo data. " : ""}{unconfirmed ? "Not confirmed. " : ""}Lightning can arrive sooner. Stay alert for stop-work orders.</p>
   </div>;
 }

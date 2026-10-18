@@ -131,16 +131,19 @@
 }
 
 @layer components {
-  /* A label, tag or heading set like a sign legend. Uppercase is only for these, never sentences. */
+  /* A small label or heading, in sentence case. */
   .pc-label {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    letter-spacing: 0.06em;
     line-height: 1.2;
+  }
+  /* Safety signs only (a stop-work sign, a reading's status word): uppercase like a sign legend. */
+  .pc-label--sign {
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
-  /* Page title: calm and large. The sign variant (uppercase, black weight) is for the crew view. */
+  /* Page title: calm and large. The sign variant (uppercase) is for crew safety signs, such as "Safety status unknown". */
   .pc-title {
     font-size: var(--pc-text-title);
     font-weight: 600;

@@ -135,7 +135,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
     return (
       <section data-theme="dark" aria-labelledby="replay-heading" className="pc-reveal flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card bg-instrument px-4 py-2 text-text shadow-float">
         <h2 id="replay-heading" className="text-sm font-semibold">Storm replay</h2>
-        <p className="min-w-0 flex-1 basis-56 text-xs text-muted sm:truncate">{replayWindowLabel(replay)} · plays a recorded storm through the live pipeline</p>
+        <p className="min-w-0 flex-1 basis-56 text-xs text-muted sm:truncate">{replayWindowLabel(replay)}. Plays a recorded storm through the live pipeline</p>
         {RECORDING_URL && <a href={RECORDING_URL} target="_blank" rel="noopener noreferrer" className="pc-link text-text">Watch the 90-second recording</a>}
         <ReplayControl />
       </section>
@@ -171,7 +171,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
           <ReplayControl />
           <div className="grid min-w-0 gap-1">
             <div className="relative h-4 mbe-1" aria-hidden="true">
-              {events.map((event) => <span key={event.id} title={`${EVENT[event.kind].label} · ${names.get(event.site_id) ?? event.site_id} · ${siteClock(Date.parse(event.at), zones.get(event.site_id))}`}
+              {events.map((event) => <span key={event.id} title={`${EVENT[event.kind].label}, ${names.get(event.site_id) ?? event.site_id}, ${siteClock(Date.parse(event.at), zones.get(event.site_id))}`}
                 className={`pc-shape ${EVENT[event.kind].mark} absolute inset-bs-0.5 -translate-x-1/2 text-[0.75rem]`} style={{ insetInlineStart: `${at(span, Date.parse(event.at))}%` }} />)}
             </div>
             <div className="relative h-0.5 bg-instrument-line" role="progressbar" aria-label="Replay progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}
@@ -187,7 +187,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
               : <div className="flex justify-between text-[0.6875rem] text-muted"><span>Storm start</span><span>Storm end</span></div>}
             <p className="text-xs text-muted">
               {quiet ? "Quiet period: countdowns clearing" : timed ? `Storm data until ${clock(tEnd)}, then 31 quiet minutes` : `${Math.round(progress * 100)}% of storm data`}
-              {replay && Number.isFinite(replay.files_total) && ` · ${replay.files_done}/${replay.files_total} files · ${(replay.flashes_ingested ?? 0).toLocaleString()} flashes`}
+              {replay && Number.isFinite(replay.files_total) && ` · ${replay.files_done}/${replay.files_total} files, ${(replay.flashes_ingested ?? 0).toLocaleString()} flashes`}
             </p>
           </div>
         </div>

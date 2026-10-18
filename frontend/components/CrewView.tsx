@@ -69,7 +69,7 @@ function CrewSite({ site }: { site: Site }) {
         <p className="mbs-2 font-semibold">Stop-work status is not confirmed. {status === "stale" ? "Connection lost." : "Waiting for the server."}</p>
       </div> : <div className={`pc-panel overflow-clip p-4 ${detailFailed || !risk ? "pc-panel--unknown grayscale" : ""}`}>
         <h2 className="flex items-center justify-between gap-3">
-          <span className="pc-label text-xs text-muted">Hazard index · now</span>
+          <span className="pc-label text-muted">Hazard index now</span>
           {risk && !detailFailed && <span className={`pc-chip rounded-[4px] ${risk.tag}`}>{risk.label} risk</span>}
         </h2>
         <div className="mbs-3">
@@ -79,10 +79,10 @@ function CrewSite({ site }: { site: Site }) {
           </p>
           <p className="mbs-3 text-xl font-semibold">{detailFailed ? "Not confirmed" : risk ? `${risk.label} risk` : loading ? "Loading conditions…" : "No data"}</p>
           {scoreKnown && <p className="mbs-1 font-semibold">Top hazard: {HAZARD_LABEL[detail.top_hazard]}</p>}
-          {scoreKnown && <p className="mbs-2 text-sm text-muted">Live score from current conditions · updated {formatAlertTime(detail.updated_at, site.timezone)}</p>}
+          {scoreKnown && <p className="mbs-2 text-sm text-muted">Updated {formatAlertTime(detail.updated_at, site.timezone)}</p>}
         </div>
       </div>)}
-      {(lightning || flood) && alertsUnknown && <p role="status" className="font-semibold text-muted">Last known alert · current conditions not confirmed.</p>}
+      {(lightning || flood) && alertsUnknown && <p role="status" className="font-semibold text-muted">Last known alert. Current conditions not confirmed.</p>}
       {replayView && replayLightning && !replayDone && <AlertBanner alert={replayLightning} site={site} compact prominent unconfirmed={alertsUnknown} />}
       {replayView && replayLightning && replayDone && <p className="text-sm text-muted">{replayClearedLabel(replayLightning, site.timezone)}</p>}
       {replayView && replayFlood && <AlertBanner alert={replayFlood} site={site} compact unconfirmed={alertsUnknown} />}
@@ -113,15 +113,15 @@ function CrewModeView({ initialSites, demo }: { initialSites: Site[] | null; dem
   useEffect(() => { if (selected) rememberSite(selected.id); }, [selected?.id]);
 
   return <main className="mx-auto max-w-2xl space-y-5 px-4 py-5">
-    <header><h1 className="pc-title pc-title--sign">Crew view</h1><p className="mbs-1 font-semibold text-muted">Your site, at a glance.</p></header>
-    {demo && <div role="status" className="rounded-card border-2 border-rule bg-surface p-4 font-semibold text-muted">Demo data · sample conditions, not live safety data. <button type="button" onClick={() => setDemo(false)} className="min-h-12 px-2 text-brand underline">Exit demo</button></div>}
+    <h1 className="pc-title break-words">{selected?.name ?? "Choose your site"}</h1>
+    {demo && <div role="status" className="rounded-card border-2 border-rule bg-surface p-4 font-semibold text-muted">Demo data: sample conditions, not live safety data. <button type="button" onClick={() => setDemo(false)} className="min-h-12 px-2 text-brand underline">Exit demo</button></div>}
     <div className="pc-panel p-4">
       {/* Type to search, or "Use my location" (the nearest plant, worked out on this device). */}
       <CrewSitePicker sites={sites} selectedId={selected?.id ?? null} onSelect={setPreferred} disabled={!storageReady} />
-      {sitesFailed && sites !== null && <p role="status" className="mbs-2 font-medium text-muted">Site list not confirmed · showing the last loaded sites.</p>}
+      {sitesFailed && sites !== null && <p role="status" className="mbs-2 font-medium text-muted">Site list not confirmed. Showing the last loaded sites.</p>}
     </div>
     {selected ? <CrewSite key={selected.id} site={selected} /> : <section role="status" className="space-y-3 rounded-card border-2 border-rule bg-surface p-5 text-muted">
-      <h2 className="text-xl font-bold">{sitesFailed ? "Can’t reach the server" : sites?.length === 0 ? "No sites available" : "Choose your site"}</h2>
+      <h2 className="text-xl font-bold">{sitesFailed ? "Can’t reach the server" : sites?.length === 0 ? "No sites available" : "No site chosen"}</h2>
       <p>Site conditions and stop-work status are unknown.</p>
       {!demo && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void refresh()} className="min-h-12 rounded-card bg-brand px-4 font-semibold text-on-brand">Retry now</button><button type="button" onClick={() => setDemo(true)} className="min-h-12 rounded-card border-2 border-rule px-4 font-semibold text-brand">Show demo data</button></div>}
     </section>}

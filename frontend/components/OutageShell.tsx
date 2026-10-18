@@ -39,7 +39,7 @@ export default function OutageShell({ children }: { children: ReactNode }) {
       {outage && (
         <div ref={banner} role="alert" className="sticky inset-bs-0 z-40 border-be-2 border-risk-red bg-risk-red-solid px-4 py-3 text-on-risk-red">
           <div className="mx-auto max-w-5xl">
-            <p className="text-lg font-bold">Status unknown · don&apos;t treat any site as clear</p>
+            <p className="text-lg font-bold">Status unknown. Don&apos;t treat any site as clear.</p>
             <p className="text-sm">
               {last === null
                 ? "No response from the server since this page opened."
