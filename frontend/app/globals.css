@@ -378,11 +378,11 @@
   from { scale: 0.8; opacity: 1; }
   to { scale: 1.6; opacity: 0; }
 }
-/* Markers wait for the basemap's first tiles, then fade in once (SiteMap adds these classes). A real
-   stop-work marker never waits. */
-.site-marker--waiting { opacity: 0; }
+/* Markers wait for the basemap's first tiles, then fade in once (SiteMap adds these classes to the
+   shape, since MapLibre sets an inline opacity on the marker). A real stop-work marker never waits. */
+.site-marker__shape--waiting { opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
-  .site-marker--enter { animation: pc-fade 250ms var(--pc-ease-out) both; }
+  .site-marker__shape--enter { animation: pc-fade 250ms var(--pc-ease-out) both; }
   /* A stop-work that just began: two soft pulses, then the halo stays still. */
   .site-marker--pulse::after { animation: lightning-pulse 1.2s var(--pc-ease-out) 2; }
 }
