@@ -47,18 +47,18 @@ test("counts: High is the live red band, Stop work is real stop-work only", () =
 });
 
 test("by default low-risk sites fold into one group; a search or a filter shows every match in order", () => {
-  const byDefault = finder.siteListView(sites, { query: "", filter: "all", realStops: none });
+  const byDefault = finder.siteListView(sites, { query: "", filter: "all", stops: none });
   assert.deepEqual(ids(byDefault.shown), ["deerhaven-generating-station", "big-bend", "martin", "turkey-point"]);
   assert.deepEqual(ids(byDefault.low), ["gulf-clean-energy-center", "crystal-river"]);
   // Search ignores grouping: a low-risk match is shown directly.
-  assert.deepEqual(ids(finder.siteListView(sites, { query: "crys", filter: "all", realStops: none }).shown), ["crystal-river"]);
-  assert.deepEqual(ids(finder.siteListView(sites, { query: "", filter: "low", realStops: none }).shown), ["gulf-clean-energy-center", "crystal-river"]);
-  assert.deepEqual(ids(finder.siteListView(sites, { query: "", filter: "stop", realStops: new Set(["big-bend"]) }).shown), ["big-bend"]);
-  assert.equal(finder.siteListView(sites, { query: "nowhere", filter: "all", realStops: none }).shown.length, 0);
+  assert.deepEqual(ids(finder.siteListView(sites, { query: "crys", filter: "all", stops: none }).shown), ["crystal-river"]);
+  assert.deepEqual(ids(finder.siteListView(sites, { query: "", filter: "low", stops: none }).shown), ["gulf-clean-energy-center", "crystal-river"]);
+  assert.deepEqual(ids(finder.siteListView(sites, { query: "", filter: "stop", stops: new Set(["big-bend"]) }).shown), ["big-bend"]);
+  assert.equal(finder.siteListView(sites, { query: "nowhere", filter: "all", stops: none }).shown.length, 0);
 });
 
 test("a real stop-work site is never folded away, even on a low live index", () => {
-  const view = finder.siteListView(sites, { query: "", filter: "all", realStops: new Set(["crystal-river"]) });
+  const view = finder.siteListView(sites, { query: "", filter: "all", stops: new Set(["crystal-river"]) });
   assert.ok(ids(view.shown).includes("crystal-river"));
   assert.ok(!ids(view.low).includes("crystal-river"));
 });
@@ -75,16 +75,16 @@ test("nearest plant is computed on the device with great-circle miles", () => {
 test("the dashboard list renders the folded low-risk row and real-only counts", () => {
   const { default: SiteListFinder } = load("components/SiteListFinder.tsx");
   const html = renderToStaticMarkup(React.createElement(SiteListFinder, {
-    sites, realStops: new Set(["big-bend"]), alertsState: "known", renderSite: (site) => React.createElement("span", null, `ROW ${site.id}`),
+    sites, stops: new Set(["big-bend"]), alertsState: "known", renderSite: (site) => React.createElement("span", null, `ROW ${site.id}`),
   }));
   assert.match(html, /Low risk · 2 sites/);
   assert.match(html, /ROW big-bend/);
   assert.doesNotMatch(html, /ROW crystal-river/);
   assert.match(html, /aria-pressed="true"[^>]*>All <span[^>]*>6</);
   assert.match(html, />Stop work <span[^>]*>1</);
-  const unknown = renderToStaticMarkup(React.createElement(SiteListFinder, { sites, realStops: none, alertsState: "unknown", renderSite: () => null }));
+  const unknown = renderToStaticMarkup(React.createElement(SiteListFinder, { sites, stops: none, alertsState: "unknown", renderSite: () => null }));
   assert.match(unknown, />Stop work <span[^>]*>—</);
-  const stale = renderToStaticMarkup(React.createElement(SiteListFinder, { sites, realStops: new Set(["big-bend"]), alertsState: "stale", renderSite: () => null }));
+  const stale = renderToStaticMarkup(React.createElement(SiteListFinder, { sites, stops: new Set(["big-bend"]), alertsState: "stale", renderSite: () => null }));
   assert.match(stale, />Stop work <span[^>]*>1\?</);
 });
 

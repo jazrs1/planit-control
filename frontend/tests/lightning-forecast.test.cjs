@@ -159,7 +159,9 @@ function hookDriver() {
 function elements(tree, match) {
   if (!tree || typeof tree !== "object") return [];
   if (Array.isArray(tree)) return tree.flatMap(child => elements(child, match));
-  return [...(match(tree) ? [tree] : []), ...elements(tree.props?.children, match)];
+  // The dashboard's site list (SiteListFinder) draws its rows with renderSite: expand them too.
+  const rows = typeof tree.props?.renderSite === "function" && Array.isArray(tree.props.sites) ? tree.props.sites.map(tree.props.renderSite) : [];
+  return [...(match(tree) ? [tree] : []), ...elements(tree.props?.children, match), ...elements(rows, match)];
 }
 
 test("crew view shows direction and speed and gives known stop-work priority", () => {
@@ -312,25 +314,28 @@ function dashboard(state) {
   Object.assign(overrides["@/lib/api"], { getSites: async () => [site], getLightningRecent: async () => [], getLightningCells: async () => [], getLightningCounts: async () => ({ minutes: 15, real: 0, replay: 0 }) });
   const Dashboard = load("components/SupervisorDashboard.tsx", overrides).default;
   const tree = driver.render(Dashboard, { initialSites: [site] });
-  return { tree, map: elements(tree, el => el.type === Map)[0].props, cards: elements(tree, el => el.type === Card), html: renderToStaticMarkup(tree) };
+  const finder = elements(tree, el => typeof el.props?.renderSite === "function")[0].props;
+  return { tree, map: elements(tree, el => el.type === Map)[0].props, cards: elements(tree, el => el.type === Card), finder, html: renderToStaticMarkup(tree) };
 }
 
 test("Live view (the default) hides the replay: no replay alerts on the map or in the list, only a banner", () => {
   const running = { running: true, window: "2025-08-04_2200-2300", simulated_now: "2025-08-04T22:20:00Z", files_done: 60, files_total: 180, flashes_ingested: 5000, window_start: "2025-08-04T22:00:00Z", window_end: "2025-08-04T23:00:00Z", quiet_until: "2025-08-04T23:31:00Z" };
-  const { map, cards, html } = dashboard({ ...baseState, alerts: [replayStop], replay: running });
+  const { map, cards, finder, html } = dashboard({ ...baseState, alerts: [replayStop], replay: running });
   assert.equal(map.alerts.length, 0, "no replay alerts on the map");
+  assert.equal(finder.stops.size, 0, "a replay stop-work never counts under the list's Stop work filter in Live view");
   assert.ok(cards.every(card => card.props.alerts.length === 0), "no replay rows");
   assert.match(html, /A storm replay is running/);
   assert.match(html, /Watch replay/);
 });
 
 test("Replay view pins a real stop-work on top and keeps it on the map; the list shows the replay's states", () => {
-  const { map, cards, html } = dashboard({ ...baseState, alerts: [replayStop, realStop], viewMode: "replay", replay: { running: true, window: "2025-08-04_2200-2300", simulated_now: "2025-08-04T22:20:00Z", files_done: 60, files_total: 180, flashes_ingested: 5000, window_start: "2025-08-04T22:00:00Z", window_end: "2025-08-04T23:00:00Z", quiet_until: "2025-08-04T23:31:00Z" } });
+  const { map, cards, finder, html } = dashboard({ ...baseState, alerts: [replayStop, realStop], viewMode: "replay", replay: { running: true, window: "2025-08-04_2200-2300", simulated_now: "2025-08-04T22:20:00Z", files_done: 60, files_total: 180, flashes_ingested: 5000, window_start: "2025-08-04T22:00:00Z", window_end: "2025-08-04T23:00:00Z", quiet_until: "2025-08-04T23:31:00Z" } });
   assert.match(html, /aria-label="Live now"/);
   assert.match(html, /Live now[\s\S]*Big Bend[\s\S]*pc-chip--stop/);
   assert.ok(map.alerts.some(alert => !alert.replay), "the real stop-work stays on the map (drawn red, the real one wins)");
   const row = cards.find(card => card.props.site.id === site.id);
   assert.ok(row.props.alerts.every(alert => alert.replay), "the row shows the replay's state; the real one is pinned");
+  assert.ok(finder.stops.has(site.id), "the Stop work filter follows the rows in Replay view");
   assert.match(html, /Back to live/);
 });
 

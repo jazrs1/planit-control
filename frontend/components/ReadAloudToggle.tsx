@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { LightningApproach, Site } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
+import { useViewMode } from "@/components/ViewModeProvider";
 import { readAloudChanges, readAloudState } from "@/lib/readAloud";
 import type { ReadAloudState } from "@/lib/readAloud";
 
@@ -28,6 +29,9 @@ function speak(text: string) {
 export default function ReadAloudToggle({ site, approach }: ReadAloudToggleProps) {
   const { alerts, status, replay } = useAlertsState();
   const serverNow = useServerNow();
+  const { mode } = useViewMode();
+  // This device's view, like the rest of the crew view: Live speaks real alerts only.
+  const view = mode === "replay" && status !== "demo" ? "replay" : "live";
   const id = useId();
   const [on, setOn] = useState(false);
   const [supported, setSupported] = useState(true);
@@ -38,16 +42,16 @@ export default function ReadAloudToggle({ site, approach }: ReadAloudToggleProps
   const unknownNow = useRef(false);
   const lastLine = useRef("");
 
-  const state = readAloudState(site, alerts, status, approach, serverNow(), !!replay?.running);
+  const state = readAloudState(site, alerts, status, approach, serverNow(), !!replay?.running, view);
   // A stable signature, so the effect runs only when what would be said changes.
-  const signature = state.known ? [...state.items.entries()].sort().map(([key, text]) => `${key}=${text.split(".")[0]}`).join("|") + (state.replayRunning ? "|replay" : "") : "unknown";
+  const signature = state.known ? [...state.items.entries()].sort().map(([key, text]) => `${key}=${text.split(".")[0]}`).join("|") + (state.replayRunning ? "|replay" : "") + `|${state.view}` : "unknown";
 
   useEffect(() => {
     if (!on) return;
     if (lastKnown.current === null) {
       // First look after turning on: the baseline, nothing to say. Unknown at first: whatever is active
       // once the state is known gets said.
-      lastKnown.current = state.known ? state : { known: true, items: new Map(), replayRunning: !!replay?.running };
+      lastKnown.current = state.known ? state : { known: true, items: new Map(), replayRunning: !!replay?.running, view };
       unknownNow.current = !state.known;
       return;
     }

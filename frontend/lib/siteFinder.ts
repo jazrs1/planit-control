@@ -2,8 +2,9 @@ import type { Site } from "@shared/types";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 
 // Finding a site: search by name or county, risk groups for the dashboard list, and the nearest plant
-// for the crew view. Groups are real only: a replay never makes a site "Stop work" or "High" here (its
-// index is hazard_index_live, without replay overrides), so the list's counts match the dashboard's.
+// for the crew view. Groups follow the view the dashboard passes in: in Live, sites carry
+// hazard_index_live (no replay overrides) and `stops` is real stop-work only, so a replay never makes a
+// site "Stop work" or "High"; in Replay view they are the replay's states, as the rows show them.
 
 export type SiteFilter = "all" | "stop" | "high" | "elevated" | "low";
 export const SITE_FILTERS: SiteFilter[] = ["all", "stop", "high", "elevated", "low"];
@@ -22,36 +23,36 @@ export function siteMatches(site: Pick<Site, "name" | "county">, query: string):
   return words.every((word) => haystack.includes(` ${word}`));
 }
 
-/** The site's band in the list: its live risk band. A real stop-work site is "stop" as well (it is also high:
- *  a real stop-work raises today's index to at least 9). */
+/** The site's band in the list: its risk band in this view. A stop-work site is "stop" as well (it is also
+ *  high: a stop-work raises today's index to at least 9). */
 export function siteBand(site: Site): Exclude<SiteFilter, "all" | "stop"> {
   const level = riskLevel(liveHazardIndex(site));
   return level === "red" ? "high" : level === "amber" ? "elevated" : "low";
 }
 
-export function inFilter(site: Site, filter: SiteFilter, realStops: ReadonlySet<string>): boolean {
+export function inFilter(site: Site, filter: SiteFilter, stops: ReadonlySet<string>): boolean {
   if (filter === "all") return true;
-  if (filter === "stop") return realStops.has(site.id);
+  if (filter === "stop") return stops.has(site.id);
   return siteBand(site) === filter;
 }
 
-export function filterCounts(sites: Site[], realStops: ReadonlySet<string>): Record<SiteFilter, number> {
+export function filterCounts(sites: Site[], stops: ReadonlySet<string>): Record<SiteFilter, number> {
   const counts: Record<SiteFilter, number> = { all: sites.length, stop: 0, high: 0, elevated: 0, low: 0 };
   for (const site of sites) {
-    if (realStops.has(site.id)) counts.stop++;
+    if (stops.has(site.id)) counts.stop++;
     counts[siteBand(site)]++;
   }
   return counts;
 }
 
 /** What the list shows. `shown` keeps the incoming order (the dashboard's ranking). By default (All, no
- *  search) low-risk sites without a real stop-work collapse into `low`; a search or another filter shows
+ *  search) low-risk sites without a stop-work collapse into `low`; a search or another filter shows
  *  every match. */
-export function siteListView(sites: Site[], options: { query: string; filter: SiteFilter; realStops: ReadonlySet<string> }) {
+export function siteListView(sites: Site[], options: { query: string; filter: SiteFilter; stops: ReadonlySet<string> }) {
   const searching = fold(options.query) !== "";
-  const matches = sites.filter((site) => inFilter(site, options.filter, options.realStops) && siteMatches(site, options.query));
+  const matches = sites.filter((site) => inFilter(site, options.filter, options.stops) && siteMatches(site, options.query));
   if (searching || options.filter !== "all") return { shown: matches, low: [] as Site[] };
-  const isLow = (site: Site) => siteBand(site) === "low" && !options.realStops.has(site.id);
+  const isLow = (site: Site) => siteBand(site) === "low" && !options.stops.has(site.id);
   return { shown: matches.filter((site) => !isLow(site)), low: matches.filter(isLow) };
 }
 

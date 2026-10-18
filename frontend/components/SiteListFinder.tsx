@@ -1,25 +1,26 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Site } from "@shared/types";
-import { SITE_FILTERS, SITE_FILTER_LABEL, filterCounts, siteListView } from "@/lib/siteFinder";
+import { SITE_FILTERS, SITE_FILTER_LABEL, filterCounts, siteBand, siteListView } from "@/lib/siteFinder";
 import type { SiteFilter } from "@/lib/siteFinder";
 
 // "Sites by risk" on the dashboard: search, one-at-a-time filter chips and, by default, low-risk sites
 // folded into one row. The dashboard keeps its order, its rows (renderSite) and every real-vs-replay
-// rule; this only decides which rows show. Counts and groups are real only (lib/siteFinder.ts).
+// rule; this only decides which rows show. Counts and groups follow the view's sites (lib/siteFinder.ts).
 
 type SiteListFinderProps = {
   /** Sites in the dashboard's order (real stop-work first, then by live hazard index). */
   sites: Site[];
-  /** Sites with a real lightning stop-work. Replay stop-works never count here. */
-  realStops: ReadonlySet<string>;
+  /** Sites whose row shows a lightning stop-work in this view: real only in Live view. */
+  stops: ReadonlySet<string>;
   /** Whether the stop-work set is confirmed: "stale" shows "?" on its count, "unknown" shows "—". */
   alertsState: "known" | "stale" | "unknown";
   /** One row of the list (the dashboard's SiteCard). */
   renderSite: (site: Site) => ReactNode;
-  /** A site that must be visible (e.g. picked on the map): opens the low-risk group when it's in it. */
+  /** A site that must be visible (e.g. picked on the map): opens the low-risk group when it's in it, and
+   *  clears a search or filter that hides it. */
   revealId?: string | null;
   /** The row element for each site, so the dashboard can scroll a picked site into view. */
   itemRef?: (siteId: string, element: HTMLLIElement | null) => void;
@@ -31,19 +32,30 @@ function SearchIcon() {
   return <svg viewBox="0 0 20 20" aria-hidden="true" className="pointer-events-none absolute inset-s-3 top-1/2 size-4 -translate-y-1/2 text-muted"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 }
 
-export default function SiteListFinder({ sites, realStops, alertsState, renderSite, revealId = null, itemRef, listClassName = "" }: SiteListFinderProps) {
+export default function SiteListFinder({ sites, stops, alertsState, renderSite, revealId = null, itemRef, listClassName = "" }: SiteListFinderProps) {
   const id = useId();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<SiteFilter>("all");
   const [lowOpen, setLowOpen] = useState(false);
-  const counts = useMemo(() => filterCounts(sites, realStops), [sites, realStops]);
-  const view = useMemo(() => siteListView(sites, { query, filter, realStops }), [sites, query, filter, realStops]);
+  const counts = useMemo(() => filterCounts(sites, stops), [sites, stops]);
+  const view = useMemo(() => siteListView(sites, { query, filter, stops }), [sites, query, filter, stops]);
   const searching = query.trim() !== "";
 
-  // A site picked elsewhere (the map) is never hidden inside the folded group.
+  // A site picked elsewhere (the map) is never hidden: not by a search or filter, nor inside the folded
+  // group. Only when the pick changes, so typing a new search afterwards isn't undone.
+  const latest = useRef({ sites, stops, view });
+  useEffect(() => { latest.current = { sites, stops, view }; });
   useEffect(() => {
-    if (revealId && view.low.some((site) => site.id === revealId)) setLowOpen(true);
-  }, [revealId, view.low]);
+    if (!revealId) return;
+    const { sites: all, stops: stopped, view: current } = latest.current;
+    const site = all.find((s) => s.id === revealId);
+    if (!site) return;
+    if (current.low.includes(site)) { setLowOpen(true); return; }
+    if (current.shown.includes(site)) return;
+    setQuery("");
+    setFilter("all");
+    if (siteBand(site) === "low" && !stopped.has(site.id)) setLowOpen(true);
+  }, [revealId]);
 
   const countText = (f: SiteFilter) => f !== "stop" || alertsState === "known" ? String(counts[f]) : alertsState === "stale" ? `${counts[f]}?` : "—";
   const total = view.shown.length + view.low.length;
@@ -51,7 +63,7 @@ export default function SiteListFinder({ sites, realStops, alertsState, renderSi
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-3 px-5 pbe-3">
+      <div className="flex shrink-0 flex-col gap-3 px-5 pbs-4 pbe-3">
         <div className="relative">
           <label htmlFor={`${id}-search`} className="sr-only">Search sites by plant name or county</label>
           <SearchIcon />
