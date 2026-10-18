@@ -34,6 +34,7 @@
 - [ ] **Phone and power bank** charged:
   - Open `https://stormsafecrews.us/crew` and set **Your site** to **Vandolah Power Station** (it's remembered), the same site as the beacon.
   - Leave **Read alerts aloud** off: it's off after every page load, and you turn it on in the demo. Turn the phone's volume up.
+  - The phone should be in **Live** view (the default). The view is chosen per device and remembered on it: the phone switches to the replay only when you tap **Watch replay** during the demo. If it shows a dark **REPLAY** banner with **Back to live**, tap that now.
   - Allow the camera for the report.
 - [ ] **Deploy freeze:** from 30 minutes before judging until after, no merges to `main` (Vercel builds the site from it) and no `deploy/update.sh` on the server. A restart only pauses the API for a few seconds: Caddy retries for up to 10 s instead of showing an error. But a restarted server rebuilds the replay's event list (about 30 s) and forgets the last replay.
 
@@ -53,7 +54,8 @@ Press **Replay storm** about **5 seconds in**; after that the replay runs on its
 
 **0:00–0:30. The problem, and start the replay.**
 - **Say:** "Crews decide every day whether it's safe to work. The data exists: lightning, heat, floods, fires, gators. But it's scattered. PlanIT puts it on one screen for 55 Florida power plants."
-- **Click** (about 0:05): **Replay storm**. Enter the demo code if asked.
+- **Click** (about 0:05): **Replay storm**. Enter the demo code if asked. The laptop switches to the replay by itself.
+- **Phone, right after:** tap **Watch replay** on the crew view's **REPLAY** banner ("A storm replay is running"). The view is per device: until this tap, the phone stays in Live view, where its card and read-aloud show only real states.
 - **Say:** "This is a real storm, August 4, 2025, replayed through our live system at 30 times speed."
 
 **0:30–1:15. The dashboard; Vandolah warns, then stops.**
@@ -72,7 +74,7 @@ Press **Replay storm** about **5 seconds in**; after that the replay runs on its
 - **Say:** "Replay alerts are blue and labeled REPLAY, on screen and on the beacon. A real alert always wins."
 
 **2:00–2:45. The crew view on a phone, a hazard report, read-aloud.**
-- **Show:** the phone: **Your site** is Vandolah, in **STOP WORK** with a REPLAY tag and countdown.
+- **Show:** the phone (in Replay view since 0:05): **Your site** is Vandolah, in **STOP WORK** with a REPLAY tag and countdown.
 - **Tap:** **Read alerts aloud** on. The phone says "Read aloud on for Vandolah Power Station."
 - **Say:** "This is the foreman's view: one site, big and clear. It can speak alerts, hands-free."
 - **Tap:** **Report hazard**:
@@ -94,10 +96,11 @@ Press **Replay storm** about **5 seconds in**; after that the replay runs on its
 - **Say:** "We started with Florida. The lightning satellite covers the Americas, so a new region needs its sites and a retrained model."
 - **Say:** "And PlanIT never says all clear without data. When it doesn't know, it says unknown. Thank you."
 - The replay ended at about 3:07 on its own; the app is back on live data.
+- **After judging:** tap **Back to live** on the phone. The view is remembered, so otherwise it stays in Replay view.
 
 ### The 60-second version
 
-Press **Replay storm** as you start talking (talk time = replay time).
+Press **Replay storm** as you start talking (talk time = replay time), and tap **Watch replay** on the phone right after.
 - **0:00.** "PlanIT puts lightning, heat, flood, fire and wildlife risk on one screen, for 55 Florida power plants. This is a real storm, replayed at 30 times speed."
 - **0:10.** "A strike within 10 miles stops work. All clear is 30 minutes after the last strike, and every strike resets it: Okeechobee here reset 177 times."
 - **≈ 0:21:** the beacon turns yellow. "And the beacon just turned yellow: our forecast saw this storm heading for Vandolah about 24 minutes ahead."
@@ -140,6 +143,8 @@ Press **Replay storm** as you start talking (talk time = replay time).
 **Is the briefing just an LLM?** No. The facts and the go / caution / no-go call come from code; Claude only words them, and every number and hazard word is checked against the data before it's shown.
 
 ## 4. Recovery
+
+**The phone doesn't show the replay** (no STOP WORK for Vandolah, or read-aloud stays silent). It's in Live view: tap **Watch replay** on the crew view's REPLAY banner.
 
 **The replay doesn't start.**
 - **It asks for the demo code again:** the code was wrong; re-enter it.
