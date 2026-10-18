@@ -1,93 +1,84 @@
 # PlanIT Control
 
-Real-time job-site safety for utility field crews: per-site heat, lightning, flood, soil, wildfire, and wildlife hazards; lightning stop-work countdowns; a 0–10 hazard index; photo hazard reports; and a 6 PM next-day briefing. Built for the Sperry Tech challenge at SwampHacks XII.
+**Live: [stormsafecrews.us](https://stormsafecrews.us)** · API docs: [api.stormsafecrews.us/docs](https://api.stormsafecrews.us/docs) · Built for the Sperry Tech challenge at SwampHacks XII.
 
-Project rules and conventions are in [`CLAUDE.md`](CLAUDE.md) (identical copies: `AGENTS.md`, `GEMINI.md`).
+Utility crews decide every morning whether a site is safe to work, but the data behind that call (lightning, heat, flood warnings, fires, alligator sightings) is scattered across agencies and apps. PlanIT Control puts it on one screen for **55 real Florida power plants** (EIA-860M): live hazard cards, a lightning stop-work countdown, a 0–10 hazard index for today and tomorrow, and a go / caution / no-go briefing every evening. When the data is missing, it says "unknown", never "all clear".
+
+## Features
+
+- **Lightning stop-work.** A GOES-19 satellite flash within 10 miles of a site stops work. All clear is 30 minutes after the latest strike, and every new strike resets the countdown.
+- **Lightning approaching.** Storm cells are tracked and projected; a site gets a heads-up when a cell is expected to reach its 10-mile ring within the hour.
+- **Hazard index (0–10)** for today and tomorrow: the higher of a LightGBM weather model and safety rules (OSHA heat band, wildfire, wildlife, crew reports), with floors from NWS warnings and stop-works. Green below 4, amber 4 to below 7, red 7 and up.
+- **Hazard cards** per site: heat, lightning, flooding, soil, wildfire and wildlife.
+- **Crew reports:** a photo pinned to the map, which raises the matching hazard for nearby sites.
+- **6 PM briefing** in each site's own timezone. The verdict is decided in code; Claude writes the text, every number is checked against the input data, and Gemini or a template takes over if a draft fails.
+- **Push notifications** for stop-work, approaching lightning, all clear, flood alerts and briefings.
+- **Hardware beacon:** an Arduino with red / yellow / green lights, a buzzer and an LCD countdown ([`hardware/`](hardware/README.md)).
+- **Replay mode** plays the real storm of Aug 4, 2025 through the live pipeline on a simulated clock. Replay alerts are labeled REPLAY and never mix with real ones.
+
+## Architecture
 
 ```
-backend/    FastAPI API (Python 3.11)
-frontend/   Next.js App Router + TypeScript + Tailwind + MapLibre GL
-shared/     types.ts (API contract) + mocks/ (sample JSON for every endpoint)
+GOES-19 GLM (every 20 s) ──► lightning ingest ──► stop-work engine ──► alerts, push, beacon
+Open-Meteo, NWS, FEMA, USGS, FIRMS, iNaturalist ──► hazard pollers ──► hourly hazard index (ML + rules)
+                                                                    └─► 6 PM briefings (Claude → Gemini → template)
+Tiger Data (TimescaleDB) ◄──► FastAPI on Vultr (Caddy, HTTPS) ◄──► Next.js on Vercel, Arduino beacon
 ```
 
-## Prerequisites
+- `backend/`: Python 3.11, FastAPI. Lightning in `lightning/`, stop-work engine in `alerts/`, hazard sources in `hazards/`, model in `ml/`, briefings in `briefing/`, push in `push/`.
+- `frontend/`: Next.js (App Router), TypeScript, Tailwind, MapLibre GL.
+- `shared/types.ts`: the API contract both sides use; `shared/mocks/` has sample JSON for every endpoint.
+- `hardware/`: the beacon sketch and a USB bridge that polls `GET /sites/{id}/beacon`.
 
-- Python 3.11
-- Node.js 20.9+ and npm
-- The OpenMP runtime for LightGBM (the hazard model): on Debian/Ubuntu servers `sudo apt-get install libgomp1` (slim Docker images don't include it); on macOS `brew install libomp`
+How the pieces work: [alert engine](docs/alert-engine.md), [lightning forecast](docs/lightning-forecast.md), [hazard model](docs/ml-model.md), [push](docs/push-notifications.md), [replay timeline](docs/replay-timeline.md), [deployment](docs/deploy.md).
 
-## Backend
+## Data sources
+
+| Source | Used for |
+|---|---|
+| [EIA-860M](https://www.eia.gov/electricity/data/eia860m/) | The 55 sites and the Florida thermal plants filtered out of fire detections |
+| NOAA GOES-19 GLM (public AWS bucket) | Lightning flashes, live and replay |
+| [Open-Meteo](https://open-meteo.com/) | Heat index, rain, soil moisture |
+| [api.weather.gov](https://www.weather.gov/documentation/services-web-api) | NWS alerts and the gridpoint rain forecast the briefing cross-checks |
+| FEMA NFHL, USGS NHD | Flood zones and rivers within a mile of each site |
+| [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) (VIIRS) | Fire detections, last 24 h |
+| [iNaturalist](https://www.inaturalist.org/) | Alligator and venomous snake sightings within 5 km, last 30 days |
+| NOAA HRRR archive, NOAA Storm Events | Training and testing the hazard model (2022–2025) |
+
+## Honest limits
+
+- The hazard index predicts hazardous weather, not injuries. On 2025 it beat both baselines, but 58% of logged events still fell on green days: many Florida storms form with little warning, so the lightning engine and NWS warnings are what protect the crew.
+- The lightning forecast was tested on one storm, which we also tuned on. It misses storms that form overhead, and its arrival estimates run late, so the app never shows an arrival countdown.
+- Satellite lightning positions are accurate to about 8–14 km, and the 10-mile radius has no extra margin yet.
+- Rainfall is a model estimate. Fire detection depends on a few satellite passes a day and ignores anything within 1 km of a site or a Florida thermal plant, so a real fire there would be missed.
+- If the lightning feed stalls, the beacon switches to "unknown" after 2 minutes, but the website doesn't yet say lightning data is delayed.
+- PlanIT supports a supervisor's judgment; it doesn't replace it.
+
+Numbers and details: [`docs/devpost.md`](docs/devpost.md) and [`docs/ml-model.md`](docs/ml-model.md).
+
+## Team
+
+John Azer, William Lin, Abid Panahie.
+
+## Running locally
+
+Needs Python 3.11, Node.js 20.9+, and the OpenMP runtime for LightGBM (`brew install libomp` on macOS, `sudo apt-get install libgomp1` on Debian/Ubuntu).
+
+**Backend** (http://localhost:8000, API docs at `/docs`):
 
 ```bash
 cd backend
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # fill in keys (ask John for DATABASE_URL)
-python -m scripts.migrate       # create/upgrade the database schema
+cp .env.example .env            # fill in the keys you have; each one is explained in the file
+python -m scripts.migrate       # create/upgrade the database schema (needs DATABASE_URL)
 python -m scripts.seed_sites    # load the 55 sites into the database
 uvicorn app.main:app --reload --port 8000
 ```
 
-- API: http://localhost:8000
-- Interactive docs: http://localhost:8000/docs
-- Health check (includes the database): `curl localhost:8000/health`
+Without `DATABASE_URL` the API still starts and serves placeholder hazard data; `/health` and the report routes return 503. Missing API keys turn off only their own feature (no `FIRMS_MAP_KEY`: no fires; no `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`: template briefings). If your machine shares a database with a running server, set `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED`, `BRIEFING_ENABLED` and `PUSH_ENABLED` to `false` so only the server polls.
 
-`/sites` and `/sites/{id}` serve 55 real Florida plants from `backend/data/sites.json` with live hazard data (see **Hazard data sources** below); `hazard_index` is the hybrid score: the ML weather model (LightGBM, see [docs/ml-model.md](docs/ml-model.md)) or a safety rule (OSHA heat band, wildfire, wildlife, crew reports), whichever is higher, plus the lightning stop-work override. Reports are stored in the Tiger Data (TimescaleDB) database, and their photos in `backend/uploads/`. Alerts come from the alert engine (`backend/alerts/`) and the 6 PM briefings from `backend/briefing/` (written by Claude, then Gemini, then a template; see `CLAUDE.md`). Without `DATABASE_URL` the API still starts: `/health` and the report routes return 503, and everything else works.
-
-### Hazard data sources
-
-With `DATABASE_URL` set, the API polls these in the background (`HAZARD_POLLING_ENABLED=false` turns it off):
-
-| Source | What | Every |
-|---|---|---|
-| Open-Meteo | heat index (NWS formula) + OSHA band, rain past 12/24/72 h and next 24 h, soil moisture | 60 min (`WEATHER_POLL_MINUTES`) |
-| api.weather.gov | active NWS alerts at each site (heat, flood, severe storm, red flag) | 5 min |
-| NWS gridpoint forecast | Rain (QPF) for the 6 PM briefing's cross-check and `conditions.flood.rain_next_24h_nws_in`; one request per site per run, cached 30 min | 6 PM run |
-| NASA FIRMS | VIIRS fire detections over Florida, last 24 h. **Needs `FIRMS_MAP_KEY`** (free at firms.modaps.eosdis.nasa.gov/api/map_key); skipped without it | 30 min |
-| iNaturalist | alligator and venomous snake sightings within 5 km, last 30 days | 6 h |
-| FEMA NFHL, USGS NHD, NWS points | flood zone, river within 1 mile, NWS zones | once per site |
-
-A flood-risk alert opens when 2+ inches of rain fell in the past 12 hours at a site in a FEMA flood zone or near a river, or when NWS has a flood warning there. Set `NWS_CONTACT` in `.env` to a URL or email NWS can reach you at.
-
-### Lightning (GOES-19 GLM)
-
-With `DATABASE_URL` set, the API polls NOAA's public GOES-19 bucket every 20 s and stores flashes over Florida (+30 mi) in `lightning_flashes`. Set `LIGHTNING_INGEST_ENABLED=false` in `.env` to turn that off. `GET /lightning/recent?minutes=15` returns them for the map.
-
-**Replay mode** plays a real storm back through the same pipeline with a simulated clock:
-
-```bash
-python -m scripts.find_replay_window      # samples Aug 2025 afternoons, downloads the stormiest hour to data/replay/ (~150 MB, gitignored)
-curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "content-type: application/json" -d '{"speed": 30}'
-curl localhost:8000/replay/status
-curl -X POST localhost:8000/replay/stop -H "X-Admin-Token: $ADMIN_TOKEN"
-```
-
-Starting or stopping a replay needs the **demo code**: `ADMIN_TOKEN` from `backend/.env`, sent as the `X-Admin-Token` header (the frontend asks for it once and remembers it on that device). Without `ADMIN_TOKEN` set, those actions are off.
-
-At 30x, one hour of lightning plays in 2 minutes, followed by 31 quiet simulated minutes so stop-work countdowns can clear. While it runs, every time-based route (sites, recent flashes) uses the simulated clock. Live lightning polling keeps running on real time, and `GET /alerts` returns real alerts alongside the replay's, each with `replay: true/false`, so a real stop-work never disappears during a demo. If ingestion can't keep up with the requested speed, the clock waits for it rather than running ahead.
-
-**Stop-work alerts:** any flash within 10 miles of a site opens an alert that clears 30 minutes after the last strike. How it works: [`docs/alert-engine.md`](docs/alert-engine.md).
-
-### Tests
-
-```bash
-cd backend
-pip install -r requirements-dev.txt
-python -m pytest -v      # needs DATABASE_URL; each test is rolled back
-```
-
-### Rebuilding the site list
-
-`backend/data/sites.json` is generated from the EIA-860M monthly generator inventory and committed, so you only need this when you want fresher EIA data:
-
-```bash
-cd backend
-pip install -r scripts/requirements.txt
-python -m scripts.load_sites        # downloads the newest workbook to data/raw/ (gitignored)
-```
-
-## Frontend
+**Frontend** (http://localhost:3000):
 
 ```bash
 cd frontend
@@ -96,38 +87,18 @@ cp .env.example .env.local      # NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Open http://localhost:3000 for the supervisor dashboard: a live map of every site with recent lightning, sites ranked by risk with stop-work countdowns, and a **⚡ Replay storm** button that plays the Aug 4, 2025 storm (after `python -m scripts.find_replay_window`). `/alerts` lists active alerts. The frontend never shows mock data when the backend is down: it says the server can't be reached and stop-work status is unknown. Sample data from `shared/mocks` is shown only if you click **Show demo data**, and is labeled "Demo data" everywhere.
+If the backend is unreachable, the frontend says so instead of showing sample data. **Show demo data** switches to the labeled sample data in `shared/mocks/`.
 
-Other commands: `npm run typecheck`, `npm run build`.
+**Replay a storm** (needs `DATABASE_URL` and `ADMIN_TOKEN`, the "demo code" the frontend asks for):
 
-## Endpoints
+```bash
+cd backend
+python -m scripts.find_replay_window      # finds the stormiest August 2025 afternoon, downloads it to data/replay/ (~150 MB)
+curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "content-type: application/json" -d '{"speed": 30}'
+```
 
-| Method | Path | Returns |
-|---|---|---|
-| GET | `/sites` | All sites with current hazard index and top hazard |
-| GET | `/sites/{id}` | Conditions per hazard, today/tomorrow index, top factors |
-| GET | `/sites/{id}/score-history` | Hazard index at every hourly scoring run, last 7 days (sparkline) |
-| GET | `/model/info` | The hazard model: test metrics, baselines, training years, calibration (`/model/calibration.svg`) |
-| GET | `/alerts` | Active alerts with all-clear countdown |
-| GET | `/reports` | Crew hazard reports |
-| POST | `/reports` | Create a hazard report |
-| POST | `/uploads` | Upload a report photo (raw image body); returns `photo_url` |
-| GET | `/briefing/{site_id}` | Latest next-day briefing (generated 6 PM site time) and key numbers |
-| GET | `/briefings` | Latest briefing for every site in one response |
-| POST | `/briefing/send-now` | Generate tomorrow's briefing now for one site (`{"site_id": "big-bend"}`, at most once a minute per site) or all (at most once per 15 min). Needs `X-Admin-Token` |
-| GET | `/lightning/cells` | Storm cells from the last 20 min with motion (for the map) |
-| GET | `/sites/{id}/beacon` | Tiny alarm state: stop / unknown / approaching / flood / clear, with countdowns |
-| GET | `/replay/events`, `/replay/series` | The replay storm's events and 5-minute charts for the timeline ([`docs/replay-timeline.md`](docs/replay-timeline.md)) |
-| GET | `/fires/recent`, `/wildlife/recent` | Map points: fire detections (last 24 h, plant hot spots removed) and wildlife sightings (last 30 days) |
-| GET | `/push/public-key` | VAPID public key for web push |
-| POST | `/push/subscribe`, `/push/unsubscribe`, `/push/test` | Web push subscriptions (sites or all, crew or supervisor) and a test notification; see [`docs/push-notifications.md`](docs/push-notifications.md) |
+Or press **Replay storm** on the dashboard.
 
-Shapes: [`shared/types.ts`](shared/types.ts).
+**Tests:** `cd backend && pip install -r requirements-dev.txt && python -m pytest` (database tests need `DATABASE_URL` and roll back), and `cd frontend && npm run typecheck && node --test tests/*.test.cjs`.
 
-## Deploying
-
-The API runs on a Vultr Ubuntu server (systemd, one uvicorn worker, Caddy for HTTPS) and the frontend on Vercel. Step by step, DNS records, health checks, restart and rollback: [`docs/deploy.md`](docs/deploy.md). Scripts: [`deploy/`](deploy/). Once the server runs, set `LIGHTNING_INGEST_ENABLED`, `HAZARD_POLLING_ENABLED`, `BRIEFING_ENABLED` and `PUSH_ENABLED` to `false` in your local `backend/.env`.
-
-## Contributing
-
-Branch from `main` as `<name>/<topic>`, keep PRs small, and don't add libraries without asking. See `CLAUDE.md`.
+Project rules and conventions for contributors: [`CLAUDE.md`](CLAUDE.md).

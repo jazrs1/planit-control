@@ -185,7 +185,7 @@ export default function BriefingCard({ siteId, siteName, timeZone, entry, nowMs,
 
   const status = <>
     {entry.kind === "none" && <p className="text-muted">No briefing yet. Briefings are generated at 6 PM site time.</p>}
-    {entry.kind === "loading" && <p role="status" className="text-muted">Loading briefing…</p>}
+    {entry.kind === "loading" && <div role="status" className="space-y-2"><span className="sr-only">Loading briefing…</span><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-full text-xl" /><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-2/3 text-xl" /></div>}
     {entry.kind === "unknown" && <p className="font-semibold text-muted">Couldn&apos;t load this briefing from the server.</p>}
   </>;
 

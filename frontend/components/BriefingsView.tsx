@@ -233,7 +233,7 @@ export default function BriefingsView({ initial }: { initial: Loaded | null }) {
         <p className="pc-panel p-6 text-muted">No briefings with this decision.</p>
       ) : (
         // Row by row, highest first: the riskiest card is always top left.
-        <ul className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <ul className="pc-enter grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
           {shown.map(({ site, entry }) => (
             <li key={site.id}>
               <BriefingCard

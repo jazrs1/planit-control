@@ -68,7 +68,7 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
       {!unknown && <div className={`flex flex-col gap-6 ${stale ? "grayscale opacity-60" : ""}`}>
       <ReportMap reports={sorted} selectedId={selectedId} onSelect={selectFromMap} emptyText={sorted.length === 0 && !stale ? "No reports yet" : undefined} />
       {sorted.length === 0 ? <p className="pc-panel p-6 text-muted">{stale ? "The last loaded list was empty. Current reports are unknown." : "No crew hazard reports yet."}</p> : (
-        <ul className="grid items-start gap-4 sm:grid-cols-2">
+        <ul className="pc-enter grid items-start gap-4 sm:grid-cols-2">
           {sorted.map((report) => {
             const site = report.site_id ? sitesById.get(report.site_id) : undefined;
             const time = new Intl.DateTimeFormat("en-US", { timeZone: site?.timezone ?? "UTC", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(report.created_at));

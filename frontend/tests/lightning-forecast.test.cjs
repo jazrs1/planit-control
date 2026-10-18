@@ -314,7 +314,7 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   assert.match(renderToStaticMarkup(tree), /Storm cells: loading/);
   failCells = true;
   await polls[1].poll(); tree = draw();
-  assert.match(renderToStaticMarkup(tree), /Storm cells: unavailable · Not confirmed/);
+  assert.match(renderToStaticMarkup(tree), /Storm cells: unavailable, not confirmed/);
   failCells = false;
   await polls[1].poll(); tree = draw();
   assert.equal(map(tree).cells.length, 1);
@@ -323,7 +323,7 @@ test("storm cells share lightning polling, speed up in replay, retain failed dat
   await polls[1].poll(); tree = draw();
   assert.equal(map(tree).cells.length, 1, "last real cells survive a failed refresh");
   assert.equal(map(tree).cellsUnconfirmed, true, "successful flashes cannot confirm failed cells");
-  assert.match(renderToStaticMarkup(tree), /Storm cells: last known · Not confirmed/);
+  assert.match(renderToStaticMarkup(tree), /Storm cells: last known, not confirmed/);
   assert.doesNotMatch(renderToStaticMarkup(tree), /Storm cells: \d+\?/, "never a count with a question mark");
   failCells = false; failFlashes = true;
   await polls[1].poll(); tree = draw();

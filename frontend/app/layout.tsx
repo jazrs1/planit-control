@@ -7,6 +7,7 @@ import { AlertsProvider } from "@/components/AlertsProvider";
 import { ViewModeProvider } from "@/components/ViewModeProvider";
 import { PushProvider } from "@/components/PushProvider";
 import OutageShell from "@/components/OutageShell";
+import MotionGate from "@/components/MotionGate";
 import TopNavigation from "@/components/TopNavigation";
 import { getAlerts, orNull } from "@/lib/api";
 import "./globals.css";
@@ -58,6 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </PushProvider>
           </ViewModeProvider>
         </AlertsProvider>
+        <MotionGate />
       </body>
     </html>
   );

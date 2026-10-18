@@ -131,16 +131,19 @@
 }
 
 @layer components {
-  /* A label, tag or heading set like a sign legend. Uppercase is only for these, never sentences. */
+  /* A small label or heading, in sentence case. */
   .pc-label {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    letter-spacing: 0.06em;
     line-height: 1.2;
+  }
+  /* Safety signs only (a stop-work sign, a reading's status word): uppercase like a sign legend. */
+  .pc-label--sign {
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
-  /* Page title: calm and large. The sign variant (uppercase, black weight) is for the crew view. */
+  /* Page title: calm and large. The sign variant (uppercase) is for crew safety signs, such as "Safety status unknown". */
   .pc-title {
     font-size: var(--pc-text-title);
     font-weight: 600;
@@ -295,6 +298,46 @@
   .pc-shape--unknown { --pc-shape: var(--pc-text-muted); border-radius: 50%; opacity: 0.6; }
 }
 
+/* ---------- Motion: loading and first-load entrance ----------
+   Everything here is off under prefers-reduced-motion: content appears directly. Safety elements
+   (stop-work signs, alert banners, countdowns, the nav badge, stop-work counts) never use these. */
+
+@keyframes pc-fade { from { opacity: 0; } }
+@keyframes pc-enter { from { opacity: 0; translate: 0 8px; } }
+@keyframes pc-pop { from { opacity: 0; scale: 0.7; } }
+@keyframes pc-skeleton { 50% { opacity: 0.5; } }
+
+/* A grey placeholder in the shape of the content that is loading. Give it a size. */
+.pc-skeleton {
+  border-radius: var(--pc-radius-card);
+  background: var(--pc-surface-2);
+}
+.pc-skeleton--line { block-size: 0.75em; border-radius: var(--pc-radius-pill); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pc-skeleton { animation: pc-skeleton 1.6s ease-in-out infinite; }
+  /* Content that replaces a skeleton fades in over it. */
+  .pc-fade-in { animation: pc-fade 200ms var(--pc-ease-out) both; }
+  /* A replay event as it happens. */
+  .pc-pop { animation: pc-pop 180ms var(--pc-ease-out) both; }
+
+  /* First load only: the children of .pc-enter fade up 8px, 30 ms apart, at most 10 staggered.
+     MotionGate sets data-settled on <html> shortly after each page load, so polling refreshes,
+     reorders and new rows never animate. */
+  :root:not([data-settled]) .pc-enter > * { animation: pc-enter 200ms var(--pc-ease-out) both; }
+  :root:not([data-settled]) .pc-enter > :nth-child(2) { animation-delay: 30ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(3) { animation-delay: 60ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(4) { animation-delay: 90ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(5) { animation-delay: 120ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(6) { animation-delay: 150ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(7) { animation-delay: 180ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(8) { animation-delay: 210ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(9) { animation-delay: 240ms; }
+  :root:not([data-settled]) .pc-enter > :nth-child(n + 10) { animation-delay: 270ms; }
+  /* Safety is never delayed: a child holding a stop-work or flood tag, a countdown or an alert appears at once. */
+  .pc-enter > :has(.pc-chip--stop, .pc-chip--flood, [role="timer"], [role="alert"]) { animation: none !important; }
+}
+
 /* ---------- Map markers (DOM elements made by SiteMap and ReportMap) ---------- */
 
 /* The button stays square so its focus ring isn't clipped; the shape inside carries the risk. */
@@ -322,7 +365,7 @@
   z-index: 2;
 }
 .site-marker:active .pc-shape { scale: 0.92; }
-/* A real lightning stop-work: a red halo, pulsing only for people who allow motion. */
+/* A real lightning stop-work: a still red halo. */
 .site-marker--lightning::after {
   content: "";
   position: absolute;
@@ -335,8 +378,13 @@
   from { scale: 0.8; opacity: 1; }
   to { scale: 1.6; opacity: 0; }
 }
+/* Markers wait for the basemap's first tiles, then fade in once (SiteMap adds these classes). A real
+   stop-work marker never waits. */
+.site-marker--waiting { opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
-  .site-marker--lightning::after { animation: lightning-pulse 1.8s var(--pc-ease-out) infinite; }
+  .site-marker--enter { animation: pc-fade 250ms var(--pc-ease-out) both; }
+  /* A stop-work that just began: two soft pulses, then the halo stays still. */
+  .site-marker--pulse::after { animation: lightning-pulse 1.2s var(--pc-ease-out) 2; }
 }
 
 /* A replay stop-work: dashed blue ring, still. Never the real red halo. */

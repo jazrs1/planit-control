@@ -292,7 +292,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         )}
       </section>
 
-      <section aria-label="Hazard conditions" className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section aria-label="Hazard conditions" className="pc-enter grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <HazardPanel
           title="Lightning" card={c.lightning} freshness={{ kind: "live" }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={c.lightning.nearest_strike_mi === null ? "None" : formatStrikeDistance(c.lightning.nearest_strike_mi)}

@@ -116,8 +116,14 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   const [ready, setReady] = useState(false);
   const [styleLoaded, setStyleLoaded] = useState(false);
   const [error, setError] = useState(false);
-  // The basemap's first tiles have drawn: until then the map shows "Loading map…" on the land color.
+  // The basemap's first tiles have drawn: until then the map shows a grey placeholder.
   const [painted, setPainted] = useState(false);
+  // Markers fade in once, after the first tiles; each real stop-work pulses once, when it begins.
+  const markersEntered = useRef(false);
+  const pulsedStops = useRef(new Set<string>());
+  // Tiles that never load nor fail (a hung tile server) must not hide the sites: show markers after 3 s.
+  const [tileWaitOver, setTileWaitOver] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setTileWaitOver(true), 3000); return () => window.clearTimeout(timer); }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -156,13 +162,20 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       // One stop-work per site, the real one when a site has both (a real stop-work never looks like a replay).
       const lightning = new Map<string, Alert>();
       for (const a of alerts) if (a.type === "lightning" && (!lightning.has(a.site_id) || !a.replay)) lightning.set(a.site_id, a);
+      const tilesDone = painted || error || tileWaitOver;
+      const realStops = new Set<string>();
       for (const site of sites) {
         const stop = lightning.get(site.id);
+        const realStop = !!stop && !stop.replay;
+        if (realStop) realStops.add(site.id);
         const button = document.createElement("button");
         button.type = "button";
         // Shape carries the band without color: circle, triangle, diamond; octagon for a stop-work.
-        // A replay stop-work gets a dashed blue ring, never the real red halo.
-        button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}`;
+        // A replay stop-work gets a dashed blue ring, never the real red halo. A real stop-work never
+        // waits for the tiles or fades in.
+        const motion = realStop ? pulsedStops.current.has(site.id) ? "" : " site-marker--pulse"
+          : !tilesDone ? " site-marker--waiting" : markersEntered.current ? "" : " site-marker--enter";
+        button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}${motion}`;
         const shape = document.createElement("span");
         shape.className = `pc-shape pc-shape--${stop ? "stop" : riskLevel(liveHazardIndex(site))}`;
         button.append(shape);
@@ -173,9 +186,11 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         if (!layers.sites) button.hidden = true;
         markers.current.set(site.id, new Marker({ element: button }).setLngLat([site.lon, site.lat]).addTo(map.current));
       }
+      if (tilesDone) markersEntered.current = true;
+      pulsedStops.current = realStops;
     });
     return () => { disposed = true; };
-  }, [ready, sites, alerts, onSelect, selectedId, layers.sites]);
+  }, [ready, sites, alerts, onSelect, selectedId, layers.sites, painted, error, tileWaitOver]);
 
   useEffect(() => {
     const instance = map.current;
@@ -449,6 +464,6 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         {(cellsUnconfirmed || (!demo && cellUnconfirmed(cell, nowMs, realFlashNowMs ?? nowMs))) && " Last known · Not confirmed."}
       </li>)}
     </ul>
-    {!painted && !error && <p role="status" className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">Loading map…</p>}
+    {!painted && !error && <div role="status" className="pc-skeleton pointer-events-none absolute inset-0 rounded-none"><span className="sr-only">Loading map…</span></div>}
     {error && <p role="status" className="absolute inset-bs-3 inset-s-3 max-w-64 rounded-card border-2 border-rule bg-surface p-3 text-sm text-muted">Map tiles unavailable. Site details remain available in the ranked list.</p>}</>;
 }

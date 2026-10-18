@@ -90,7 +90,10 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
     {/* The name keeps at least ~12 characters; the status wraps instead. */}
     <span className="min-w-[12ch] flex-1 text-start">
       <span title={site.name} className={`block text-sm font-semibold leading-tight text-text ${selected ? "" : "truncate"}`}>{site.name}</span>
-      <span className="block truncate text-xs font-normal text-muted">{site.county} · {HAZARD_LABEL[site.top_hazard]}</span>
+      <span className="flex min-w-0 items-center gap-2 text-xs font-normal text-muted">
+        <span className="truncate">{site.county}</span>
+        <span className="shrink-0 rounded-[4px] bg-surface-2 px-1.5 text-[0.6875rem] leading-normal"><span className="sr-only">Top hazard: </span>{HAZARD_LABEL[site.top_hazard]}</span>
+      </span>
     </span>
     <span className="flex max-w-[55%] items-center justify-end">{status}</span>
   </>;
