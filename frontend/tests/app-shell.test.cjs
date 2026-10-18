@@ -20,7 +20,8 @@ function load(file) {
 test("home-screen launch uses crew view, standalone display, and source color tokens", () => {
   const manifest = load("app/manifest.ts").default();
   const tokens = fs.readFileSync(path.join(__dirname, "../styles/tokens.css"), "utf8");
-  assert.equal(manifest.name, "PlanIT Control");
+  assert.equal(manifest.name, "Fieldcast");
+  assert.equal(manifest.short_name, "Fieldcast");
   assert.equal(manifest.start_url, "/crew");
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.scope, "/");
@@ -45,14 +46,14 @@ test("Apple and social images have the intended sizes, and favicon is valid ICO"
 
 test("each page metadata has a description and a matching social title", () => {
   const metadata = load("lib/metadata.ts").pageMetadata("Alerts", "Current site alerts.");
-  assert.equal(metadata.title.absolute, "Alerts · PlanIT Control");
+  assert.equal(metadata.title.absolute, "Alerts · Fieldcast");
   assert.equal(metadata.description, "Current site alerts.");
-  assert.equal(metadata.openGraph.title, "Alerts · PlanIT Control");
+  assert.equal(metadata.openGraph.title, "Alerts · Fieldcast");
   assert.equal(metadata.twitter.card, "summary_large_image");
   assert.equal(metadata.twitter.title, metadata.openGraph.title);
   // The homepage's shared-link card says the name and the tagline, while its tab title stays per page.
-  const home = load("lib/metadata.ts").pageMetadata("Dashboard", "Monitor sites.", { title: "PlanIT Control", description: "Live job-site safety for Florida utility crews" });
-  assert.equal(home.title.absolute, "Dashboard · PlanIT Control");
-  assert.equal(home.openGraph.title, "PlanIT Control");
+  const home = load("lib/metadata.ts").pageMetadata("Dashboard", "Monitor sites.", { title: "Fieldcast", description: "Live job-site safety for Florida utility crews" });
+  assert.equal(home.title.absolute, "Dashboard · Fieldcast");
+  assert.equal(home.openGraph.title, "Fieldcast");
   assert.equal(home.openGraph.description, "Live job-site safety for Florida utility crews");
 });

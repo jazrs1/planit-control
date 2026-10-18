@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { HazardIndex } from "@shared/types";
 import ModelExplanation from "@/components/ModelExplanation";
 import { getModelInfo, orNull } from "@/lib/api";
-import { pageMetadata } from "@/lib/metadata";
+import { APP_CREDIT, pageMetadata } from "@/lib/metadata";
 import { riskLevel } from "@/lib/risk";
 
 // "How it works" for judges and supervisors. Every fact here was checked against the backend
@@ -92,7 +92,8 @@ export default async function HowItWorksPage() {
     <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6 [&_strong]:font-semibold">
       <header className="flex flex-col gap-2">
         <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em] text-balance">How 9 data sources become one safety call per site</h1>
-        <p className="max-w-[68ch] text-muted">PlanIT Control pulls live hazard data for 55 real Florida power plants, stops work when lightning gets close, and tells supervisors each evening whether tomorrow is go, caution or no-go.</p>
+        <p className="max-w-[68ch] text-muted">Fieldcast pulls live hazard data for 55 real Florida power plants, stops work when lightning gets close, and tells supervisors each evening whether tomorrow is go, caution or no-go.</p>
+        <p className="text-xs text-muted">{APP_CREDIT}</p>
       </header>
 
       <aside aria-labelledby="sixty-title" className="pc-panel flex flex-col gap-4 p-6 sm:p-8">
@@ -116,14 +117,14 @@ export default async function HowItWorksPage() {
 
       <Section id="problem" title="The problem" takeaway="Hazard data is scattered across agencies, so go/no-go calls get made on instinct.">
         <p>A utility foreman deciding whether a crew should set up a bucket truck tomorrow would need to check a weather app, NWS alerts, a lightning map, FEMA flood maps, fire satellites and whatever the last crew said. Nobody has time for that at 6 AM, so the call is often a gut feeling.</p>
-        <div role="img" aria-label="Before: six separate sources lead to a gut call. With PlanIT: the same sources feed one score per site and a go, caution or no-go briefing." className="space-y-3">
+        <div role="img" aria-label="Before: six separate sources lead to a gut call. With Fieldcast: the same sources feed one score per site and a go, caution or no-go briefing." className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row">
             <Box title="Before" tone="muted">Weather app, NWS, lightning map, FEMA, fire satellites, crew texts</Box>
             <Arrow />
             <Box title="Gut call" tone="muted">Different every foreman, every day</Box>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Box title="With PlanIT">The same sources, checked automatically for every site</Box>
+            <Box title="With Fieldcast">The same sources, checked automatically for every site</Box>
             <Arrow />
             <Box title="One score and rules">0–10 hazard index and lightning stop-work</Box>
             <Arrow />

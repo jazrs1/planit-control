@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { pageMetadata } from "@/lib/metadata";
+import { APP_CREDIT, pageMetadata } from "@/lib/metadata";
 
-export const metadata = pageMetadata("About", "About PlanIT Control and adding the field safety app to your phone’s home screen.");
+export const metadata = pageMetadata("About", "About Fieldcast and adding the field safety app to your phone’s home screen.");
 
 export default function AboutPage() {
   return <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
     <header className="flex flex-col gap-2">
-      <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em]">About PlanIT Control</h1>
-      <p className="text-muted">Built for the Sperry Tech challenge at SwampHacks XII.</p>
+      <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em]">About Fieldcast</h1>
+      <p className="text-muted">{APP_CREDIT}</p>
     </header>
     <section className="pc-panel flex flex-col items-start gap-4 p-6 max-sm:p-5">
       <h2 className="text-xl font-semibold">What it does</h2>
