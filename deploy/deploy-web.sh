@@ -71,7 +71,8 @@ caddy_set() {
 # Point current at a release, restart, wait until it answers.
 switch_to() {
   local rel=$1 why=$2 prev
-  prev=$(readlink -f "$WEB/current" 2>/dev/null || echo none)
+  prev=none
+  [[ -L $WEB/current ]] && prev=$(readlink -f "$WEB/current")
   ln -sfn "$rel" "$WEB/current.new"
   chown -h planit-web:planit-web "$WEB/current.new"
   mv -T "$WEB/current.new" "$WEB/current"
