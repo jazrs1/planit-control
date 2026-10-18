@@ -262,7 +262,9 @@ test("settings have labeled site/role controls, live confirmation, demo-disabled
   }).default;
   const draw = () => renderToStaticMarkup(React.createElement(Component, { sites: [{ id: "big-bend", name: "Big Bend" }], defaultSiteId: "big-bend", defaultRole: "crew" }));
   let html = draw();
-  for (const text of ["Get alerts on this device", "Your role", "All sites", "Choose sites", "Big Bend", "Save alert preferences", "Send test notification", "Unsubscribe", "No notification does not mean all clear"]) assert.ok(html.includes(text), text);
+  for (const text of ["Alerts on this device", "Choose sites", "Turn on alerts", "Send a test", "All sites", "Big Bend", "Save alert preferences", "Send test notification", "Unsubscribe", "No notification does not mean all clear"]) assert.ok(html.includes(text), text);
+  // Both roles get the same events: no role control and no sentence about roles.
+  assert.doesNotMatch(html, /Your role|<select|both roles/i);
   connection.level = "offline"; assert.match(draw(), /Last confirmed registration/);
   state.phase = "demo"; state.message = "Demo data · sample registration";
   html = draw(); assert.match(html, /Demo data/);
@@ -335,4 +337,34 @@ test("notification clicks close the notification and open or focus the correct f
   sw.self.clients.matchAll = async () => [{ url: "https://planit.test/briefings", focus: async () => { focused++; } }];
   await click("/briefings");
   assert.equal(focused, 1); assert.equal(sw.opened.length, 4); assert.equal(closed, 5);
+});
+
+test("with the role control gone, saving still sends the default or saved role and the chosen sites", () => {
+  // A shallow render: hooks keep their initial values, effects run once by hand.
+  const slots = [];
+  let cursor = 0;
+  const effects = [];
+  const hooks = { ...React, useId: () => "x", useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], (value) => { slots[i] = typeof value === "function" ? value(slots[i]) : value; }]; }, useEffect(fn) { effects.push(fn); } };
+  const sent = [];
+  for (const [state, props, role] of [
+    [{ restored: false, preferences }, { defaultSiteId: "big-bend", defaultRole: "crew" }, "crew"],
+    [{ restored: false, preferences }, {}, "supervisor"],
+    [{ restored: true, preferences: { role: "crew", site_ids: ["big-bend"] } }, {}, "crew"],
+  ]) {
+    slots.length = 0; effects.length = 0; sent.length = 0;
+    const push = { phase: "idle", busy: false, canUnsubscribe: false, message: "", enable: (body) => sent.push(body), sendTest() {}, unsubscribe() {}, ...state };
+    const Component = load("components/PushSettings.tsx", {
+      react: hooks,
+      "@/components/PushProvider": { useDevicePush: () => push },
+      "@/components/AlertsProvider": { useAlertsState: () => ({ connection: { level: "online" } }) },
+    }).default;
+    const render = () => { cursor = 0; effects.length = 0; return Component({ sites: [{ id: "big-bend", name: "Big Bend" }], ...props }); };
+    render(); for (const effect of [...effects]) effect();
+    const tree = render();
+    const find = (node) => !node || typeof node !== "object" ? null : Array.isArray(node) ? node.map(find).find(Boolean) ?? null
+      : node.props?.onClick && /Get alerts on this device/.test(String(node.props.children)) ? node : find(node.props?.children);
+    find(tree).props.onClick();
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].role, role);
+  }
 });
