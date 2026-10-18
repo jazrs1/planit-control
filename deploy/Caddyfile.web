@@ -1,0 +1,21 @@
+# The frontend served from this server, the standby for Vercel. Installed by deploy/setup-web.sh to
+# /etc/caddy/web.caddy but NOT imported: while DNS still points at Vercel, Caddy would only keep failing to
+# get certificates for these names. Turn it on after the DNS switch (docs/deploy.md, "Frontend on this server"):
+#   /opt/planit/app/deploy/deploy-web.sh --caddy-on     (and --caddy-off to go back)
+stormsafecrews.us, www.stormsafecrews.us {
+	encode zstd gzip
+
+	# Same as the API block: during a web restart (deploy-web.sh) the upstream refuses connections for a
+	# moment. Retry the connection for up to 10 s instead of answering 502 at once.
+	reverse_proxy 127.0.0.1:3000 {
+		lb_try_duration 10s
+		lb_try_interval 250ms
+	}
+
+	log {
+		output file /var/log/caddy/planit-web.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}
