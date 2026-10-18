@@ -8,6 +8,7 @@ import { createReport, uploadPhoto, validatePhoto } from "@/lib/api";
 import { REPORT_OPTIONS, ROLE_LABEL } from "@/lib/reports";
 import ReportMap from "@/components/ReportMap";
 import ReportPhoto from "@/components/ReportPhoto";
+import SitePicker from "@/components/SitePicker";
 
 const NO_REPORTS: HazardReport[] = [];
 const fieldClass = "mbs-1.5 block min-h-12 w-full rounded-card border border-border-strong bg-surface px-3.5 py-2 text-base text-text focus-visible:outline-2 focus-visible:outline-notice";
@@ -150,7 +151,7 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
         <div className={stepClass}>
           <label htmlFor="photo"><span className="block text-xs text-muted">Step 1 of 3</span><span className="block text-xl font-semibold">Take or choose a photo</span></label>
           <div className="flex flex-col gap-2 rounded-card border-[1.5px] border-dashed border-border-strong p-6 max-sm:p-4">
-          <input id="photo" type="file" accept="image/*" capture="environment" required aria-describedby="photo-help photo-error" aria-invalid={!!photoError} className="block min-h-11 w-full min-w-0 text-sm text-muted file:me-3 file:min-h-11 file:cursor-pointer file:rounded-card file:border file:border-border-strong file:bg-surface file:px-4 file:font-semibold file:text-text" onChange={(event) => {
+          <input id="photo" type="file" accept="image/*" required aria-describedby="photo-help photo-error" aria-invalid={!!photoError} className="block min-h-11 w-full min-w-0 text-sm text-muted file:me-3 file:min-h-11 file:cursor-pointer file:rounded-card file:border file:border-border-strong file:bg-surface file:px-4 file:font-semibold file:text-text" onChange={(event) => {
             const next = event.target.files?.[0] ?? null;
             const invalid = next ? validatePhoto(next) : "";
             setPhotoError(invalid || ""); setFile(invalid ? null : next); uploaded.current = null; setError("");
@@ -179,14 +180,12 @@ export default function ReportForm({ sites, initialSiteId = "" }: { sites: Site[
                 {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
-            <label htmlFor="site" className={labelClass}>Site (optional)
-              <select id="site" disabled={sites === null} value={validSiteId} onChange={(event) => setSiteId(event.target.value)} className={fieldClass}>
-                <option value="">Away from a site / unknown</option>
-                {/* Alphabetical: 55 plants in capacity order are hard to find on a phone. */}
-                {sites && [...sites].sort((a, b) => a.name.localeCompare(b.name)).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
-              </select>
+            {/* The shared site picker: type a plant or county, or use the nearest one. "No site" stays first. */}
+            <div>
+              <SitePicker sites={sites} selectedId={validSiteId || null} onSelect={(id) => setSiteId(id ?? "")} disabled={sites === null}
+                label="Site (optional)" noneLabel="Away from a site / unknown" />
               {sites === null && <span role="status" className="mbs-2 block text-sm text-muted">Couldn&apos;t load sites; retrying. You can still submit with a map pin and no site.</span>}
-            </label>
+            </div>
           </div>
         </div>
 
