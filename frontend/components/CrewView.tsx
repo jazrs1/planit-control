@@ -77,7 +77,8 @@ function CrewSite({ site }: { site: Site }) {
             {scoreKnown && risk && !detailFailed && <span aria-hidden="true" className={`pc-shape pc-shape--${riskLevel(todayIndex)} text-4xl`} />}
             {scoreKnown ? todayIndex.toFixed(1) : "—"}{detailFailed && scoreKnown ? " ?" : ""}<span className="font-sans text-xl text-muted"> / 10</span>
           </p>
-          <p className="mbs-3 text-xl font-semibold">{detailFailed ? "Not confirmed" : risk ? `${risk.label} risk` : loading ? "Loading conditions…" : "No data"}</p>
+          {!detailFailed && !risk && loading ? <div role="status" className="mbs-3 space-y-2"><span className="sr-only">Loading conditions…</span><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-32 text-xl" /><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-44" /></div>
+            : <p className="mbs-3 text-xl font-semibold">{detailFailed ? "Not confirmed" : risk ? `${risk.label} risk` : "No data"}</p>}
           {scoreKnown && <p className="mbs-1 font-semibold">Top hazard: {HAZARD_LABEL[detail.top_hazard]}</p>}
           {scoreKnown && <p className="mbs-2 text-sm text-muted">Updated {formatAlertTime(detail.updated_at, site.timezone)}</p>}
         </div>

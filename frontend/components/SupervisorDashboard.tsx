@@ -404,7 +404,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 contains the cards' absolutely positioned screen-reader text (otherwise the desktop page
                 scrolled into blank space). */}
             {sites.length > 0 && <SiteListFinder sites={sorted} stops={viewStops} unfold={realActive} alertsState={!alertsKnown ? "unknown" : alertsStale ? "stale" : "known"} revealId={selectedId} itemRef={rowRef}
-              listClassName="lg:overflow-y-auto lg:overscroll-contain"
+              listClassName="pc-enter lg:overflow-y-auto lg:overscroll-contain"
               renderSite={(site) => <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
                 onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />} />}
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}

@@ -42,7 +42,7 @@ export default function CrewBriefing({ briefing, site, failed, loading }: { brie
           <span className="pc-label text-muted">{source}</span>
           <span className="shrink-0 font-mono text-xl font-bold tabular-nums">{forecast.toFixed(1)}<span className="text-sm text-muted"> / 10</span></span>
         </div>}
-      </> : <p role="status" className="text-lg font-semibold text-muted">{loading ? "Loading briefing…" : "No current briefing"}</p>}
+      </> : loading ? <div role="status" className="space-y-3"><span className="sr-only">Loading briefing…</span><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-24 text-lg" /><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-full text-xl" /><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-2/3 text-xl" /></div> : <p role="status" className="text-lg font-semibold text-muted">No current briefing</p>}
       {briefing && <p className="text-sm text-muted">Generated {formatAlertTime(briefing.generated_at, site.timezone)}{!current ? ` · Covers ${formatForDate(briefing.for_date)}` : ""}</p>}
       <Link href={`/briefing/${encodeURIComponent(site.id)}`} className="pc-link">{current ? "Read full briefing →" : "View latest briefing →"}</Link>
     </div>

@@ -36,7 +36,7 @@ export default function CrewReadings({ detail, stale }: { detail: SiteDetail | n
   return <section aria-labelledby="readings-heading" className={stale ? "grayscale" : ""}>
     <h2 id="readings-heading" className="pc-label mbe-3 text-xs text-muted">Today&apos;s readings</h2>
     {stale && <p role="status" className="mbe-3 font-semibold text-muted">Readings not confirmed. Showing the last real readings.</p>}
-    <div className="grid grid-cols-2 gap-3">
+    <div className="pc-enter grid grid-cols-2 gap-3">
       <Reading title="Heat index" card={heat} stale={stale} timezone={timezone} value={big(heat?.heat_index_f, 0, "°F")}>
         {/* risk_band is for today's whole-day peak; the card's color is the rest of today. */}
         <p>OSHA at today&apos;s peak: {heat?.risk_band ? OSHA[heat.risk_band] : "Unknown"}</p>

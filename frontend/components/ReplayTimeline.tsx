@@ -147,7 +147,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
     // update, not when it was issued, so it's left out; an all clear has none.
     const distance = event.kind === "stop_work_start" ? formatStrikeDistance(event.distance_mi) : null;
     return (
-      <li key={event.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 py-1.5 text-[0.8125rem]">
+      <li key={event.id} className="pc-pop grid grid-cols-[auto_1fr_auto] items-center gap-2.5 py-1.5 text-[0.8125rem]">
         <span aria-hidden="true" className={`pc-shape ${EVENT[event.kind].mark}`} />
         <span className="min-w-0"><span className="font-semibold">{EVENT[event.kind].label}</span><span className="block truncate text-xs text-muted">{names.get(event.site_id) ?? event.site_id}{distance && ` · ${distance}`}</span></span>
         <time className="font-mono text-xs text-muted" dateTime={event.at}>{siteClock(Date.parse(event.at), zones.get(event.site_id))}</time>
@@ -172,7 +172,7 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
           <div className="grid min-w-0 gap-1">
             <div className="relative h-4 mbe-1" aria-hidden="true">
               {events.map((event) => <span key={event.id} title={`${EVENT[event.kind].label}, ${names.get(event.site_id) ?? event.site_id}, ${siteClock(Date.parse(event.at), zones.get(event.site_id))}`}
-                className={`pc-shape ${EVENT[event.kind].mark} absolute inset-bs-0.5 -translate-x-1/2 text-[0.75rem]`} style={{ insetInlineStart: `${at(span, Date.parse(event.at))}%` }} />)}
+                className={`pc-shape pc-pop ${EVENT[event.kind].mark} absolute inset-bs-0.5 -translate-x-1/2 text-[0.75rem]`} style={{ insetInlineStart: `${at(span, Date.parse(event.at))}%` }} />)}
             </div>
             <div className="relative h-0.5 bg-instrument-line" role="progressbar" aria-label="Replay progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}
               aria-valuetext={timed ? `${clock(span.now, true)}, simulated` : `${Math.round(progress * 100)}% of storm data`}>
