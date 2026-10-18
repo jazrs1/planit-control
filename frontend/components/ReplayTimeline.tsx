@@ -93,12 +93,26 @@ type ReplayTimelineProps = {
   /** Replay view after the replay finished: the panel stays on its final state. */
   ended?: boolean;
   onWatch?: () => void;
+  /** Replay view: picking an event marker selects its site, like the list's "Show on map". */
+  onSelectSite?: (siteId: string) => void;
 };
 
 /** The storm replay instrument: the one dark panel on the light page, so a replay can never be mistaken
  *  for a real stop-work. Controls, forward-only progress (no seeking), event markers, flash particles,
  *  two quiet charts and the key events. Replay counts live here, never in the dashboard's real counts. */
-export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs, stale, view = "replay", ended = false, onWatch }: ReplayTimelineProps) {
+/** Close events overlap on a narrow track, and the top marker's tap area takes the tap: a pointer pick goes
+ *  to the marker whose center is nearest the pointer. (Keyboard picks the focused marker.) */
+function nearestMarkerSite(click: React.MouseEvent<HTMLButtonElement>): string | undefined {
+  let best: { site?: string; distance: number } = { distance: Infinity };
+  for (const marker of click.currentTarget.parentElement?.querySelectorAll<HTMLElement>("[data-site]") ?? []) {
+    const box = marker.getBoundingClientRect();
+    const distance = Math.abs(box.left + box.width / 2 - click.clientX);
+    if (distance < best.distance) best = { site: marker.dataset.site, distance };
+  }
+  return best.site;
+}
+
+export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs, stale, view = "replay", ended = false, onWatch, onSelectSite }: ReplayTimelineProps) {
   const running = replay?.running ?? false;
   const names = new Map(sites.map((site) => [site.id, site.name]));
   const zones = new Map(sites.map((site) => [site.id, site.timezone]));
@@ -170,9 +184,19 @@ export default function ReplayTimeline({ replay, alerts, sites, timeline, nowMs,
         <div className="grid items-center gap-x-6 gap-y-3">
           <ReplayControl />
           <div className="grid min-w-0 gap-1">
-            <div className="relative h-4 mbe-1" aria-hidden="true">
-              {events.map((event) => <span key={event.id} title={`${EVENT[event.kind].label}, ${names.get(event.site_id) ?? event.site_id}, ${siteClock(Date.parse(event.at), zones.get(event.site_id))}`}
-                className={`pc-shape pc-pop ${EVENT[event.kind].mark} absolute inset-bs-0.5 -translate-x-1/2 text-[0.75rem]`} style={{ insetInlineStart: `${at(span, Date.parse(event.at))}%` }} />)}
+            {/* Each marker selects its site (tap, click, or Enter / Space): the map flies to it and its row is
+                highlighted. The tooltip only repeats the label; it is never the only way to learn the site. */}
+            <div className="relative h-4 mbe-1" role={onSelectSite ? "group" : undefined} aria-label={onSelectSite ? "Storm events: select one to show its site" : undefined} aria-hidden={onSelectSite ? undefined : true}>
+              {events.map((event) => {
+                const label = `${EVENT[event.kind].label}, ${names.get(event.site_id) ?? event.site_id}, ${siteClock(Date.parse(event.at), zones.get(event.site_id))}`;
+                const place = { insetInlineStart: `${at(span, Date.parse(event.at))}%` };
+                return onSelectSite
+                  ? <button key={event.id} type="button" title={label} aria-label={`Show ${label} on the map`} data-site={event.site_id} onClick={(click) => onSelectSite(click.detail > 0 ? nearestMarkerSite(click) ?? event.site_id : event.site_id)} style={place}
+                    className="group/mark pc-pop absolute inset-bs-0 grid size-4 -translate-x-1/2 place-items-center rounded-pill after:absolute after:inset-[-6px] after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-text">
+                    <span aria-hidden="true" className={`pc-shape ${EVENT[event.kind].mark} text-[0.75rem] motion-safe:transition-[scale] group-hover/mark:scale-125 group-active/mark:scale-90`} />
+                  </button>
+                  : <span key={event.id} title={label} className={`pc-shape pc-pop ${EVENT[event.kind].mark} absolute inset-bs-0.5 -translate-x-1/2 text-[0.75rem]`} style={place} />;
+              })}
             </div>
             <div className="relative h-0.5 bg-instrument-line" role="progressbar" aria-label="Replay progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}
               aria-valuetext={timed ? `${clock(span.now, true)}, simulated` : `${Math.round(progress * 100)}% of storm data`}>
