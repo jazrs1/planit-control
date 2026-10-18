@@ -1,7 +1,7 @@
 import type { Alert, FloodConditions, Site } from "@shared/types";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { HAZARD_LABEL } from "@/lib/risk";
-import { floodReason, formatAlertTime, formatStrikeDistance } from "@/lib/alerts";
+import { floodReason, formatAlertTime, formatStrikeDistance, heldForLightningData } from "@/lib/alerts";
 
 type AlertBannerProps = {
   alert: Alert;
@@ -40,7 +40,8 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
       : `Last lightning strike: ${distance} away.`
     : alert.type === "flood" ? `Reason: ${floodReason(flood)}` : `${HAZARD_LABEL[alert.type]} alert active.`;
   const started = !lightning && <p className="mbs-1 text-sm">Started <time dateTime={alert.started_at}>{formatAlertTime(alert.started_at, site?.timezone)}</time></p>;
-  const restart = lightning && <p className="mbs-1 text-sm font-semibold">Each new strike restarts the 30-minute wait.</p>;
+  const held = heldForLightningData(alert);
+  const restart = lightning && <p className="mbs-1 text-sm font-semibold">{held ? "Lightning data is delayed. Stop work stays in place until it’s back." : "Each new strike restarts the 30-minute wait."}</p>;
 
   // Crew view: the whole alert is a sign. Solid red (or amber) header, white body.
   if (prominent) {
@@ -59,7 +60,7 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
           </div>
         </header>
         {lightning && <div className="border-be-[length:var(--pc-rule-heavy)] border-rule">
-          <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} prominent />
+          <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} prominent held={held} />
         </div>}
         <div className="p-4">
           <p className="font-semibold">{detail}</p>
@@ -89,7 +90,7 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
         {restart}
       </div>
       {lightning && <div className="shrink-0 sm:max-w-64">
-        <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} />
+        <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} held={held} />
       </div>}
     </article>
   );

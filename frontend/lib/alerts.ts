@@ -1,5 +1,15 @@
 import type { Alert, FloodConditions, Site } from "@shared/types";
 
+/** A real stop-work the backend is holding because lightning data is delayed: its countdown can't end, so
+ *  never show it reaching zero or "All clear". `held_reason` comes with the backend safety fix; until it is
+ *  in shared/types it is read as optional, so this works before and after that deploys. */
+export function heldForLightningData(alert: Alert | null | undefined): boolean {
+  return !!alert && alert.type === "lightning" && !alert.replay
+    && (alert as Alert & { held_reason?: string | null }).held_reason === "lightning_data_delayed";
+}
+
+export const HELD_TEXT = "Waiting for lightning data";
+
 /** Always round down: an in-range strike must never appear to be 10 miles away. Whole miles from 10 up. */
 export function formatStrikeDistance(distance: Alert["last_strike_distance_mi"]): string | null {
   if (distance === null || !Number.isFinite(distance) || distance < 0) return null;

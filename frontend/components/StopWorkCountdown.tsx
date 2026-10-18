@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Alert } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
+import { HELD_TEXT } from "@/lib/alerts";
 
 /** `inline`: just the time, for a list row. `boxless`: a large countdown with its label and no border,
- *  for the alerts and site pages. Default: the bordered box. `prominent`: the crew view's sign. */
-export default function StopWorkCountdown({ all_clear_at, replay, prominent = false, inline = false, boxless = false }: Pick<Alert, "all_clear_at"> & Partial<Pick<Alert, "replay">> & { prominent?: boolean; inline?: boolean; boxless?: boolean }) {
+ *  for the alerts and site pages. Default: the bordered box. `prominent`: the crew view's sign.
+ *  `held`: the backend is holding the stop-work while lightning data is delayed (heldForLightningData):
+ *  no timer, never "All clear". */
+export default function StopWorkCountdown({ all_clear_at, replay, prominent = false, inline = false, boxless = false, held = false }: Pick<Alert, "all_clear_at"> & Partial<Pick<Alert, "replay">> & { prominent?: boolean; inline?: boolean; boxless?: boolean; held?: boolean }) {
   // Start with a placeholder so the server and hydration render agree.
   const [now, setNow] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
@@ -45,8 +48,8 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
     ? Math.max(0, Math.ceil((target - now) / 1000))
     : null;
   const unconfirmed = offline;
-  const cleared = seconds === 0 && !offline;
-  const label = target === null
+  const cleared = seconds === 0 && !offline && !held;
+  const label = held ? HELD_TEXT : target === null
     ? "Awaiting all-clear"
     : !Number.isFinite(target)
       ? "All-clear time unavailable"
@@ -57,6 +60,19 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
         : seconds === null
           ? "--:--"
           : `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+  // Held: the stop-work stays until lightning data is back. Words, not a timer; never green.
+  if (held) {
+    const tone = unconfirmed ? "text-muted" : "text-risk-red";
+    if (inline) return <span role="status" className={`whitespace-nowrap px-1 text-sm font-semibold ${tone}`}>{HELD_TEXT.toLowerCase()}</span>;
+    return (
+      <div role="status" className={`grid gap-0.5 ${boxless ? "" : prominent ? "px-4 py-3 bg-surface" : "border-2 border-current bg-surface px-3 py-2"} ${tone}`}>
+        <span className={boxless ? "text-xs text-muted" : "pc-label block"}>Stop-work status</span>
+        <span className={`font-semibold leading-tight ${prominent ? "text-2xl" : "text-xl"}`}>{HELD_TEXT}</span>
+        {unconfirmed && <span className="text-sm font-semibold">Last known, connection lost</span>}
+      </div>
+    );
+  }
 
   // A compact list row: just the time (or its unknown state), same reset flash.
   if (inline) {

@@ -15,7 +15,7 @@ import { DEMO_DATA, getFires, getLightningCells, getLightningCounts, getLightnin
 import { cellIsReplay, cellUnconfirmed } from "@/lib/lightning";
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
-import { countAlerts, realAlerts } from "@/lib/alerts";
+import { countAlerts, heldForLightningData, realAlerts } from "@/lib/alerts";
 import { useReplayTimeline } from "@/lib/useReplayTimeline";
 import { alertsForView, layerForView, pinnedApproaches, siteForView } from "@/lib/viewMode";
 import { replayWindowLabel } from "@/components/ReplayTimeline";
@@ -371,7 +371,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {[...pinned].sort((a, b) => Number(b.type === "lightning") - Number(a.type === "lightning")).map((alert) => <li key={alert.id} className={`flex flex-wrap items-center gap-x-2 rounded-[6px] px-3 py-2 text-sm ${alert.type === "lightning" ? "bg-risk-red-bg" : "bg-risk-amber-bg"}`}>
                   <span className="pc-label">Live</span><span className="font-semibold">{siteName(alert.site_id)}</span>
                   <span className={`pc-chip ${alertsStale ? "pc-chip--unknown" : alert.type === "lightning" ? "pc-chip--stop" : "pc-chip--flood"}`}>{alert.type === "lightning" ? "Stop work" : alert.type === "flood" ? "Flood risk" : "Alert"}</span>
-                  {alert.type === "lightning" && <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={false} inline />}
+                  {alert.type === "lightning" && <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={false} inline held={heldForLightningData(alert)} />}
                   {alertsStale && <span className="pc-label text-muted">Last known</span>}
                 </li>)}
                 {/* Advisories on one line: they're a heads-up, so they take less room than a stop-work. */}
