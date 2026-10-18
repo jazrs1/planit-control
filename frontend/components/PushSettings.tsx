@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import type { PushRole, Site } from "@shared/types";
 import { useAlertsState } from "@/components/AlertsProvider";
 import { useDevicePush } from "@/components/PushProvider";
+import SitePicker from "@/components/SitePicker";
 
 export default function PushSettings({ sites, defaultSiteId, defaultRole = "supervisor", compact = false, sitesUnconfirmed = false }: { sites: Site[] | null; defaultSiteId?: Site["id"]; defaultRole?: PushRole; compact?: boolean; sitesUnconfirmed?: boolean }) {
   const push = useDevicePush();
@@ -41,8 +42,13 @@ export default function PushSettings({ sites, defaultSiteId, defaultRole = "supe
           <legend className="text-sm font-semibold">Sites to follow</legend>
           <label className="flex min-h-11 items-center gap-2"><input type="radio" name={`${id}-scope`} checked={all} onChange={() => setAll(true)} />All sites</label>
           <label className="flex min-h-11 items-center gap-2"><input type="radio" name={`${id}-scope`} checked={!all} onChange={() => setAll(false)} />Choose sites</label>
-          {!all && <div className={`max-h-52 overflow-y-auto rounded-card bg-surface p-2 ${"border border-border"}`}>
-            {choices.map(site => <label key={site.id} className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={chosen.includes(site.id)} onChange={event => setChosen(previous => event.target.checked ? [...new Set([...previous, site.id])] : previous.filter(site_id => site_id !== site.id))} />{site.name}</label>)}
+          {/* Choose sites with the shared search picker; the chosen ones are listed below it, each a checkbox to remove. */}
+          {!all && <div className="mbs-2 flex flex-col gap-2">
+            {sites !== null && sites.length > 0 && <SitePicker multiple sites={sites} chosen={chosen} label="Add a site to follow" labelHidden
+              onToggle={site_id => setChosen(previous => previous.includes(site_id) ? previous.filter(value => value !== site_id) : [...previous, site_id])} />}
+          </div>}
+          {!all && (chosen.length > 0 || sites === null || sites?.length === 0) && <div className={`max-h-52 overflow-y-auto rounded-card bg-surface p-2 ${"border border-border"}`}>
+            {choices.filter(site => chosen.includes(site.id)).map(site => <label key={site.id} className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={chosen.includes(site.id)} onChange={event => setChosen(previous => event.target.checked ? [...new Set([...previous, site.id])] : previous.filter(site_id => site_id !== site.id))} />{site.name}</label>)}
             {missing.map(site_id => <label key={site_id} className="flex min-h-11 items-center gap-2 text-sm text-muted"><input type="checkbox" checked onChange={() => setChosen(previous => previous.filter(value => value !== site_id))} />{site_id} · site name unavailable</label>)}
             {sites === null && <p className="p-2 text-sm text-muted">Site list unavailable. Retry loading sites or choose All sites.</p>}
             {sites?.length === 0 && <p className="p-2 text-sm text-muted">No sites available.</p>}
