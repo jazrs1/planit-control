@@ -64,6 +64,6 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
   - Fire detection depends on a few satellite passes a day.
   - The index predicts hazardous weather, not injuries.
   - The forecast misses storms that form overhead.
-  - If the lightning feed stalls, the beacon switches to "unknown" after 2 minutes, but the website doesn't yet say lightning data is delayed.
+  - If the lightning feed stalls (NOAA's newest file over 2 minutes old), a stop-work is held: the website shows "Waiting for lightning data", the beacon stays red, and no all-clear goes out until the data is back and the late files are checked. Sites with no stop-work show "unknown" on the beacon, but the website doesn't flag delayed data for them, and the first 2 minutes of a stall look like a quiet feed.
   - PlanIT supports a supervisor's judgment; it doesn't replace it.
 - Pilot with a real crew.
