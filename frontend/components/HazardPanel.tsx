@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
 import type { HazardCard, HazardStatus } from "@shared/types";
 import { formatPageTime } from "@/lib/siteTime";
@@ -45,6 +45,11 @@ type HazardPanelProps = {
   /** The page lost its connection: everything shown is last known. */
   connectionLost: boolean;
   children?: ReactNode;
+  /** Anchor for deep links (lib/hazardLinks.ts), and extra classes for the article (the link highlight). */
+  id?: string;
+  className?: string;
+  /** Opened by a deep link: show the details. */
+  expand?: boolean;
 };
 
 /** "3 hours", "90 minutes", "18 hours". */
@@ -52,8 +57,10 @@ function overMinutes(min: number) {
   return min >= 120 && min % 60 === 0 ? `${min / 60} hours` : `${min} minutes`;
 }
 
-export default function HazardPanel({ title, card, value, caption, note = null, rows, freshness, timeZone, nowMs, connectionLost, children }: HazardPanelProps) {
+export default function HazardPanel({ title, card, value, caption, note = null, rows, freshness, timeZone, nowMs, connectionLost, children, id, className = "", expand = false }: HazardPanelProps) {
   const [open, setOpen] = useState(false);
+  // A deep link opens the details; it never closes them.
+  useEffect(() => { if (expand) setOpen(true); }, [expand]);
   const detailsId = useId();
   const status = card?.hazard_status ?? null;
   const asOf = card?.as_of ?? null;
@@ -68,7 +75,7 @@ export default function HazardPanel({ title, card, value, caption, note = null, 
   const statusLabel = status === null ? `${title}: no data` : `${title}: ${style!.label}${uncertain ? ", may be out of date" : ""}`;
 
   return (
-    <article className={`flex flex-col overflow-clip rounded-card bg-surface ${style && !uncertain ? "shadow-card" : "border-2 border-dashed border-muted"}`}>
+    <article id={id} className={`flex flex-col overflow-clip rounded-card bg-surface ${style && !uncertain ? "shadow-card" : "border-2 border-dashed border-muted"} ${className}`}>
       {band && (
         <header className="flex items-center justify-between gap-3 bg-risk-red-solid px-6 py-3 text-on-risk-red max-sm:px-5">
           <h2 className="pc-label">{title}</h2>

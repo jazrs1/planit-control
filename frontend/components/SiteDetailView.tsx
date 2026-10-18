@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Alert, FloodStatus, OshaHeatRisk, SiteDetail, SoilLevel } from "@shared/types";
+import type { Alert, FloodStatus, HazardType, OshaHeatRisk, SiteDetail, SoilLevel } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import { NoticeCard, ReplayLine, StopWorkCard } from "@/components/AlertCards";
 import BriefingCard from "@/components/BriefingCard";
@@ -11,6 +11,7 @@ import LightningApproachChip from "@/components/LightningApproachChip";
 import SiteScoreHistory from "@/components/SiteScoreHistory";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { formatMiles, formatStrikeDistance } from "@/lib/alerts";
+import { HAZARD_ANCHOR, hazardTarget } from "@/lib/hazardLinks";
 import { ApiRequestError, DEMO_DATA, getSiteDetail, sendBriefingNow } from "@/lib/api";
 import { loadBriefing } from "@/lib/loadBriefings";
 import type { BriefingResult } from "@/lib/loadBriefings";
@@ -44,6 +45,13 @@ const SOIL_LABEL: Record<SoilLevel, string> = { dry: "Dry", moist: "Moist", satu
 const fmt = (v: number | null | undefined, unit: string, digits = 0) => (v == null ? null : `${v.toFixed(digits)}${unit}`);
 const yesNo = (v: boolean | null | undefined) => (v == null ? null : v ? "Yes" : "No");
 const count = (v: number | null | undefined) => (v == null ? null : String(v));
+
+/** How long a deep-linked card stays highlighted before its outline fades. */
+const HIGHLIGHT_MS = 2_000;
+/** How long a deep link keeps its card in place while late content above it loads. */
+const SETTLE_MS = 4_000;
+/** A deep-link target stops below the sticky connection-lost banner (the nav itself scrolls away). */
+const ANCHOR_OFFSET = "scroll-mt-[calc(var(--pc-outage-height,0px)+1rem)]";
 
 /** A panel on this page: white, small radius, soft shadow. */
 const PANEL = "pc-panel flex flex-col gap-4 p-6 max-sm:p-5";
@@ -141,6 +149,61 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
     const timer = window.setInterval(tick, 30_000);
     return () => window.clearInterval(timer);
   }, [demo, serverNow]);
+
+  // Deep links (/sites/<id>#hazard-wildlife, lib/hazardLinks.ts): once the cards exist, scroll to the
+  // one in the hash, open its details and highlight it briefly. An unknown or missing hash does nothing.
+  const [target, setTarget] = useState<ReturnType<typeof hazardTarget>>(null);
+  const [glow, setGlow] = useState(false);
+  const [jump, setJump] = useState(0);
+  const cardsShown = detail !== null;
+  useEffect(() => {
+    if (!cardsShown) return;
+    const read = () => {
+      const next = hazardTarget(window.location.hash);
+      if (!next) return;
+      setTarget(next);
+      setGlow(true);
+      setJump((n) => n + 1);
+    };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, [cardsShown]);
+  useEffect(() => {
+    if (!target || jump === 0) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const align = (behavior: ScrollBehavior) => document.getElementById(target.elementId)?.scrollIntoView({ block: "start", behavior });
+    // After the details open, once the page has laid out.
+    const frame = window.requestAnimationFrame(() => align(reduce ? "auto" : "smooth"));
+    // The history chart and the briefing load after the cards and push them down: keep the card in place
+    // while the page settles, until the reader scrolls on their own.
+    let settled = false;
+    const stop = () => { settled = true; };
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    for (const name of events) window.addEventListener(name, stop, { passive: true });
+    let first = true;
+    const observer = new ResizeObserver(() => {
+      if (first) { first = false; return; } // called once on observe: nothing has moved yet
+      if (!settled) align("auto");
+    });
+    const page = document.querySelector("main");
+    if (page) observer.observe(page);
+    const settle = window.setTimeout(stop, SETTLE_MS);
+    const fade = window.setTimeout(() => setGlow(false), HIGHLIGHT_MS);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
+      window.clearTimeout(fade);
+      observer.disconnect();
+      for (const name of events) window.removeEventListener(name, stop);
+    };
+  }, [target, jump]);
+  // A soft outline on the linked card that fades out (no fade with reduced motion: it just goes).
+  const anchor = (hazard: HazardType) => ({
+    id: HAZARD_ANCHOR[hazard],
+    className: `${ANCHOR_OFFSET} ${target?.hazard === hazard ? `outline-2 outline-offset-4 motion-safe:transition-[outline-color] motion-safe:duration-1000 ${glow ? "outline-notice/70" : "outline-transparent"}` : ""}`,
+    expand: target?.hazard === hazard && target.expand,
+  });
 
   const backLink = (
     <Link href="/" className="inline-flex min-h-11 items-center self-start text-xs text-muted hover:text-text focus-visible:outline-2 focus-visible:outline-notice">
@@ -294,6 +357,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
 
       <section aria-label="Hazard conditions" className="pc-enter grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <HazardPanel
+          {...anchor("lightning")}
           title="Lightning" card={c.lightning} freshness={{ kind: "live" }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={c.lightning.nearest_strike_mi === null ? "None" : formatStrikeDistance(c.lightning.nearest_strike_mi)}
           caption={c.lightning.nearest_strike_mi === null ? "Nearest strike, last 30 min" : `Nearest strike${c.lightning.nearest_strike_at ? `, ${formatPageTime(c.lightning.nearest_strike_at, tz, nowMs)}` : ""}`}
@@ -302,6 +366,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           ]}
         />
         <HazardPanel
+          {...anchor("heat")}
           title="Heat" card={c.heat} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={fmt(c.heat.heat_index_f, "°F")} caption="Heat index now"
           rows={[
@@ -313,6 +378,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           ]}
         />
         <HazardPanel
+          {...anchor("flood")}
           title="Flooding" card={c.flood} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={rain.value} caption={rain.caption} note={rain.note}
           rows={[
@@ -330,11 +396,13 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           ]}
         />
         <HazardPanel
+          {...anchor("soil_saturation")}
           title="Soil saturation" card={c.soil} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.weather }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={fmt(c.soil.moisture_pct, "%")} caption={`Soil moisture${c.soil.level ? `, ${SOIL_LABEL[c.soil.level].toLowerCase()}` : ""}`}
           rows={[]}
         />
         <HazardPanel
+          {...anchor("wildfire")}
           title="Wildfire" card={c.wildfire} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.wildfire }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={count(c.wildfire.detections_25mi)} caption="Fires within 25 mi, last 24 h"
           rows={[
@@ -345,6 +413,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           ]}
         />
         <HazardPanel
+          {...anchor("wildlife")}
           title="Wildlife" card={c.wildlife_summary} freshness={{ kind: "polled", staleAfterMin: STALE_AFTER_MIN.wildlife }} timeZone={tz} nowMs={nowMs} connectionLost={connectionLost}
           value={count(c.wildlife_summary?.observations_30d)} caption="Alligator and snake sightings, 30 days"
           rows={c.wildlife_summary ? [
@@ -376,7 +445,8 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
         onRegenerate={demo ? undefined : regenerateBriefing}
       />
 
-      <section aria-labelledby="factors-heading" className={PANEL}>
+      {/* Storms & wind has no card of its own: its deep link lands on what drives the index. */}
+      <section aria-labelledby="factors-heading" id={anchor("storm").id} className={`${PANEL} ${anchor("storm").className}`}>
         <h2 id="factors-heading" className="text-xs text-muted">What drives today&apos;s index</h2>
         {factors.length === 0 ? (
           <p className="text-muted">Nothing is raising today&apos;s index.</p>
