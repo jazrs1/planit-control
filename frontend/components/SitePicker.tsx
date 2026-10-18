@@ -142,7 +142,8 @@ export default function SitePicker(props: SitePickerProps) {
           // With a "no site" option the list opens like a dropdown: on focus, and on a tap once focused.
           onFocus={(event) => { if (noneLabel !== undefined) { setQuery(""); setActive(0); } else event.currentTarget.select(); }}
           onClick={() => { if (!typing && noneLabel !== undefined) { setQuery(""); setActive(0); } }}
-          onChange={(event) => { setQuery(event.target.value); setActive(0); }}
+          // Typing highlights the first matching site, not "no site", so Enter picks what was typed.
+          onChange={(event) => { setQuery(event.target.value); setActive(noneLabel !== undefined && event.target.value.trim() !== "" ? 1 : 0); }}
           onBlur={() => setQuery(null)}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" && !typing) { event.preventDefault(); setQuery(""); setActive(0); }
