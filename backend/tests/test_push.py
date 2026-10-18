@@ -307,7 +307,7 @@ def test_hook_pushes_only_when_stop_work_starts_or_clears(monkeypatch):
     monkeypatch.setattr(alert_hook, "_forecast_pool", type("P", (), {"submit": lambda self, *a: None})())
     for summary in (engine.CycleSummary(extended=["a"]), engine.CycleSummary(created=["a"]),
                     engine.CycleSummary(cleared=["b"])):
-        monkeypatch.setattr(engine, "run", lambda flashes, now, replay, s=summary: s)
+        monkeypatch.setattr(engine, "run", lambda flashes, now, replay, s=summary, **_: s)
         alert_hook.on_new_flashes([], T0, replay=True)
     assert kicks == [(T0, True), (T0, True)]
 

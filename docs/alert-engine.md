@@ -108,7 +108,7 @@ It opens a pooled connection, loads the sites from the `sites` table, calls `pro
 
 ### `active_alerts(conn, now, replay)`: what the API shows
 
-Returns alerts that are `status = 'active'` **and** `all_clear_at > now`. The second condition means an alert whose countdown ended between engine cycles disappears from the API at exactly the right moment, without waiting up to 20 seconds for the next cycle to mark it cleared.
+Returns alerts that are `status = 'active'` **and** `all_clear_at > now`. The second condition means an alert whose countdown ended between engine cycles disappears from the API at exactly the right moment, without waiting up to 20 seconds for the next cycle to mark it cleared. That holds for replay and flood alerts. A **real lightning** alert past its `all_clear_at` is different: it's still returned, with `held_reason: "lightning_data_delayed"`, until the engine closes or extends it. That covers both a stall (next section) and the up-to-20-second gap before the clearing cycle runs, so an open real stop-work never shows "00:00 All clear". Every row carries `held_reason` (`null` when not held).
 
 ## The tricky parts
 
@@ -140,6 +140,16 @@ Test: `test_late_file_with_older_strike_does_not_shorten_timer`. Removing the "k
 An alert clears because **time passes**, not because something happens. The quietest moment (no lightning at all) is exactly when crews are waiting for the all-clear. If the engine only ran when there were new flashes, a site would stay in stop-work forever after the storm passed. So the hook runs every cycle, empty or not, and `clear_expired` runs at the end of every cycle.
 
 Replay does the same: after the last satellite file, it keeps cycling with no flashes for 31 simulated minutes so the final countdowns can finish.
+
+### A stalled feed holds the all-clear
+
+"No new flashes" only means "no lightning" if the satellite data is actually arriving. If NOAA's GLM files stop (or keep failing to download), a strike could be happening that we can't see, so the countdown must not end in an all-clear.
+
+- **When it's held:** a live cycle holds when NOAA's newest file is more than 2 minutes old, when a file in the cycle failed, or when the previous cycles weren't current (`lightning/health.py`, the same check the beacon uses). The live poll marks the feed not current as soon as it sees a stale newest file (`glm.poll_latest`).
+- **What held means:** `clear_expired` is skipped, so a real alert whose `all_clear_at` has passed stays `active`. No `cleared` event is written and no all-clear is pushed. `GET /alerts`, `/sites` and `/sites/{id}` keep showing it as a stop-work with `held_reason: "lightning_data_delayed"`, and the hazard index stays at 9 or more. The lightning card says "Stop work held: lightning data is delayed". The beacon stays on `stop` (red), with 0 seconds left.
+- **Recovery:** the first good cycle looks back to the last successful cycle (at most 2 hours, `glm.BACKLOG_MAX`) and ingests any files NOAA published late. Their strikes extend or restart countdowns exactly as on any other cycle. That cycle still holds, because the cycles before it weren't current. Until the next cycle runs (20 s later), the API still shows the alert as held, the beacon stays on `stop` and nothing is pushed. That next cycle is current: anything still expired clears, and the all-clear is pushed then (push picks events by `recorded_at`).
+- **Replay is never held.** It runs on its own clock and files.
+- **Limits:** the first 2 minutes of a stall still look like a normal quiet feed (the same tolerance as the beacon). After a server restart, the first cycle looks back only the usual 3 minutes.
 
 ### Why strikes are applied *before* clearing
 
@@ -219,6 +229,7 @@ cleared   23:29:36                 all clear 23:29:36
 - **If the engine fails mid-cycle** (say the database drops for a moment), that cycle's flashes are already saved but never evaluated, and the next cycle won't see them again. A fix: each cycle, check the 5-minute rollup for sites with flashes within 10 miles in the last 30 minutes but no active alert, and evaluate those flashes.
 - **Satellite locations are approximate.** GLM pixels are roughly 8–14 km across, so a flash reported at 9.8 miles could really be a bit farther or closer. A real deployment might add a safety margin.
 - **The hazard index doesn't react to alerts yet.** It's still a placeholder (until the ML model exists), so a site can show a stop-work banner with a low index.
+- **A held alert keeps its `all_clear_at`.** The countdown time is in the past while it's held; the frontend must show `held_reason` ("Waiting for lightning data"), never a countdown at 0 or "All clear".
 - **Granularity.** Live data is checked every 20 seconds and satellite files cover 20 seconds, so a strike reaches the engine roughly 20–40 seconds after it happens.
 
 ## Talking points for judges

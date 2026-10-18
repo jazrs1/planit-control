@@ -135,6 +135,10 @@ def heat(inp: Inputs) -> Hazard:
 def lightning(inp: Inputs) -> Hazard:
     alert = inp.lightning_alert
     level, nws_alert = _nws(inp, STORM_LEVELS)
+    if alert and alert.get("held_reason"):
+        reading = (f"Stop work held: lightning data is delayed. Last strike {alert['last_strike_distance_mi']:.1f} mi "
+                   f"away at {_time(alert['last_strike_at'], inp.site)}; no all clear until data is back")
+        return Hazard({"hazard_status": "danger", "reading": reading}, 9.0, 0, STOP_WORK_FACTOR, "")
     if alert:
         reading = (f"Stop work: strike {alert['last_strike_distance_mi']:.1f} mi away at "
                    f"{_time(alert['last_strike_at'], inp.site)}; all clear at "

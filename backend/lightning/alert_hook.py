@@ -43,13 +43,13 @@ _forecast_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="lightning
 _forecast_busy = {False: threading.Lock(), True: threading.Lock()}   # per mode: a forecast queued or running
 
 
-def on_new_flashes(flashes: list[Flash], now: datetime, *, replay: bool = False) -> None:
+def on_new_flashes(flashes: list[Flash], now: datetime, *, replay: bool = False, feed_ok: bool = True) -> None:
     from alerts import engine
 
     from push import notify
 
     # Replay writes its own alerts (alerts.replay = true) so it never touches live ones.
-    summary = engine.run(flashes, now, replay=replay)
+    summary = engine.run(flashes, now, replay=replay, feed_ok=feed_ok)   # holds all clears while not feed_ok
     notify.stop_work_cycle(summary, now, replay=replay)   # committed; queues any push, never raises
     if _forecast_busy[replay].acquire(blocking=False):
         _forecast_pool.submit(_forecast, now, replay)

@@ -245,6 +245,14 @@ export interface Alert {
    * returns both, so real alerts never disappear.
    */
   replay: boolean;
+  /**
+   * "lightning_data_delayed": a real lightning stop-work whose countdown (all_clear_at) has run out but
+   * that the backend hasn't closed: the GOES lightning feed is stalled, or the cycle that confirms the
+   * all clear hasn't run yet (up to ~20 s). No all clear has been pushed. Show it as still in effect
+   * ("Waiting for lightning data"), never as a countdown at 0 or "All clear".
+   * null otherwise (always null for replay and non-lightning alerts).
+   */
+  held_reason: "lightning_data_delayed" | null;
 }
 
 export type AlertsResponse = Alert[];

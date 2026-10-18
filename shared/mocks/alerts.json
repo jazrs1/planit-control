@@ -6,7 +6,8 @@
     "started_at": "2026-10-16T16:12:00-04:00",
     "all_clear_at": "2026-10-16T17:08:00-04:00",
     "last_strike_distance_mi": 2.4,
-    "replay": false
+    "replay": false,
+    "held_reason": null
   },
   {
     "id": "alt_20261016_deerhaven_fld",
@@ -15,6 +16,7 @@
     "started_at": "2026-10-16T11:00:00-04:00",
     "all_clear_at": null,
     "last_strike_distance_mi": null,
-    "replay": false
+    "replay": false,
+    "held_reason": null
   }
 ]
