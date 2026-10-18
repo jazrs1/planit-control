@@ -233,6 +233,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     pendingScroll.current = id;
     setScrollTo(id);
   }, []);
+  // A replay timeline marker: select its site like "Show on map" (the map flies to it) and, on a wide
+  // screen, scroll its row into view in the list. On a phone the page goes to the map, as Show on map does.
+  const selectFromTimeline = useCallback((id: string) => {
+    setSelectedId(id);
+    setFocusKey((key) => key + 1);
+    if (window.matchMedia("(min-width: 64rem)").matches) { pendingScroll.current = id; setScrollTo(id); }
+    else map.current?.scrollIntoView({ block: "start" });
+  }, []);
   useEffect(() => {
     if (!scrollTo) return;
     const row = rows.current.get(scrollTo);
@@ -363,7 +371,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
             </div>
             <div className="w-full max-lg:order-3">
               <ReplayTimeline replay={replay} alerts={allAlerts} sites={sites} timeline={replayTimeline} nowMs={replayEnded && lastReplay.current ? lastReplay.current.simNow : replayNowMs} stale={replayStale}
-                view={replayView ? "replay" : "live"} ended={replayEnded} onWatch={() => setMode("replay")} />
+                view={replayView ? "replay" : "live"} ended={replayEnded} onWatch={() => setMode("replay")} onSelectSite={selectFromTimeline} />
             </div>
           </div>
 
