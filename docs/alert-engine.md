@@ -108,7 +108,7 @@ It opens a pooled connection, loads the sites from the `sites` table, calls `pro
 
 ### `active_alerts(conn, now, replay)`: what the API shows
 
-Returns alerts that are `status = 'active'` **and** `all_clear_at > now`. The second condition means an alert whose countdown ended between engine cycles disappears from the API at exactly the right moment, without waiting up to 20 seconds for the next cycle to mark it cleared. The exception is a held alert (next section): while the live feed isn't current, a real lightning alert past its `all_clear_at` is still returned, with `held_reason: "lightning_data_delayed"`. Every row carries `held_reason` (`null` when not held).
+Returns alerts that are `status = 'active'` **and** `all_clear_at > now`. The second condition means an alert whose countdown ended between engine cycles disappears from the API at exactly the right moment, without waiting up to 20 seconds for the next cycle to mark it cleared. That holds for replay and flood alerts. A **real lightning** alert past its `all_clear_at` is different: it's still returned, with `held_reason: "lightning_data_delayed"`, until the engine closes or extends it. That covers both a stall (next section) and the up-to-20-second gap before the clearing cycle runs, so an open real stop-work never shows "00:00 All clear". Every row carries `held_reason` (`null` when not held).
 
 ## The tricky parts
 
@@ -147,7 +147,7 @@ Replay does the same: after the last satellite file, it keeps cycling with no fl
 
 - **When it's held:** a live cycle holds when NOAA's newest file is more than 2 minutes old, when a file in the cycle failed, or when the previous cycles weren't current (`lightning/health.py`, the same check the beacon uses). The live poll marks the feed not current as soon as it sees a stale newest file (`glm.poll_latest`).
 - **What held means:** `clear_expired` is skipped, so a real alert whose `all_clear_at` has passed stays `active`. No `cleared` event is written and no all-clear is pushed. `GET /alerts`, `/sites` and `/sites/{id}` keep showing it as a stop-work with `held_reason: "lightning_data_delayed"`, and the hazard index stays at 9 or more. The lightning card says "Stop work held: lightning data is delayed". The beacon stays on `stop` (red), with 0 seconds left.
-- **Recovery:** the first good cycle looks back to the last successful cycle (at most 2 hours, `glm.BACKLOG_MAX`) and ingests any files NOAA published late. Their strikes extend or restart countdowns exactly as on any other cycle. That cycle still holds, because the cycles before it weren't current. The next cycle (20 s later) is current: anything still expired clears, and the all-clear is pushed then (push picks events by `recorded_at`).
+- **Recovery:** the first good cycle looks back to the last successful cycle (at most 2 hours, `glm.BACKLOG_MAX`) and ingests any files NOAA published late. Their strikes extend or restart countdowns exactly as on any other cycle. That cycle still holds, because the cycles before it weren't current. Until the next cycle runs (20 s later), the API still shows the alert as held, the beacon stays on `stop` and nothing is pushed. That next cycle is current: anything still expired clears, and the all-clear is pushed then (push picks events by `recorded_at`).
 - **Replay is never held.** It runs on its own clock and files.
 - **Limits:** the first 2 minutes of a stall still look like a normal quiet feed (the same tolerance as the beacon). After a server restart, the first cycle looks back only the usual 3 minutes.
 

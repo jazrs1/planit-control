@@ -185,14 +185,20 @@ def test_replay_alerts_never_touch_live_alerts(conn):
     assert replayed["all_clear_at"] == T0 + 35 * MIN
 
 
-def test_active_alerts_hides_expired_alert_between_cycles(conn):
+def test_active_alerts_keeps_an_expired_real_alert_held_until_the_engine_clears_it(conn):
     cycle(conn, [flash(SITE_A, 2.0, T0)], now=T0 + MIN)
+    cycle(conn, [flash(SITE_A, 2.0, T0)], now=T0 + MIN, replay=True)
 
-    def visible(now):
-        return [a for a in engine.active_alerts(conn, now, replay=False) if a["site_id"] == SITE_A.id]
+    def visible(now, replay=False):
+        return [a["held_reason"] for a in engine.active_alerts(conn, now, replay=replay) if a["site_id"] == SITE_A.id]
 
-    assert len(visible(T0 + 29 * MIN)) == 1
-    assert visible(T0 + 30 * MIN) == []  # no engine cycle has run yet, but the countdown is over
+    assert visible(T0 + 29 * MIN) == [None]
+    # No engine cycle has run yet, but the countdown is over: a real one is shown held (never "all clear"
+    # while still open), a replay one is hidden at once.
+    assert visible(T0 + 30 * MIN) == [engine.HELD_DATA_DELAYED]
+    assert visible(T0 + 30 * MIN, replay=True) == []
+    cycle(conn, [], now=T0 + 30 * MIN)
+    assert visible(T0 + 30 * MIN) == []
 
 
 def test_api_shows_live_and_replay_alerts_together_each_on_its_own_clock(conn):
@@ -208,6 +214,7 @@ def test_api_shows_live_and_replay_alerts_together_each_on_its_own_clock(conn):
     # No replay running: live only.
     assert ours(engine.alerts_for_api(conn, real + 5 * MIN, None)) == [(SITE_A.id, False)]
     # The live countdown ends on real time even while the replay clock is earlier.
+    cycle(conn, [], now=real + 31 * MIN, replay=False)
     assert ours(engine.alerts_for_api(conn, real + 31 * MIN, T0 + 5 * MIN)) == [(SITE_B.id, True)]
     assert ours(engine.alerts_for_api(conn, real + 5 * MIN, None, site_id=SITE_B.id)) == []
 
@@ -336,23 +343,28 @@ def test_recovery_without_new_strikes_clears_and_pushes_the_all_clear(conn, monk
     assert _held(conn, T0 + 46 * MIN) == []
 
 
-def test_recovery_window_keeps_the_stop_work_held_until_the_clearing_cycle(conn, monkeypatch):
-    """After a stall the first good cycle makes the feed current again, but the expired stop-work must stay
-    listed and held until the next cycle clears it and pushes the all clear: never shown as ended early."""
-    from lightning import health
-    monkeypatch.setattr(engine, "feed_current", lambda now: True)
+def test_recovery_window_before_the_clearing_cycle_still_shows_held_stop_work(conn, monkeypatch):
+    """The first good cycle after a stall still holds (the cycles before it weren't current); by the time a
+    request comes in, the feed is current again but the clearing cycle hasn't run. The alert must stay a
+    held stop-work (held_reason set, beacon on stop, no push) until that cycle closes it."""
+    from alerts import approach
+    from push import notify
+    pushed = []
+    monkeypatch.setattr(notify, "alerts_changed", lambda now, replay: pushed.append(now))
     cycle(conn, [flash(SITE_A, 5.0, T0)], now=T0 + MIN)
-    health.mark_stalled(replay=False)                                  # stall: hold starts
-    engine.process(conn, [], T0 + 31 * MIN, SITES, hold_clears=True)   # countdown ran out, held
-    # Recovery: the feed is current again (first good cycle recorded) but nothing has cleared yet.
-    health.record_success(T0 + 45 * MIN, replay=False)
-    assert _held(conn, T0 + 45 * MIN) == [(SITE_A.id, engine.HELD_DATA_DELAYED)]
-    assert _held(conn, T0 + 45 * MIN + timedelta(seconds=15)) == [(SITE_A.id, engine.HELD_DATA_DELAYED)]
-    # The clearing cycle ends it and releases the hold.
-    summary = engine.process(conn, [], T0 + 46 * MIN, SITES)
-    health.release_hold(replay=False)
-    assert summary.cleared == [SITE_A.id] and _held(conn, T0 + 46 * MIN) == []
-    assert not health.holding(replay=False)
+    summary = engine.process(conn, [], T0 + 40 * MIN, SITES, hold_clears=True)   # first good cycle: backlog, held
+    notify.stop_work_cycle(summary, T0 + 40 * MIN, replay=False)
+    now = T0 + 40 * MIN + 10 * timedelta(seconds=1)                               # feed current (conftest)
+    rows = [a for a in engine.active_alerts(conn, now, replay=False) if a["site_id"] == SITE_A.id]
+    assert [a["held_reason"] for a in rows] == [engine.HELD_DATA_DELAYED]
+    assert [a["held_reason"] for a in engine.alerts_for_api(conn, now, None) if a["site_id"] == SITE_A.id] \
+        == [engine.HELD_DATA_DELAYED]
+    assert approach.beacon(SITE_A.id, rows, None, now, True)["state"] == "stop"
+    assert pushed == []
+    summary = engine.process(conn, [], T0 + 40 * MIN + 20 * timedelta(seconds=1), SITES)   # the clearing cycle
+    notify.stop_work_cycle(summary, T0 + 40 * MIN + 20 * timedelta(seconds=1), replay=False)
+    assert summary.cleared == [SITE_A.id] and len(pushed) == 1
+    assert [a for a in engine.active_alerts(conn, now, replay=False) if a["site_id"] == SITE_A.id] == []
 
 
 def test_recovery_with_late_strikes_extends_or_restarts_as_usual(conn):

@@ -246,9 +246,10 @@ export interface Alert {
    */
   replay: boolean;
   /**
-   * "lightning_data_delayed": a real lightning stop-work whose countdown (all_clear_at) ran out while
-   * the GOES lightning feed is stalled. The backend keeps it active and pushes no all clear until data
-   * is current again, so show it as still in effect ("Waiting for lightning data"), never as all clear.
+   * "lightning_data_delayed": a real lightning stop-work whose countdown (all_clear_at) has run out but
+   * that the backend hasn't closed: the GOES lightning feed is stalled, or the cycle that confirms the
+   * all clear hasn't run yet (up to ~20 s). No all clear has been pushed. Show it as still in effect
+   * ("Waiting for lightning data"), never as a countdown at 0 or "All clear".
    * null otherwise (always null for replay and non-lightning alerts).
    */
   held_reason: "lightning_data_delayed" | null;
