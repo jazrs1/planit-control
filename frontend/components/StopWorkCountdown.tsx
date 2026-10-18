@@ -5,6 +5,8 @@ import type { Alert } from "@shared/types";
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import { HELD_TEXT } from "@/lib/alerts";
 
+const CHECKING_TEXT = "Checking for all clear…";
+
 /** `inline`: just the time, for a list row. `boxless`: a large countdown with its label and no border,
  *  for the alerts and site pages. Default: the bordered box. `prominent`: the crew view's sign.
  *  `held`: the backend is holding the stop-work while lightning data is delayed (heldForLightningData):
@@ -48,13 +50,27 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
     ? Math.max(0, Math.ceil((target - now) / 1000))
     : null;
   const unconfirmed = offline;
-  const cleared = seconds === 0 && !offline && !held;
+  const atZero = seconds === 0 && !offline && !held;
+  // A real stop-work ends when the server ends it (the alert goes away and the all clear is pushed), not
+  // when this clock reaches zero: the server may be holding it while lightning data is delayed. Until the
+  // alerts refresh says so, a real countdown at zero is "checking", never a green All clear.
+  const checking = atZero && !replay;
+  const cleared = atZero && !checking;
+  const { refresh } = alertsState;
+  useEffect(() => {
+    if (!checking) return;
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5000);
+    return () => window.clearInterval(timer);
+  }, [checking, refresh]);
   const label = held ? HELD_TEXT : target === null
     ? "Awaiting all-clear"
     : !Number.isFinite(target)
       ? "All-clear time unavailable"
       : unconfirmed
         ? "Not confirmed"
+        : checking
+        ? CHECKING_TEXT
         : cleared
         ? "All clear"
         : seconds === null
@@ -77,27 +93,27 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
   // A compact list row: just the time (or its unknown state), same reset flash.
   if (inline) {
     return (
-      <span className={`whitespace-nowrap px-1 font-mono text-sm font-bold transition-colors duration-300 ${unconfirmed ? "text-muted" : replay ? "text-notice" : cleared ? "text-risk-green" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+      <span className={`whitespace-nowrap px-1 font-mono text-sm font-bold transition-colors duration-300 ${unconfirmed ? "text-muted" : replay ? "text-notice" : checking ? "text-muted" : cleared ? "text-risk-green" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
         <span role="timer" aria-live="off">{label}</span>
-        <span role="status" className="sr-only">{resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : cleared ? "All clear" : ""}</span>
+        <span role="status" className="sr-only">{resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : checking ? CHECKING_TEXT : cleared ? "All clear" : ""}</span>
       </span>
     );
   }
 
   if (boxless) {
     return (
-      <div className={`grid gap-0.5 transition-colors duration-300 ${unconfirmed ? "text-muted" : replay ? "text-notice" : cleared ? "text-risk-green" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+      <div className={`grid gap-0.5 transition-colors duration-300 ${unconfirmed ? "text-muted" : replay ? "text-notice" : checking ? "text-muted" : cleared ? "text-risk-green" : "text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
         <span className="text-xs text-muted">{target === null ? "Stop-work status" : "All-clear countdown"}</span>
         <span role="timer" aria-live="off" className="font-mono text-[2rem] font-semibold leading-none tabular-nums">{label}</span>
         <span role="status" className={resetting || unconfirmed ? "text-sm font-semibold" : "sr-only"}>
-          {resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : cleared ? "All clear" : ""}
+          {resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : checking ? CHECKING_TEXT : cleared ? "All clear" : ""}
         </span>
       </div>
     );
   }
 
   return (
-    <div className={`transition-colors duration-300 ${prominent ? "px-4 py-3" : `border-2 border-current px-3 py-2 ${replay ? "border-dashed" : ""}`} ${replay ? "bg-surface text-notice" : cleared ? "bg-risk-green-bg text-risk-green" : "bg-surface text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
+    <div className={`transition-colors duration-300 ${prominent ? "px-4 py-3" : `border-2 border-current px-3 py-2 ${replay ? "border-dashed" : ""}`} ${replay ? "bg-surface text-notice" : checking ? "bg-surface text-muted" : cleared ? "bg-risk-green-bg text-risk-green" : "bg-surface text-risk-red"} ${resetting ? "stop-work-reset" : ""}`}>
       <span className="pc-label block">
         {target === null ? "Stop-work status" : "All-clear countdown"}
       </span>
@@ -105,7 +121,7 @@ export default function StopWorkCountdown({ all_clear_at, replay, prominent = fa
         {label}
       </span>
       <span role="status" className={resetting || unconfirmed ? "block text-sm font-semibold" : "sr-only"}>
-        {resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : cleared ? "All clear" : ""}
+        {resetting ? "New strike — timer reset" : unconfirmed ? "All clear not confirmed: connection lost" : checking ? CHECKING_TEXT : cleared ? "All clear" : ""}
       </span>
     </div>
   );
