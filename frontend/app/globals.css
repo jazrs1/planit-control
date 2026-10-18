@@ -365,6 +365,29 @@
   .pc-enter > :has(.pc-chip--stop, .pc-chip--flood, [role="timer"], [role="alert"]) { animation: none !important; }
 }
 
+/* Legend and layer-list glyphs that match the map symbols (paths from lib/mapStyle.ts). */
+.pc-glyph-flame {
+  background: var(--pc-fire);
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 1.5C13.6 6.4 19.5 9.2 19.5 15.2 19.5 19.6 16.2 22.5 12 22.5S4.5 19.6 4.5 15.2C4.5 11.6 6.8 9.7 8.2 7.4 8.7 10 10 11.6 11.2 11.9 10.6 8.8 10.9 5.3 12 1.5Z'/></svg>") center / contain no-repeat;
+}
+.pc-glyph-approach {
+  position: relative;
+  display: inline-block;
+  inline-size: 14px;
+  block-size: 14px;
+  border: 1.5px dashed var(--pc-risk-amber-solid);
+  border-radius: var(--pc-radius-pill);
+}
+.pc-glyph-approach::after {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  background: var(--pc-risk-amber);
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M13 2 4 14h7l-1 8 9-12h-7z'/></svg>") center / contain no-repeat;
+}
+.pc-glyph-approach--replay { border-color: var(--pc-notice); }
+.pc-glyph-approach--replay::after { background: var(--pc-notice); }
+
 /* ---------- Map markers (DOM elements made by SiteMap and ReportMap) ---------- */
 
 /* The button stays square so its focus ring isn't clipped; the shape inside carries the risk. */
@@ -424,6 +447,33 @@
   pointer-events: none;
 }
 .site-marker--replay .pc-shape { --pc-shape: var(--pc-notice); }
+/* "Lightning possible": a dashed amber ring and a bolt badge on the site's own marker (blue for a
+   replay advisory). Never a marker of its own: shapes are reserved for site risk. */
+.site-marker--approach::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px dashed var(--pc-risk-amber-solid);
+  border-radius: var(--pc-radius-pill);
+  pointer-events: none;
+}
+.site-marker--approach-replay::before { border-color: var(--pc-notice); }
+.site-marker__bolt {
+  position: absolute;
+  inset-block-start: -8px;
+  inset-inline-end: -8px;
+  display: grid;
+  place-items: center;
+  inline-size: 13px;
+  block-size: 13px;
+  border-radius: var(--pc-radius-pill);
+  background: var(--pc-risk-amber-solid);
+  color: var(--pc-on-risk-amber);
+  box-shadow: 0 0 0 1.5px oklch(1 0 none);
+  pointer-events: none;
+}
+.site-marker__bolt svg { inline-size: 9px; block-size: 9px; }
+.site-marker--approach-replay .site-marker__bolt { background: var(--pc-notice); color: var(--pc-on-notice); }
 .site-marker[hidden] { display: none; }
 
 /* Three brief flashes make a new lightning strike visible without constant motion. */

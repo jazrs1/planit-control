@@ -70,7 +70,7 @@
   /* Replay flashes: blue-tinted like every other replay mark, never the real yellow. */
   --pc-lightning-replay: light-dark(oklch(0.68 0.13 250), oklch(0.74 0.12 250));
   /* Fire detections: a quiet dark orange, never a stop-work red. */
-  --pc-fire: light-dark(oklch(0.56 0.14 48), oklch(0.68 0.14 52));
+  --pc-fire: light-dark(oklch(0.54 0.18 40), oklch(0.68 0.16 45));
 
   /* Basemap, read by components/SiteMap.tsx */
   --pc-map-land: light-dark(oklch(0.955 0 none), oklch(0.24 0.005 250));

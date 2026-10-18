@@ -181,6 +181,11 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // The site list shows the view's states: real in Live, the replay's in Replay (real ones are pinned).
   const rowAlerts = replayView ? shownAlerts : alerts;
   const viewSites = useMemo(() => sites?.map((site) => siteForView(site, viewMode)) ?? null, [sites, viewMode]);
+  // The map keeps a real advisory's ring in Replay view too (real beats replay, like a real stop-work).
+  const mapSites = useMemo(() => sites?.map((site, i) => {
+    const view = viewSites![i];
+    return site.lightning_approach && !site.lightning_approach.replay ? { ...view, lightning_approach: site.lightning_approach } : view;
+  }) ?? null, [sites, viewSites]);
   const lightning = useMemo(() => new Map(rowAlerts.filter((a) => a.type === "lightning").map((a) => [a.site_id, a])), [rowAlerts]);
   // Active stop-work sites first: the hazard index doesn't reflect alerts yet.
   const alertsBySite = useMemo(() => {
@@ -195,6 +200,11 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // Never folded into the low-risk group, in either view: a real alert of any kind or a real advisory.
   const realActive = useMemo(() => new Set([...real.map((a) => a.site_id), ...(sites ?? []).filter((s) => s.lightning_approach && !s.lightning_approach.replay).map((s) => s.id)]), [real, sites]);
   // Real stop-work first, then replay stop-work, then the live index (without replay overrides).
+  // The legend's "Lightning possible" chips, only while the map shows such a ring (a real stop-work hides it).
+  const approachesShown = useMemo(() => {
+    const shown = (mapSites ?? []).filter((site) => site.lightning_approach && !realStops.has(site.id)).map((site) => site.lightning_approach!);
+    return { real: shown.some((a) => !a.replay), replay: shown.some((a) => a.replay) };
+  }, [mapSites, realStops]);
   const sorted = useMemo(() => [...(viewSites ?? [])].sort((a, b) =>
     Number(realStops.has(b.id)) - Number(realStops.has(a.id)) || Number(lightning.has(b.id)) - Number(lightning.has(a.id))
     || liveHazardIndex(b) - liveHazardIndex(a) || a.name.localeCompare(b.name)), [viewSites, lightning, realStops]);
@@ -307,7 +317,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
             <button type="button" onClick={() => setMode("live")} className="pc-link ms-auto min-h-9 text-text">Back to live</button>
           </div>}
           <section ref={map} aria-label="Florida site safety map" className="pc-dash-map relative h-[min(56svh,30rem)] min-h-80 lg:absolute lg:inset-0 lg:h-auto">
-            <SiteMap sites={viewSites ?? sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={mapFlashNowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} firesStale={!demo && (firesFailed || offline)} wildlifeStale={!demo && (wildlifeFailed || offline)} focusKey={focusKey} isReplayFlash={isReplayFlash} realFlashNowMs={realFlashNowMs} callouts />
+            <SiteMap sites={mapSites ?? sites} alerts={alerts} flashes={flashes} cells={cells ?? []} cellsUnconfirmed={cellsUnconfirmed} demo={demo} nowMs={serverNow()} flashNowMs={mapFlashNowMs} selectedId={selectedId} onSelect={selectFromMap} layers={layers} reports={reports} fires={fires} wildlife={wildlife} firesStale={!demo && (firesFailed || offline)} wildlifeStale={!demo && (wildlifeFailed || offline)} focusKey={focusKey} isReplayFlash={isReplayFlash} realFlashNowMs={realFlashNowMs} callouts />
             <details ref={layersPanel} data-map-avoid className="pc-float group absolute inset-bs-3 inset-s-3 z-10 w-60 max-w-[calc(100%-4.5rem)]">
               <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3">
                 <span className="flex items-center gap-2 text-sm font-semibold">
@@ -321,7 +331,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {layerRow("cells", "Storm cells", cellsText, "rounded-pill border border-risk-amber-solid bg-risk-amber-solid/25")}
                 {layerRow("sites", "Sites", `${sites.length} sites`, "rounded-pill bg-muted")}
                 {layerRow("reports", "Crew reports", `${reports.length} ${reports.length === 1 ? "report" : "reports"}`, "rounded-pill bg-brand ring-2 ring-surface outline outline-border")}
-                {layerRow("fires", "Fires", pointsText(fires.length, demo || firesLoaded, !demo && firesFailed, "detections in 24 h"), "bg-fire [clip-path:polygon(50%_5%,100%_95%,0_95%)]")}
+                {layerRow("fires", "Fires", pointsText(fires.length, demo || firesLoaded, !demo && firesFailed, "detections in 24 h"), "pc-glyph-flame")}
                 {layerRow("wildlife", "Wildlife", layers.wildlife ? pointsText(wildlife.length, demo || wildlifeLoaded, !demo && wildlifeFailed, "sightings in 30 days") : "Alligators and venomous snakes", "rounded-pill border-2 border-text bg-surface")}
               </ul>
             </details>
@@ -338,14 +348,17 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               <span className={`flex shrink-0 items-center gap-1.5 ${lightningStale ? "text-muted grayscale" : ""}`}><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning" />{lightningStale ? "Flashes: last known, fade paused" : "Flash"}</span>
               {replayView && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2 rounded-pill bg-lightning-replay" />Replay flash</span>}
               <span role="status" className="flex shrink-0 items-center gap-1.5 text-muted">{demo && "Demo data · "}Storm cells: {cellsText}</span>
-              {layers.fires && fires.length > 0 && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2.5 bg-fire [clip-path:polygon(50%_5%,100%_95%,0_95%)]" />Fire</span>}
+              {approachesShown.real && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="pc-glyph-approach" />Lightning possible</span>}
+              {approachesShown.replay && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="pc-glyph-approach pc-glyph-approach--replay" />Replay: lightning possible</span>}
+              {layers.fires && fires.length > 0 && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="pc-glyph-flame inline-block size-3" />Fire</span>}
               {layers.reports && reports.length > 0 && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2.5 rounded-pill bg-brand ring-2 ring-surface" />Crew report</span>}
               {layers.wildlife && wildlife.length > 0 && <span className="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" className="inline-block size-2.5 rounded-pill border-2 border-text bg-surface" />Wildlife</span>}
               <InfoButton id="legend-help" label="About the map legend">
                 <p><b>Sites:</b> circle low (under 4), triangle elevated (4 to under 7), diamond high (7 and up), octagon stop work. Blue marks are from a storm replay.</p>
                 <p><b>Flashes:</b> last {LIGHTNING_WINDOW_MIN} min, newest brightest. {flashText}.</p>
                 <p><b>Storm cells:</b> circle = cell extent, arrow = motion direction; no arrow = stationary or untracked.</p>
-                <p><b>Fires:</b> last 24 h; faint = seen on one satellite pass. <b>Wildlife:</b> last 30 days.</p>
+                <p><b>Lightning possible:</b> a dashed ring with a bolt around the site&apos;s marker; blue for a replay.</p>
+                <p><b>Fires:</b> flames, last 24 h; faint = seen on one satellite pass. <b>Wildlife:</b> last 30 days.</p>
               </InfoButton>
             </div>
             <div className="w-full max-lg:order-3">
