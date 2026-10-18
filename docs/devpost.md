@@ -1,4 +1,6 @@
-# PlanIT Control: Devpost story (draft)
+# Fieldcast: Devpost story (draft)
+
+Built for Sperry Tech's PlanIT Control challenge at SwampHacks XII.
 
 > Fill in or delete every `TODO` before submitting.
 
@@ -8,7 +10,7 @@ Sperry Tech's PlanIT Control brief starts with a utility crew in the Everglades.
 
 ## What it does
 
-PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **stormsafecrews.us**, with hazard cards for heat, lightning, flooding, soil, wildfire and wildlife.
+Fieldcast watches **55 real Florida power plants** (EIA-860M), live at **stormsafecrews.us**, with hazard cards for heat, lightning, flooding, soil, wildfire and wildlife.
 
 - **Lightning stop-work:** a strike within 10 miles stops work. All clear = 30 minutes after the latest strike; every new strike restarts the countdown.
 - **"Lightning approaching":** a heads-up when a storm is projected to reach a site's 10-mile ring within the hour.
@@ -65,5 +67,5 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
   - The index predicts hazardous weather, not injuries.
   - The forecast misses storms that form overhead.
   - If the lightning feed stalls (NOAA's newest file over 2 minutes old), a stop-work is held: the website shows "Waiting for lightning data", the beacon stays red, and no all-clear goes out until the data is back and the late files are checked. Sites with no stop-work show "unknown" on the beacon, but the website doesn't flag delayed data for them, and the first 2 minutes of a stall look like a quiet feed.
-  - PlanIT supports a supervisor's judgment; it doesn't replace it.
+  - Fieldcast supports a supervisor's judgment; it doesn't replace it.
 - Pilot with a real crew.
