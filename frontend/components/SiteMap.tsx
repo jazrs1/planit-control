@@ -6,7 +6,7 @@ import type { ExpressionSpecification, GeoJSONSource, Map as LibreMap, Marker } 
 import { liveHazardIndex, riskLevel } from "@/lib/risk";
 import { cellIsReplay, cellUnconfirmed, stormCellsGeoJson } from "@/lib/lightning";
 import { formatStrikeDistance } from "@/lib/alerts";
-import { paintBasemap } from "@/lib/mapStyle";
+import { BOLT_PATH, FLAME_PATH, paintBasemap } from "@/lib/mapStyle";
 import { formatAgo } from "@/lib/time";
 import { resolveColor } from "@/lib/themeColor";
 
@@ -44,14 +44,15 @@ export type MapLayers = { lightning: boolean; cells: boolean; sites: boolean; re
 const ALL_LAYERS: MapLayers = { lightning: true, cells: true, sites: true, reports: true, fires: true, wildlife: false };
 
 const NO_REPLAY = () => false;
-/** A 20px (10 CSS px) triangle with a thin light rim, drawn once for the fire layer. */
+/** A 24px (12 CSS px) flame with a thin light rim, drawn once for the fire layer. A flame, not a
+ *  triangle: shapes are reserved for site risk. */
 function fireIcon(color: string): ImageData {
-  const size = 20, canvas = document.createElement("canvas");
+  const size = 24, canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const g = canvas.getContext("2d")!;
-  g.beginPath(); g.moveTo(size / 2, 2); g.lineTo(size - 2, size - 3); g.lineTo(2, size - 3); g.closePath();
-  g.fillStyle = color; g.fill();
-  g.lineWidth = 2; g.strokeStyle = "rgba(255, 255, 255, 0.85)"; g.stroke();
+  const flame = new Path2D(FLAME_PATH);
+  g.lineWidth = 2.5; g.lineJoin = "round"; g.strokeStyle = "rgba(255, 255, 255, 0.9)"; g.stroke(flame);
+  g.fillStyle = color; g.fill(flame);
   return g.getImageData(0, 0, size, size);
 }
 
@@ -175,12 +176,24 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         // waits for the tiles or fades in. The wait and fade go on the shape: MapLibre sets an inline
         // opacity on the marker element itself.
         const pulse = realStop && !pulsedStops.current.has(site.id) ? " site-marker--pulse" : "";
+        // "Lightning possible": no marker of its own, a dashed ring and a bolt badge on the site's own
+        // marker (amber, or blue for a replay advisory). A real stop-work supersedes it.
+        const approach = realStop ? null : site.lightning_approach;
+        const ring = approach ? approach.replay ? " site-marker--approach site-marker--approach-replay" : " site-marker--approach" : "";
         const fade = realStop ? "" : !tilesDone ? " site-marker__shape--waiting" : markersEntered.current ? "" : " site-marker__shape--enter";
-        button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}${pulse}`;
+        button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}${ring}${pulse}`;
         const shape = document.createElement("span");
         shape.className = `pc-shape pc-shape--${stop ? "stop" : riskLevel(liveHazardIndex(site))}${fade}`;
         button.append(shape);
-        button.title = `${site.name}: ${liveHazardIndex(site).toFixed(1)} / 10${stop ? stop.replay ? " · REPLAY lightning stop work" : " · Lightning stop work" : ""}`;
+        if (approach) {
+          const badge = document.createElement("span");
+          badge.className = "site-marker__bolt";
+          badge.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${BOLT_PATH}" fill="currentColor"/></svg>`;
+          button.append(badge);
+        }
+        const state = stop ? stop.replay ? " · REPLAY lightning stop work" : " · Lightning stop work"
+          : approach ? approach.replay ? " · REPLAY lightning possible within the hour" : " · Lightning possible within the hour" : "";
+        button.title = `${site.name}: ${liveHazardIndex(site).toFixed(1)} / 10${state}`;
         button.setAttribute("aria-label", button.title);
         button.setAttribute("aria-pressed", String(site.id === selectedId));
         button.addEventListener("click", () => onSelect(site.id));
@@ -399,7 +412,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     });
   }, [styleLoaded, reports]);
 
-  // Fires: red dots; seen on 2+ passes or high confidence (what the wildfire card calls confirmed) is
+  // Fires: dark-orange flames; seen on 2+ passes or high confidence (what the wildfire card calls confirmed) is
   // larger and solid, a single pass is smaller and faint (it can be a flare or a hot roof).
   useEffect(() => {
     const instance = map.current;
@@ -415,10 +428,10 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
     if (source) { void source.setData(data); return; }
     if (!instance.hasImage("pc-fire")) instance.addImage("pc-fire", fireIcon(resolveColor("--pc-fire")), { pixelRatio: 2 });
     instance.addSource(FIRES_SOURCE, { type: "geojson", data });
-    // Under the site markers and quieter than them: a small dark-orange triangle, never a stop-work red.
+    // Under the site markers and quieter than them: a small dark-orange flame, never a site shape or a stop-work red.
     instance.addLayer({
       id: FIRES_SOURCE, type: "symbol", source: FIRES_SOURCE,
-      layout: { "icon-image": "pc-fire", "icon-size": byZoom(["case", ["get", "confirmed"], 1, 0.75], 0.7), "icon-allow-overlap": true },
+      layout: { "icon-image": "pc-fire", "icon-size": byZoom(["case", ["get", "confirmed"], 1, 0.75], 0.9), "icon-allow-overlap": true },
       paint: { "icon-opacity": ["case", ["get", "confirmed"], 0.9, 0.5] },
     });
   }, [styleLoaded, fires]);
