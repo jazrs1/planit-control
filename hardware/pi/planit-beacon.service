@@ -13,7 +13,7 @@ StartLimitIntervalSec=0
 Type=simple
 User=planit
 SupplementaryGroups=dialout
-ExecStart=/usr/bin/python3 -u /opt/planit-beacon/bridge.py https://api.stormsafecrews.us --site vandolah-power-station --site okeechobee-clean-energy-center
+ExecStart=/usr/bin/python3 -u /opt/planit-beacon/bridge.py https://api.stormsafecrews.us --site osceola-generating-station-fl --site okeechobee-clean-energy-center
 Restart=always
 RestartSec=5
 
