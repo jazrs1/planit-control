@@ -63,25 +63,49 @@ test("advisories use a broad amber heads-up and motion, never ETA or countdown",
   assert.equal(render(Chip, { ...chipProps, stopWork: true }), "");
 });
 
-test("stale and unknown advisories stay visible, grey with ? and Not confirmed; demos are labeled", () => {
-  for (const props of [
-    { ...chipProps, unconfirmed: true },
-    { ...chipProps, nowMs: nowMs + 3 * 60_000 },
-    { ...chipProps, approach: { ...approach, updated_at: "invalid" } },
-  ]) {
-    const html = render(Chip, props);
-    advisory(html);
-    assert.match(html, /unconfirmed/i);
-    assert.doesNotMatch(html, /WITHIN THE HOUR \?/);
-    assert.match(html, /Last known/);
-    assert.match(html, /Not confirmed/);
-    assert.doesNotMatch(html, /text-risk-amber|bg-risk-amber-bg/);
+// The backend holds an advisory for 15 min after its last projection (docs/lightning-forecast.md §4),
+// so updated_at stops moving while the advisory is still active.
+const held = { ...approach, updated_at: new Date(nowMs - 20 * 60_000).toISOString() };
+
+function active(html) {
+  advisory(html);
+  assert.match(html, /bg-risk-amber-bg/);
+  assert.doesNotMatch(html, /Last known|connection lost|Not confirmed|unconfirmed/i);
+}
+function lastKnown(html) {
+  advisory(html);
+  assert.match(html, /Last known · connection lost/);
+  assert.match(html, /Not confirmed/);
+  assert.doesNotMatch(html, /text-risk-amber|bg-risk-amber-bg/);
+}
+
+test("a held advisory stays active while online, however old its updated_at", () => {
+  for (const updated_at of [held.updated_at, new Date(nowMs - 75 * 60_000).toISOString(), new Date(nowMs + 5 * 60_000).toISOString(), "invalid"]) {
+    active(render(Chip, { ...chipProps, approach: { ...approach, updated_at } }));
   }
+  assert.equal(helpers.approachUnconfirmed, undefined, "no age-based staleness for advisories");
+});
+
+test("only a lost connection greys an advisory: Last known · connection lost; demos are labeled", () => {
+  lastKnown(render(Chip, { ...chipProps, unconfirmed: true }));
+  lastKnown(render(Chip, { ...chipProps, approach: held, unconfirmed: true }));
   const demo = render(Chip, { ...chipProps, demo: true, nowMs: nowMs + 86_400_000 });
   assert.match(demo, /Demo data/);
   assert.match(demo, /bg-risk-amber-bg/);
-  assert.equal(helpers.approachUnconfirmed(approach, nowMs), false);
-  assert.equal(helpers.approachUnconfirmed(approach, nowMs - 120_000), true);
+});
+
+test("dashboard row and expanded row: held advisory online vs connection dropped", () => {
+  const Card = load("components/SiteCard.tsx").default;
+  const heldSite = { ...site, lightning_approach: held };
+  const row = render(Card, { site: heldSite, nowMs });
+  assert.match(row, /pc-chip--approach[^>]*>Lightning possible/);
+  assert.doesNotMatch(row, /Last known|pc-chip--unknown/);
+  active(render(Card, { site: heldSite, nowMs, selected: true }));
+  const droppedRow = render(Card, { site: heldSite, nowMs, approachUnconfirmed: true });
+  assert.match(droppedRow, /pc-chip--unknown[^>]*>Lightning possible/);
+  assert.match(droppedRow, /Last known/);
+  assert.doesNotMatch(droppedRow, /pc-chip--approach/);
+  lastKnown(render(Card, { site: heldSite, nowMs, approachUnconfirmed: true, selected: true }));
 });
 
 test("dashboard cards suppress advisories for a stop-work, including last-known stop-work", () => {
@@ -185,6 +209,31 @@ test("crew view shows direction and speed and gives known stop-work priority", (
       if (state.status === "demo") assert.match(html, /Demo data/);
     }
   }
+});
+
+function crewHtml(state, crewDetail) {
+  const driver = hookDriver();
+  const Crew = load("components/CrewView.tsx", modules(state, {
+    react: driver.hooks,
+    "@/lib/useCrewSiteData": { useCrewSiteData: () => ({ detail: crewDetail, detailFailed: false, briefingFailed: false, loading: false }) },
+  })).default;
+  const mode = Crew({ initialSites: [site] });
+  driver.render(mode.type, mode.props);
+  driver.flushEffects();
+  const selected = elements(driver.render(mode.type, mode.props), el => typeof el.type === "function" && el.type.name === "CrewSite")[0];
+  driver.reset();
+  return renderToStaticMarkup(driver.render(selected.type, selected.props));
+}
+
+test("site detail and crew view: held advisory online is active; only a dropped connection greys it", () => {
+  const heldDetail = { ...detail, lightning_approach: held };
+  const offline = { ...baseState, status: "stale", connection: { level: "offline", lastSuccessAt: nowMs } };
+  const Detail = load("components/SiteDetailView.tsx", modules(baseState)).default;
+  active(render(Detail, { siteId: site.id, initialDetail: heldDetail }));
+  const Offline = load("components/SiteDetailView.tsx", modules(offline)).default;
+  lastKnown(render(Offline, { siteId: site.id, initialDetail: heldDetail }));
+  active(crewHtml(baseState, heldDetail));
+  lastKnown(crewHtml(offline, heldDetail));
 });
 
 function distance(a, b) {

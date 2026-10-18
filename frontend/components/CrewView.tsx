@@ -62,7 +62,7 @@ function CrewSite({ site }: { site: Site }) {
     </div>}
     <section aria-label="Selected site safety status" className="space-y-3">
       {lightning && <AlertBanner alert={lightning} site={site} compact prominent unconfirmed={alertsUnknown} />}
-      <LightningApproachChip approach={approach} stopWork={!!lightning} unconfirmed={detailFailed || alertsUnknown || connection.level !== "online"} nowMs={approach?.replay || !replay?.running ? serverNow() : Date.now()} demo={status === "demo"} />
+      <LightningApproachChip approach={approach} stopWork={!!lightning} unconfirmed={detailFailed || alertsUnknown || connection.level !== "online"} demo={status === "demo"} />
       {flood && <AlertBanner alert={flood} site={site} compact prominent flood={detailFailed ? undefined : detail?.conditions.flood} unconfirmed={alertsUnknown} />}
       {!lightning && !flood && (alertsUnknown ? <div role="status" className="pc-panel pc-panel--unknown p-5">
         <h2 className="pc-title pc-title--sign">Safety status unknown</h2>
