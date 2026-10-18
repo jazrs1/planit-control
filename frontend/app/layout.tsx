@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Overpass, Overpass_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { APP_COLORS } from "@/lib/branding";
-import { APP_CREDIT, APP_DESCRIPTION, APP_NAME, APP_TAGLINE, pageMetadata } from "@/lib/metadata";
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, pageMetadata } from "@/lib/metadata";
 import { AlertsProvider } from "@/components/AlertsProvider";
 import { ViewModeProvider } from "@/components/ViewModeProvider";
 import { PushProvider } from "@/components/PushProvider";
@@ -56,7 +56,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <PushProvider>
               <TopNavigation />
               <OutageShell>{children}</OutageShell>
-              <footer className="border-bs border-border px-4 py-5 text-xs text-muted sm:px-6">{APP_NAME} · {APP_CREDIT}</footer>
             </PushProvider>
           </ViewModeProvider>
         </AlertsProvider>

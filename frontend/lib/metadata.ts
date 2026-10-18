@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const APP_NAME = "Fieldcast";
-/** Shown in the footer and on How it works: the challenge this was built for. */
+/** Shown on About and How it works: the challenge this was built for. */
 export const APP_CREDIT = "Built for Sperry Tech's PlanIT Control challenge at SwampHacks XII.";
 /** The one line on the social card and the homepage's link preview. */
 export const APP_TAGLINE = "Live job-site safety for Florida utility crews";
