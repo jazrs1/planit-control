@@ -238,14 +238,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const statusLine = demo
     ? <p role="status" className="flex flex-wrap items-center gap-2 text-sm font-semibold text-muted">
       <span className="pc-chip pc-chip--unknown">Demo data</span>
-      Sample sites, alerts and lightning from shared/mocks · not live conditions
+      Sample sites, alerts and lightning from shared/mocks, not live conditions
       <button type="button" onClick={() => setDemo(false)} className="min-h-11 px-1 text-text underline underline-offset-2 focus-visible:outline-2">Exit demo</button>
     </p>
     : (staleSince || offline) && sites
       ? <p role="status" className="text-sm font-bold text-risk-red">Connection lost · showing data from {timeOfDay(staleSince ?? new Date(connection.lastSuccessAt ?? Date.now()))}</p>
       : sites === null
         ? <p role="status" className="text-sm text-muted">{sitesFailed ? "Not connected to the server" : "Connecting…"}</p>
-        : <p className="flex flex-wrap items-baseline gap-x-2 text-[0.8125rem] text-muted">Florida field operations{updatedAt && <span className="text-xs">Updated {easternTime(updatedAt)}</span>}</p>;
+        : updatedAt && <p className="text-xs text-muted">Updated {easternTime(updatedAt)}</p>;
   // A count is unknown ("—"), last known ("3?", greyed) or current. Solid sign color only when a crew
   // must act: real stop-work above 0 (red), flood risk above 0 (amber).
   const countUnknown = !alertsKnown || alertsStale;
@@ -267,8 +267,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   // A real count or no count: cells we can't confirm are drawn grey and described, never counted with "?".
   // Each view counts its own layer: real in Live, the replay's in Replay. Never mixed.
   const cellCount = cells?.length ?? 0;
-  const cellsText = cells === null ? cellsFailed ? "unavailable · Not confirmed" : "loading…"
-    : cellsUnconfirmed ? "last known · Not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed"
+  const cellsText = cells === null ? cellsFailed ? "unavailable, not confirmed" : "loading…"
+    : cellsUnconfirmed ? "last known, not confirmed" : oldCells ? "quiet for 5 min · motion not confirmed"
     : replayView ? `${cellCount} replay` : `${cellCount} active`;
   // A map layer's count, or why there isn't one: never a "0" for data we couldn't fetch.
   const pointsText = (count: number, loaded: boolean, failed: boolean, unit: string) =>
@@ -276,7 +276,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   const stale = lightningStale ? " · last known" : "";
   const replayFlashCount = replayEnded ? flashes.length : !demo && flashCounts ? flashCounts.replay : allFlashes.filter(isReplayFlash).length;
   const realFlashCount = !demo && flashCounts ? flashCounts.real : allFlashes.length - allFlashes.filter(isReplayFlash).length;
-  const flashText = replayView ? `${replayFlashCount.toLocaleString()} replay${replayEnded ? " · replay ended" : stale}` : `${realFlashCount.toLocaleString()} real${stale}`;
+  const flashText = replayView ? `${replayFlashCount.toLocaleString()} replay${replayEnded ? ", replay ended" : stale}` : `${realFlashCount.toLocaleString()} real${stale}`;
   const fullHeight = "lg:h-[calc(100dvh-var(--pc-nav-height)-var(--pc-outage-height,0px))]";
 
   // Wide screens: the map fills the page and the panels float over it (layers top-left, legend and the
@@ -321,8 +321,8 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {layerRow("cells", "Storm cells", cellsText, "rounded-pill border border-risk-amber-solid bg-risk-amber-solid/25")}
                 {layerRow("sites", "Sites", `${sites.length} sites`, "rounded-pill bg-muted")}
                 {layerRow("reports", "Crew reports", `${reports.length} ${reports.length === 1 ? "report" : "reports"}`, "rounded-pill bg-brand ring-2 ring-surface outline outline-border")}
-                {layerRow("fires", "Fires", pointsText(fires.length, demo || firesLoaded, !demo && firesFailed, "detections · last 24 h"), "bg-fire [clip-path:polygon(50%_5%,100%_95%,0_95%)]")}
-                {layerRow("wildlife", "Wildlife", layers.wildlife ? pointsText(wildlife.length, demo || wildlifeLoaded, !demo && wildlifeFailed, "sightings · last 30 days") : "Alligators and venomous snakes", "rounded-pill border-2 border-text bg-surface")}
+                {layerRow("fires", "Fires", pointsText(fires.length, demo || firesLoaded, !demo && firesFailed, "detections in 24 h"), "bg-fire [clip-path:polygon(50%_5%,100%_95%,0_95%)]")}
+                {layerRow("wildlife", "Wildlife", layers.wildlife ? pointsText(wildlife.length, demo || wildlifeLoaded, !demo && wildlifeFailed, "sightings in 30 days") : "Alligators and venomous snakes", "rounded-pill border-2 border-text bg-surface")}
               </ul>
             </details>
           </section>
@@ -377,14 +377,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 {/* Advisories on one line: they're a heads-up, so they take less room than a stop-work. */}
                 {pinnedAdvisories.length > 0 && <li className="flex flex-wrap items-baseline gap-x-2 rounded-[6px] bg-risk-amber-bg/60 px-3 py-2 text-sm">
                   <span className="pc-label">Live</span><span className="pc-chip pc-chip--approach">Lightning possible</span>
-                  <span className="min-w-0">{pinnedAdvisories.map((site) => site.name).join(" · ")}</span>
+                  <span className="min-w-0">{pinnedAdvisories.map((site) => site.name).join(", ")}</span>
                 </li>}
-                {(!alertsKnown || alertsStale) && <li className="rounded-[6px] border border-dashed border-muted px-3 py-2 text-sm font-semibold text-muted">Live: stop-work status unknown · connection lost</li>}
+                {(!alertsKnown || alertsStale) && <li className="rounded-[6px] border border-dashed border-muted px-3 py-2 text-sm font-semibold text-muted">Live: stop-work status unknown, connection lost</li>}
               </ul>}
               {replayView && <p className="pc-caption">Counts below are live, not the replay.</p>}
               {!alertsKnown && (
                 <p role="status" className="border-2 border-dashed border-muted p-2 text-sm font-bold text-muted">
-                  Stop-work status unknown · can&apos;t load alerts · retrying…
+                  Stop-work status unknown. Can&apos;t load alerts, retrying…
                 </p>
               )}
               {/* "Alerts" is every real active alert (same number as the nav badge); "Stop work" is real
@@ -404,7 +404,7 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
                 contains the cards' absolutely positioned screen-reader text (otherwise the desktop page
                 scrolled into blank space). */}
             {sites.length > 0 && <SiteListFinder sites={sorted} stops={viewStops} unfold={realActive} alertsState={!alertsKnown ? "unknown" : alertsStale ? "stale" : "known"} revealId={selectedId} itemRef={rowRef}
-              listClassName="lg:overflow-y-auto lg:overscroll-contain"
+              listClassName="pc-enter lg:overflow-y-auto lg:overscroll-contain"
               renderSite={(site) => <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
                 onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />} />}
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}

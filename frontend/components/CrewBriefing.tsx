@@ -28,7 +28,7 @@ export default function CrewBriefing({ briefing, site, failed, loading }: { brie
   const go = briefing?.go_status ? GO[briefing.go_status] : null;
   const forecast = briefing && Number.isFinite(briefing.key_numbers.hazard_index) ? briefing.key_numbers.hazard_index : null;
   // Last night's briefing covers today; tonight's (after 6 PM) covers tomorrow.
-  const source = day === "today" ? "Forecast from last night\u2019s briefing" : "Forecast for tomorrow · from tonight\u2019s briefing";
+  const source = day === "today" ? "Forecast from last night\u2019s briefing" : "Forecast for tomorrow, from tonight\u2019s briefing";
   return <section aria-labelledby="briefing-heading" className="pc-panel overflow-clip">
     <h2 id="briefing-heading" className="pc-label flex h-9 items-center border-be border-border px-4 text-xs text-muted">{day === "today" ? "Today\u2019s briefing" : "Tomorrow\u2019s briefing"}</h2>
     <div className={`space-y-3 p-4 ${failed ? "text-muted grayscale" : ""}`}>
@@ -42,7 +42,7 @@ export default function CrewBriefing({ briefing, site, failed, loading }: { brie
           <span className="pc-label text-muted">{source}</span>
           <span className="shrink-0 font-mono text-xl font-bold tabular-nums">{forecast.toFixed(1)}<span className="text-sm text-muted"> / 10</span></span>
         </div>}
-      </> : <p role="status" className="text-lg font-semibold text-muted">{loading ? "Loading briefing…" : "No current briefing"}</p>}
+      </> : loading ? <div role="status" className="space-y-3"><span className="sr-only">Loading briefing…</span><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-24 text-lg" /><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-full text-xl" /><div aria-hidden="true" className="pc-skeleton pc-skeleton--line w-2/3 text-xl" /></div> : <p role="status" className="text-lg font-semibold text-muted">No current briefing</p>}
       {briefing && <p className="text-sm text-muted">Generated {formatAlertTime(briefing.generated_at, site.timezone)}{!current ? ` · Covers ${formatForDate(briefing.for_date)}` : ""}</p>}
       <Link href={`/briefing/${encodeURIComponent(site.id)}`} className="pc-link">{current ? "Read full briefing →" : "View latest briefing →"}</Link>
     </div>

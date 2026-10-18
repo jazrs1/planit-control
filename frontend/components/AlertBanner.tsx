@@ -54,8 +54,8 @@ export default function AlertBanner({ alert, site, flood, compact = false, uncon
             <p className="text-sign font-black leading-none tracking-[0.02em]">
               {alert.replay && <ReplayTag />}{label}
             </p>
-            {unconfirmed && <p className="pc-label mbs-2">Last known · connection lost</p>}
-            {lightning && distance !== null && <p className="pc-label mbs-2 text-base">Lightning {distance} away</p>}
+            {unconfirmed && <p className="pc-label pc-label--sign mbs-2">Last known · connection lost</p>}
+            {lightning && distance !== null && <p className="pc-label pc-label--sign mbs-2 text-base">Lightning {distance} away</p>}
           </div>
         </header>
         {lightning && <div className="border-be-[length:var(--pc-rule-heavy)] border-rule">
