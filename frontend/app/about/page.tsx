@@ -7,11 +7,11 @@ export default function AboutPage() {
   return <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6">
     <header className="flex flex-col gap-2">
       <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em]">About PlanIT Control</h1>
-      <p className="text-muted">Job-site safety for utility field crews.</p>
+      <p className="text-muted">Built for the Sperry Tech challenge at SwampHacks XII.</p>
     </header>
     <section className="pc-panel flex flex-col items-start gap-4 p-6 max-sm:p-5">
-      <h2 className="text-xl font-semibold">Your site, at a glance</h2>
-      <p className="max-w-[68ch]">Check lightning stop-work alerts, flood risk, site readings, crew hazard reports, and next-day briefings. Built for the Sperry Tech challenge at SwampHacks XII.</p>
+      <h2 className="text-xl font-semibold">What it does</h2>
+      <p className="max-w-[68ch]">Lightning stop-work alerts, flood risk, live site readings, crew hazard reports and next-day briefings for 55 Florida power plant sites.</p>
       <Link href="/crew" className="pc-btn pc-btn--primary">Open crew view</Link>
     </section>
     <section className="pc-panel flex flex-col gap-4 p-6 max-sm:p-5">

@@ -225,9 +225,11 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <header className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
         <div className="flex min-w-0 flex-col gap-2">
           <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em] text-balance">{detail.name}</h1>
+          {/* One middle dot per line: the county, then when it was updated. The zone is said once, here. */}
           <p className="text-xs text-muted">
-            {detail.county} County{" · "}Times in {zoneLabel(tz)}{" · "}
-            <span className="whitespace-nowrap">Updated {formatPageTime(detail.updated_at, tz, nowMs)}{nowMs !== null && `, ${formatAgo(Math.max(0, nowMs - Date.parse(detail.updated_at)))}`}</span>
+            {detail.county} County{" · "}
+            <span className="whitespace-nowrap">Updated {formatPageTime(detail.updated_at, tz, nowMs)}{nowMs !== null && ` (${formatAgo(Math.max(0, nowMs - Date.parse(detail.updated_at)))})`}</span>
+            . All times {zoneLabel(tz)}.
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-x-10 gap-y-4" title="Hazard index 0–10: weather model + safety rules">
@@ -236,7 +238,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
           <div className="flex flex-col">
             <span className="text-xs text-muted">Top hazard</span>
             <span className={`text-xl font-semibold leading-[2.5rem] ${connectionLost ? "text-muted" : ""}`}>{HAZARD_LABEL[detail.top_hazard]}</span>
-            <span className="text-xs text-muted">Hazard index, 0–10</span>
+            <span className="text-xs text-muted">Index runs 0 to 10</span>
           </div>
         </div>
       </header>
@@ -244,7 +246,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       {/* Order: real stop-work, real advisory, real flood risk, then unknown; replay tags last. */}
       {alerts === null ? (
         <p role="status" className="rounded-card border-2 border-dashed border-muted px-6 py-4 font-semibold text-muted">
-          Alert status unknown: not connected to the server. Don&apos;t treat this site as clear.
+          Can&apos;t reach the server, so stop-work status is unknown. Don&apos;t treat this site as clear.
         </p>
       ) : realStops.map((alert) => <StopWorkCard key={alert.id} alert={alert} lastKnown={alertsLastKnown} />)}
       {approach && !approach.replay && <LightningApproachChip approach={approach} stopWork={approachStopWork} unconfirmed={connectionLost || alerts === null || alertsLastKnown} nowMs={nowMs === null ? null : !replay?.running ? serverNow() : Date.now()} demo={demo} />}
@@ -265,7 +267,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <section aria-labelledby="nws-heading" className={PANEL}>
         <h2 id="nws-heading" className="text-xs text-muted">National Weather Service</h2>
         {nws == null ? (
-          <p className="text-muted">NWS alerts unavailable for this site.</p>
+          <p className="text-muted">Couldn&apos;t get NWS alerts for this site.</p>
         ) : nws.length === 0 ? (
           <p className="text-muted">No active NWS alerts{connectionLost ? " (last known)" : ""}.</p>
         ) : (
@@ -377,7 +379,7 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
       <section aria-labelledby="factors-heading" className={PANEL}>
         <h2 id="factors-heading" className="text-xs text-muted">What drives today&apos;s index</h2>
         {factors.length === 0 ? (
-          <p className="text-muted">No contributing factors.</p>
+          <p className="text-muted">Nothing is raising today&apos;s index.</p>
         ) : (
           <ul className="flex flex-col gap-4">
             {factors.map((f) => (

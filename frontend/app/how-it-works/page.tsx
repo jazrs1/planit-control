@@ -10,7 +10,7 @@ import { riskLevel } from "@/lib/risk";
 // (hazards/scheduler.py, hazards/sources/*, hazards/risk.py, lightning/*), docs/alert-engine.md
 // and docs/ml-model.md. Model evaluation numbers come from /model/info on each page request.
 
-export const metadata = pageMetadata("How it works", "Data sources, the lightning stop-work rule, the hazard index, honest limits and replay mode.");
+export const metadata = pageMetadata("How it works", "Data sources, the lightning stop-work rule, the hazard index, its limits and replay mode.");
 
 const SECTIONS = [
   { id: "problem", label: "The problem" },
@@ -19,7 +19,7 @@ const SECTIONS = [
   { id: "index", label: "Hazard index" },
   { id: "model", label: "Machine learning model" },
   { id: "briefing", label: "Next-day briefing" },
-  { id: "limits", label: "Honest limits" },
+  { id: "limits", label: "Limits" },
   { id: "replay", label: "Replay mode" },
 ];
 
@@ -46,11 +46,12 @@ const BAND_STYLE = {
 /** One band per example score, via riskLevel(): the same thresholds the whole app uses. */
 const BAND_EXAMPLES: HazardIndex[] = [2, 5, 8];
 
-function Section({ id, title, takeaway, children }: { id: string; title: string; takeaway: string; children: ReactNode }) {
+/** `takeaway` is the section's one-line point; leave it out when it would only restate the title. */
+function Section({ id, title, takeaway, children }: { id: string; title: string; takeaway?: string; children: ReactNode }) {
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="pc-panel scroll-mt-4 p-6 sm:p-8">
       <h2 id={`${id}-title`} className="text-xl font-semibold">{title}</h2>
-      <p className="mbs-1 max-w-[68ch] text-muted">{takeaway}</p>
+      {takeaway && <p className="mbs-1 max-w-[68ch] text-muted">{takeaway}</p>}
       <div className="mbs-6 flex flex-col gap-6">{children}</div>
     </section>
   );
@@ -79,8 +80,8 @@ function Arrow() {
 // Stop-work timeline: minutes after 6:00 PM on a 0-50 minute axis.
 const AXIS_MIN = 50;
 const TIMELINE = [
-  { at: 0, label: "6:00 strike, 6.6 mi", note: "Alert starts · all clear 6:30", kind: "start" },
-  { at: 12, label: "6:12 strike, 3.2 mi", note: "Countdown restarts · all clear 6:42", kind: "reset" },
+  { at: 0, label: "6:00 strike, 6.6 mi", note: "Alert starts; all clear at 6:30", kind: "start" },
+  { at: 12, label: "6:12 strike, 3.2 mi", note: "Countdown restarts; all clear at 6:42", kind: "reset" },
   { at: 5, label: "6:05 strike, file arrives late", note: "Would end at 6:35: ignored, the countdown never gets shorter", kind: "late" },
 ] as const;
 const pct = (min: number) => `${(min / AXIS_MIN) * 100}%`;
@@ -90,13 +91,12 @@ export default async function HowItWorksPage() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 pbs-8 pbe-12 sm:px-6 [&_strong]:font-semibold">
       <header className="flex flex-col gap-2">
-        <p className="text-xs text-muted">How it works</p>
-        <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em] text-balance">One honest picture of every job site&apos;s hazards</h1>
+        <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.015em] text-balance">How 9 data sources become one safety call per site</h1>
         <p className="max-w-[68ch] text-muted">PlanIT Control pulls live hazard data for 55 real Florida power plants, stops work when lightning gets close, and tells supervisors each evening whether tomorrow is go, caution or no-go.</p>
       </header>
 
       <aside aria-labelledby="sixty-title" className="pc-panel flex flex-col gap-4 p-6 sm:p-8">
-        <h2 id="sixty-title" className="text-xs text-muted">In 60 seconds</h2>
+        <h2 id="sixty-title" className="text-xs text-muted">Summary</h2>
         <ul className="flex max-w-[68ch] list-disc flex-col gap-2 ps-5">
           <li><strong>9 data sources</strong>, from satellite lightning every 20 seconds to FEMA flood maps, joined per site.</li>
           <li><strong>Lightning within 10 miles stops work</strong> for 30 minutes, and every new strike restarts the clock. It runs on strike time, so late data can&apos;t end it early.</li>
@@ -118,14 +118,14 @@ export default async function HowItWorksPage() {
         <p>A utility foreman deciding whether a crew should set up a bucket truck tomorrow would need to check a weather app, NWS alerts, a lightning map, FEMA flood maps, fire satellites and whatever the last crew said. Nobody has time for that at 6 AM, so the call is often a gut feeling.</p>
         <div role="img" aria-label="Before: six separate sources lead to a gut call. With PlanIT: the same sources feed one score per site and a go, caution or no-go briefing." className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Box title="Before" tone="muted">Weather app · NWS · lightning map · FEMA · fire satellites · crew texts</Box>
+            <Box title="Before" tone="muted">Weather app, NWS, lightning map, FEMA, fire satellites, crew texts</Box>
             <Arrow />
             <Box title="Gut call" tone="muted">Different every foreman, every day</Box>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Box title="With PlanIT">The same sources, checked automatically for every site</Box>
             <Arrow />
-            <Box title="One score + rules">0–10 hazard index · lightning stop-work</Box>
+            <Box title="One score and rules">0–10 hazard index and lightning stop-work</Box>
             <Arrow />
             <Box title="Go / Caution / No-go" tone="brand">Per site, every evening at 6 PM</Box>
           </div>
@@ -249,7 +249,7 @@ export default async function HowItWorksPage() {
         <p className="max-w-[68ch] text-muted">Claude writes the briefing from the same facts (then Gemini, then a fixed template). Every number and hazard word is checked against the input before it&apos;s sent, and when our rain forecast and the NWS forecast are far apart, the app shows the range instead of the higher one.</p>
       </Section>
 
-      <Section id="limits" title="Honest limits" takeaway="What this system can't tell you, so nobody over-trusts it.">
+      <Section id="limits" title="Limits">
         <ul className="flex flex-col gap-5">
           {[
             { t: "Rainfall is a model estimate.", d: "Open-Meteo rain totals come from weather models, not a rain gauge at the site. Real totals can be higher or lower." },
@@ -287,7 +287,7 @@ export default async function HowItWorksPage() {
           <li>Heat, rain, fire and wildlife stay live during a replay; only lightning is replayed.</li>
         </ul>
         <p>
-          <Link href="/" className="pc-link">Try it: open the dashboard and press ⚡ Replay storm</Link>
+          <Link href="/" className="pc-link">Open the dashboard and press Replay storm</Link>
         </p>
       </Section>
     </main>
