@@ -300,6 +300,31 @@
   .pc-shape--unknown { --pc-shape: var(--pc-text-muted); border-radius: 50%; opacity: 0.6; }
 }
 
+/* A hazard name that links to its card on the site page: a quiet tag, underlined on hover, with a
+   44px tap target on touch screens. Sits above a row's stretched button (see SiteCard). */
+.pc-hazard-tag {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  padding-inline: 0.375rem;
+  border-radius: 4px;
+  background: var(--pc-surface-2);
+  color: var(--pc-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+.pc-hazard-tag:focus-visible { outline: 2px solid var(--pc-notice); outline-offset: 1px; }
+.pc-hazard-tag:active { background: color-mix(in oklch, var(--pc-surface-2), var(--pc-text) 12%); }
+@media (hover: hover) and (pointer: fine) {
+  .pc-hazard-tag:hover { color: var(--pc-text); text-decoration: underline; }
+}
+@media (pointer: coarse) {
+  .pc-hazard-tag::after { content: ""; position: absolute; inset: min(0px, (100% - 44px) / 2); }
+}
+
 /* ---------- Motion: loading and first-load entrance ----------
    Everything here is off under prefers-reduced-motion: content appears directly. Safety elements
    (stop-work signs, alert banners, countdowns, the nav badge, stop-work counts) never use these. */

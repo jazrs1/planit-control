@@ -5,6 +5,7 @@ import AlertBanner from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { replayCleared, replayClearedLabel } from "@/lib/alerts";
+import { hazardHref } from "@/lib/hazardLinks";
 import { HAZARD_LABEL, liveHazardIndex, replayRaised, riskLevel } from "@/lib/risk";
 
 // Reference component: copy this structure for new cards.
@@ -89,10 +90,16 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
     </span>
     {/* The name keeps at least ~12 characters; the status wraps instead. */}
     <span className="min-w-[12ch] flex-1 text-start">
-      <span title={site.name} className={`block text-sm font-semibold leading-tight text-text ${selected ? "" : "truncate"}`}>{site.name}</span>
+      {/* The row toggles from the name's button, stretched over the whole row; the hazard tag is a link
+          above it, so tapping the tag opens that hazard's card without toggling the row. */}
+      {onSelect
+        ? <button type="button" onClick={onSelect} aria-expanded={selected} title={site.name} className="block w-full text-start text-sm font-semibold leading-tight text-text after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-transparent">
+          <span className={`block ${selected ? "" : "truncate"}`}>{site.name}</span>
+        </button>
+        : <span title={site.name} className={`block text-sm font-semibold leading-tight text-text ${selected ? "" : "truncate"}`}>{site.name}</span>}
       <span className="flex min-w-0 items-center gap-2 text-xs font-normal text-muted">
         <span className="truncate">{site.county}</span>
-        <span className="shrink-0 rounded-[4px] bg-surface-2 px-1.5 text-[0.6875rem] leading-normal"><span className="sr-only">Top hazard: </span>{HAZARD_LABEL[site.top_hazard]}</span>
+        <Link href={hazardHref(site.id, site.top_hazard)} className="pc-hazard-tag"><span className="sr-only">Top hazard: </span>{HAZARD_LABEL[site.top_hazard]}</Link>
       </span>
     </span>
     <span className="flex max-w-[55%] items-center justify-end">{status}</span>
@@ -100,9 +107,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
 
   return (
     <article className={`border-s-4 ${edge} ${selected ? "shadow-[inset_0_0_0_2px_var(--pc-notice)]" : ""}`}>
-      {onSelect
-        ? <h2 className="text-base"><button type="button" onClick={onSelect} aria-expanded={selected} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 hover:bg-surface-2/60">{row}</button></h2>
-        : <h2 className="flex min-h-16 items-center gap-3 px-4 py-3 text-base">{row}</h2>}
+      <h2 className={`relative flex min-h-16 items-center gap-3 px-4 py-3 text-base ${onSelect ? "cursor-pointer hover:bg-surface-2/60 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:-outline-offset-2" : ""}`}>{row}</h2>
 
       {selected && <div className="pc-reveal flex flex-col gap-3 px-4 pbe-3">
         {/* Real alerts first; a finished replay stop-work is one neutral line. */}
