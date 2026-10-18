@@ -1,14 +1,7 @@
-import type { LightningApproach, LightningCell } from "@shared/types";
+import type { LightningCell } from "@shared/types";
 
-// Advisories update every 20 s, with a 2 min grace period. Allow a short buffer for site polling.
-const APPROACH_STALE_MS = 3 * 60_000;
 // Cells use the last 5 min of flashes for motion. Older motion is no longer current.
 const CELL_STALE_MS = 5 * 60_000;
-
-export function approachUnconfirmed(approach: LightningApproach, nowMs: number | null): boolean {
-  const updated = Date.parse(approach.updated_at);
-  return !Number.isFinite(updated) || (nowMs !== null && (nowMs - updated > APPROACH_STALE_MS || updated > nowMs + 60_000));
-}
 
 // A replay cell's flashes are hours older than real time (the recorded storm's date).
 const REPLAY_AGE_MS = 3 * 60 * 60_000;

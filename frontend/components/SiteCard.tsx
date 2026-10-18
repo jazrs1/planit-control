@@ -26,10 +26,8 @@ type SiteCardProps = {
   alertsUnconfirmed?: boolean;
   history?: ReactNode;
   approachUnconfirmed?: boolean;
-  /** Backend clock (simulated during a replay), for replay advisories. */
+  /** Backend clock (simulated during a replay), for replay countdowns. */
   nowMs?: number | null;
-  /** Real time, for real advisories: during a replay the backend clock is simulated. Defaults to nowMs. */
-  realNowMs?: number | null;
   demo?: boolean;
   /** Selected: the row expands to its details (alerts, countdown, history, actions). */
   selected?: boolean;
@@ -40,7 +38,7 @@ type SiteCardProps = {
 };
 
 /** One compact row in the ranked site list; the selected row expands to its details. */
-export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, approachUnconfirmed = false, nowMs = null, realNowMs, demo = false, history, selected = false, onSelect, onShowOnMap }: SiteCardProps) {
+export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, approachUnconfirmed = false, nowMs = null, demo = false, history, selected = false, onSelect, onShowOnMap }: SiteCardProps) {
   // The index without replay overrides; a replay-raised index is never shown as real risk.
   const index = liveHazardIndex(site);
   const raised = replayRaised(site, alerts);
@@ -60,7 +58,6 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
   // A real stop-work makes the advisory moot; a replay one never hides a real advisory.
   const approach = !realLightning && site.lightning_approach ? site.lightning_approach : null;
   const realApproach = approach && !approach.replay ? approach : null;
-  const approachNow = site.lightning_approach?.replay ? nowMs : realNowMs ?? nowMs;
   // Unknown after a dropped connection: the tag keeps its state and says so, in words.
   const lastKnown = alertsUnconfirmed && <span className="pc-label text-muted">Last known</span>;
 
@@ -70,7 +67,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
       {lastKnown}
       {!selected && <StopWorkCountdown all_clear_at={realLightning.all_clear_at} replay={false} inline />}
     </span>
-    : realApproach ? <span className="pc-chip pc-chip--approach">Lightning possible</span>
+    : realApproach ? <span className="flex items-center gap-1.5"><span className={`pc-chip ${approachUnconfirmed ? "pc-chip--unknown" : "pc-chip--approach"}`}>Lightning possible</span>{approachUnconfirmed && <span className="pc-label text-muted">Last known</span>}</span>
     : realFlood ? <span className="flex items-center gap-1.5"><span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : "pc-chip--flood"}`}>Flood risk</span>{lastKnown}</span>
     : null;
   // The replay, as a short secondary tag so the site name keeps its room.
@@ -109,7 +106,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
         {[...alerts].sort((a, b) => Number(a.replay) - Number(b.replay)).map((alert) => alert === replayLightning && replayDone
           ? <p key={alert.id} className="text-sm text-muted">{replayClearedLabel(alert, site.timezone)}</p>
           : <AlertBanner key={alert.id} alert={alert} site={site} flood={flood} compact unconfirmed={alertsUnconfirmed} />)}
-        <LightningApproachChip approach={site.lightning_approach} stopWork={!!realLightning} unconfirmed={approachUnconfirmed} nowMs={approachNow} demo={demo} />
+        <LightningApproachChip approach={site.lightning_approach} stopWork={!!realLightning} unconfirmed={approachUnconfirmed} demo={demo} />
         {history}
         <div className="flex flex-wrap gap-x-6">
           <Link href={`/sites/${site.id}`} className="pc-link">Site details →</Link>
