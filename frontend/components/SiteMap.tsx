@@ -172,12 +172,13 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
         button.type = "button";
         // Shape carries the band without color: circle, triangle, diamond; octagon for a stop-work.
         // A replay stop-work gets a dashed blue ring, never the real red halo. A real stop-work never
-        // waits for the tiles or fades in.
-        const motion = realStop ? pulsedStops.current.has(site.id) ? "" : " site-marker--pulse"
-          : !tilesDone ? " site-marker--waiting" : markersEntered.current ? "" : " site-marker--enter";
-        button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}${motion}`;
+        // waits for the tiles or fades in. The wait and fade go on the shape: MapLibre sets an inline
+        // opacity on the marker element itself.
+        const pulse = realStop && !pulsedStops.current.has(site.id) ? " site-marker--pulse" : "";
+        const fade = realStop ? "" : !tilesDone ? " site-marker__shape--waiting" : markersEntered.current ? "" : " site-marker__shape--enter";
+        button.className = `site-marker${stop ? stop.replay ? " site-marker--replay" : " site-marker--lightning" : ""}${pulse}`;
         const shape = document.createElement("span");
-        shape.className = `pc-shape pc-shape--${stop ? "stop" : riskLevel(liveHazardIndex(site))}`;
+        shape.className = `pc-shape pc-shape--${stop ? "stop" : riskLevel(liveHazardIndex(site))}${fade}`;
         button.append(shape);
         button.title = `${site.name}: ${liveHazardIndex(site).toFixed(1)} / 10${stop ? stop.replay ? " · REPLAY lightning stop work" : " · Lightning stop work" : ""}`;
         button.setAttribute("aria-label", button.title);
