@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAlertsState } from "@/components/AlertsProvider";
 import { countAlerts, realAlerts } from "@/lib/alerts";
+import { APP_NAME } from "@/lib/metadata";
 
 const LINKS = [
   { href: "/", label: "Dashboard" },
@@ -60,9 +61,9 @@ export default function TopNavigation() {
   return (
     <nav ref={nav} aria-label="Main navigation" className="sticky inset-bs-0 z-50 h-[calc(var(--pc-nav-height)+env(safe-area-inset-top,0px))] border-be border-border bg-surface pbs-[env(safe-area-inset-top,0px)] text-text">
       <div className="flex h-full items-center gap-3 px-3 sm:px-4">
-        <Link href="/" className="flex min-h-12 shrink-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="PlanIT Control dashboard">
+        <Link href="/" className="flex min-h-12 shrink-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={`${APP_NAME} dashboard`}>
           <img src="/icon.svg" width={30} height={30} alt="" className="shrink-0" />
-          <span className="text-base font-semibold tracking-[-0.01em]">PlanIT<span className="hidden font-normal text-muted sm:inline"> Control</span></span>
+          <span className="text-base font-semibold tracking-[-0.01em]">{APP_NAME}</span>
         </Link>
         <div className="ms-auto hidden items-center gap-0.5 xl:flex">
           {LINKS.filter((link) => link.href !== "/alerts").map((link) => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} className={linkStyle(link.href)}>{link.label}</Link>)}

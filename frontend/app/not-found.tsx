@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { pageMetadata } from "@/lib/metadata";
 
-export const metadata = pageMetadata("Page not found", "This page is unavailable. Return to the PlanIT Control crew view or dashboard.");
+export const metadata = pageMetadata("Page not found", "This page is unavailable. Return to the Fieldcast crew view or dashboard.");
 
 export default function NotFound() {
   return <main className="mx-auto grid min-h-[calc(100svh-var(--pc-nav-height)-8rem)] max-w-xl place-content-center gap-6 px-4 py-12 text-center">

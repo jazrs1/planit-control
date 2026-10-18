@@ -38,7 +38,7 @@ async function main() {
       <rect x="470" width="300" height="630" fill="url(#fade)"/>
       <rect x="72" y="200" width="112" height="112" rx="24" fill="${brand}"/><g transform="translate(72 200) scale(.21875)">${artwork}</g>
       <g font-family="Helvetica Neue,Arial,sans-serif" fill="${brand}">
-        <text x="72" y="392" font-size="64" font-weight="600" letter-spacing="-1">PlanIT Control</text>
+        <text x="72" y="392" font-size="64" font-weight="600" letter-spacing="-1">Fieldcast</text>
         <text x="74" y="446" font-size="30" fill="#5d5a52">Live job-site safety for Florida utility crews</text>
         <text x="74" y="540" font-size="22" fill="#7b776c">stormsafecrews.us</text>
       </g></svg>`;
