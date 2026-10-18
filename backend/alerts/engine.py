@@ -242,7 +242,12 @@ def active_alerts(conn: Connection, now: datetime, replay: bool, site_id: str | 
     all_clear_at against `now`, so an alert whose countdown ended between engine cycles is already
     hidden, except a real lightning alert while the feed isn't current (`current`, default
     feed_current(now)): the engine is holding it, so it's returned with held_reason set."""
-    held = None if replay or (feed_current(now) if current is None else current) else HELD_DATA_DELAYED
+    from lightning import health
+
+    # Held while the feed isn't current, and after a stall until a cycle has cleared (lightning/health.py),
+    # so the recovery window never shows an expired stop-work as ended before its all clear is pushed.
+    current = feed_current(now) if current is None else current
+    held = None if replay or (current and not health.holding(replay=False)) else HELD_DATA_DELAYED
     return conn.execute(
         """SELECT id, site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay,
                   CASE WHEN type = %(type)s AND all_clear_at <= %(now)s THEN %(held)s::text END AS held_reason
@@ -313,7 +318,13 @@ def run(flashes: list, now: datetime, *, replay: bool, feed_ok: bool = True) -> 
     hold = not replay and not (feed_ok and feed_current(now))
     with get_pool().connection() as conn:
         summary = process(conn, flashes, now, load_sites(conn), replay=replay, hold_clears=hold)
-    if summary.changed:
+    released = False
+    if not replay and not hold:
+        from lightning import health
+
+        released = health.holding(replay=False)
+        health.release_hold(replay=False)   # committed with clears allowed: the stall's hold is over
+    if summary.changed or released:
         from app.cache import api_cache
 
         api_cache.invalidate()  # committed: let /alerts and /sites show it on the next request

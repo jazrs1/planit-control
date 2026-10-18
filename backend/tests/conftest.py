@@ -15,3 +15,4 @@ def lightning_feed_current(monkeypatch):
 def lightning_health_not_stalled(monkeypatch):
     """A stall marked by one test (health.mark_stalled) never leaks into the next."""
     monkeypatch.setattr(health, "_stalled", set())
+    monkeypatch.setattr(health, "_holding", set())

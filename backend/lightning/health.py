@@ -18,6 +18,7 @@ STALE_AFTER = timedelta(minutes=2)
 _lock = threading.Lock()
 _last_success: dict[bool, datetime] = {}   # replay? -> clock time of the last successful cycle
 _stalled: set[bool] = set()   # modes whose newest file was too old: not current, but the last success is kept
+_holding: set[bool] = set()   # modes with a stall not yet followed by a clearing engine cycle (alerts/engine.py)
 
 
 def record_success(at: datetime, *, replay: bool) -> None:
@@ -31,6 +32,7 @@ def reset(*, replay: bool) -> None:
     with _lock:
         _last_success.pop(replay, None)
         _stalled.discard(replay)
+        _holding.discard(replay)
 
 
 def mark_stalled(*, replay: bool) -> None:
@@ -38,6 +40,20 @@ def mark_stalled(*, replay: bool) -> None:
     success is kept, so the first cycle after the stall can look back to it for files published late."""
     with _lock:
         _stalled.add(replay)
+        _holding.add(replay)
+
+
+def holding(*, replay: bool) -> bool:
+    """A stall happened and no engine cycle has cleared since: expired alerts stay held, even in the
+    recovery window between the first good cycle and the one that clears and pushes the all clear."""
+    with _lock:
+        return replay in _holding
+
+
+def release_hold(*, replay: bool) -> None:
+    """An engine cycle ran with clears allowed and committed: the hold is over."""
+    with _lock:
+        _holding.discard(replay)
 
 
 def last_success(*, replay: bool) -> datetime | None:

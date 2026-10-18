@@ -336,6 +336,25 @@ def test_recovery_without_new_strikes_clears_and_pushes_the_all_clear(conn, monk
     assert _held(conn, T0 + 46 * MIN) == []
 
 
+def test_recovery_window_keeps_the_stop_work_held_until_the_clearing_cycle(conn, monkeypatch):
+    """After a stall the first good cycle makes the feed current again, but the expired stop-work must stay
+    listed and held until the next cycle clears it and pushes the all clear: never shown as ended early."""
+    from lightning import health
+    monkeypatch.setattr(engine, "feed_current", lambda now: True)
+    cycle(conn, [flash(SITE_A, 5.0, T0)], now=T0 + MIN)
+    health.mark_stalled(replay=False)                                  # stall: hold starts
+    engine.process(conn, [], T0 + 31 * MIN, SITES, hold_clears=True)   # countdown ran out, held
+    # Recovery: the feed is current again (first good cycle recorded) but nothing has cleared yet.
+    health.record_success(T0 + 45 * MIN, replay=False)
+    assert _held(conn, T0 + 45 * MIN) == [(SITE_A.id, engine.HELD_DATA_DELAYED)]
+    assert _held(conn, T0 + 45 * MIN + timedelta(seconds=15)) == [(SITE_A.id, engine.HELD_DATA_DELAYED)]
+    # The clearing cycle ends it and releases the hold.
+    summary = engine.process(conn, [], T0 + 46 * MIN, SITES)
+    health.release_hold(replay=False)
+    assert summary.cleared == [SITE_A.id] and _held(conn, T0 + 46 * MIN) == []
+    assert not health.holding(replay=False)
+
+
 def test_recovery_with_late_strikes_extends_or_restarts_as_usual(conn):
     cycle(conn, [flash(SITE_A, 5.0, T0), flash(SITE_B, 5.0, T0, direction=1)], now=T0 + MIN)
     engine.process(conn, [], T0 + 31 * MIN, SITES, hold_clears=True)     # both held
