@@ -71,7 +71,8 @@ export default function ReportsView({ initialReports, sites }: { initialReports:
         <ul className="pc-enter grid items-start gap-4 sm:grid-cols-2">
           {sorted.map((report) => {
             const site = report.site_id ? sitesById.get(report.site_id) : undefined;
-            const time = new Intl.DateTimeFormat("en-US", { timeZone: site?.timezone ?? "UTC", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(report.created_at));
+            // No site chosen: Eastern time (most sites), with the zone shown, never UTC.
+            const time = new Intl.DateTimeFormat("en-US", { timeZone: site?.timezone ?? "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(report.created_at));
             return <li key={report.id} ref={(element) => { if (element) rows.current.set(report.id, element); else rows.current.delete(report.id); }}>
               <article className={`flex flex-col gap-4 rounded-card bg-surface p-6 shadow-card max-sm:p-5 ${selectedId === report.id ? "outline-2 outline-notice" : ""}`}>
                 <div className="flex items-start gap-4">
