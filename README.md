@@ -99,6 +99,6 @@ curl -X POST localhost:8000/replay/start -H "X-Admin-Token: $ADMIN_TOKEN" -H "co
 
 Or press **Replay storm** on the dashboard.
 
-**Tests:** `cd backend && pip install -r requirements-dev.txt && python -m pytest` (database tests need `DATABASE_URL` and roll back), and `cd frontend && npm run typecheck`.
+**Tests:** `cd backend && pip install -r requirements-dev.txt && python -m pytest` (database tests need `DATABASE_URL` and roll back), and `cd frontend && npm run typecheck && node --test tests/*.test.cjs`.
 
 Project rules and conventions for contributors: [`CLAUDE.md`](CLAUDE.md).
