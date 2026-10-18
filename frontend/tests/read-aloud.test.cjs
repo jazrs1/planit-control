@@ -42,27 +42,50 @@ test("unknown is never all clear: it says the connection was lost, once", () => 
   assert.deepEqual(say(stopped, readAloudState(site, [], "live", null, NOW), true), ["All clear at Big Bend. Stop work has ended."]);
 });
 
-test("replay alerts are prefixed, and a replay ending is never an all clear", () => {
-  const before = readAloudState(site, [], "live", null, NOW, true);
-  const replay = readAloudState(site, [stop({ replay: true })], "live", null, NOW, true);
+test("in Replay view, replay alerts are prefixed, and a replay ending is never an all clear", () => {
+  const before = readAloudState(site, [], "live", null, NOW, true, "replay");
+  const replay = readAloudState(site, [stop({ replay: true })], "live", null, NOW, true, "replay");
   assert.deepEqual(say(before, replay), ["Replay: Stop work at Big Bend. Lightning 3.2 miles away."]);
   // Its countdown ran out on the replay clock while the replay goes on.
-  const cleared = readAloudState(site, [stop({ replay: true })], "live", null, Date.parse("2026-10-17T20:41:00Z"), true);
+  const cleared = readAloudState(site, [stop({ replay: true })], "live", null, Date.parse("2026-10-17T20:41:00Z"), true, "replay");
   assert.deepEqual(say(replay, cleared), ["Replay: Stop work ended at Big Bend."]);
   // The replay was stopped partway: its stop-work and flood risk vanish together, said once.
-  const both = readAloudState(site, [stop({ replay: true }), stop({ id: "a2", type: "flood", replay: true })], "live", null, NOW, true);
-  const stoppedReplay = readAloudState(site, [], "live", null, NOW, false);
+  const both = readAloudState(site, [stop({ replay: true }), stop({ id: "a2", type: "flood", replay: true })], "live", null, NOW, true, "replay");
+  const stoppedReplay = readAloudState(site, [], "live", null, NOW, false, "replay");
   assert.deepEqual(say(both, stoppedReplay), ["Replay ended at Big Bend."]);
   for (const line of [...say(replay, cleared), ...say(both, stoppedReplay)]) assert.doesNotMatch(line, /All clear/);
 });
 
-test("a lightning advisory is spoken, and a replay stop-work doesn't hide a real one", () => {
-  const before = readAloudState(site, [], "live", null, NOW);
-  const advisory = readAloudState(site, [stop({ replay: true })], "live", approach(), NOW);
+test("a lightning advisory is spoken, and in Replay view a replay stop-work doesn't hide a real one", () => {
+  const before = readAloudState(site, [], "live", null, NOW, true, "replay");
+  const advisory = readAloudState(site, [stop({ replay: true })], "live", approach(), NOW, true, "replay");
   assert.deepEqual(say(before, advisory), ["Lightning possible within the hour at Big Bend.", "Replay: Stop work at Big Bend. Lightning 3.2 miles away."]);
   // A real stop-work replaces the advisory; the advisory ending says nothing.
   const stopped = readAloudState(site, [stop()], "live", approach(), NOW);
   assert.deepEqual(say(readAloudState(site, [], "live", approach(), NOW), stopped), ["Stop work at Big Bend. Lightning 3.2 miles away."]);
+});
+
+test("Live view never speaks replay alerts; real ones are spoken in both views", () => {
+  const replayStop = stop({ id: "r1", replay: true });
+  const replayAdvisory = approach({ replay: true });
+  // Live view: a replay stop-work, flood risk and advisory say nothing, starting or ending.
+  const before = readAloudState(site, [], "live", null, NOW, true, "live");
+  const replayOnly = readAloudState(site, [replayStop, stop({ id: "r2", type: "flood", replay: true })], "live", replayAdvisory, NOW, true, "live");
+  assert.equal(replayOnly.items.size, 0);
+  assert.deepEqual(say(before, replayOnly), []);
+  assert.deepEqual(say(replayOnly, readAloudState(site, [], "live", null, NOW, false, "live")), []);
+  // A real stop-work during a replay is spoken in Live view, with no prefix, and so is its all clear.
+  const realStop = readAloudState(site, [stop(), replayStop], "live", null, NOW, true, "live");
+  assert.deepEqual(say(replayOnly, realStop), ["Stop work at Big Bend. Lightning 3.2 miles away."]);
+  assert.deepEqual(say(realStop, readAloudState(site, [replayStop], "live", null, NOW, true, "live")), ["All clear at Big Bend. Stop work has ended."]);
+  // Replay view: the same real stop-work, then the replay's with the prefix.
+  const replayView = readAloudState(site, [stop(), replayStop], "live", null, NOW, true, "replay");
+  assert.deepEqual(say(readAloudState(site, [], "live", null, NOW, true, "replay"), replayView),
+    ["Stop work at Big Bend. Lightning 3.2 miles away.", "Replay: Stop work at Big Bend. Lightning 3.2 miles away."]);
+  // Switching views isn't a change: into Replay announces what the replay has now; back to Live says
+  // nothing ended (no "Replay ended", never "All clear").
+  assert.deepEqual(say(realStop, replayView), ["Replay: Stop work at Big Bend. Lightning 3.2 miles away."]);
+  assert.deepEqual(say(replayView, realStop), []);
 });
 
 test("only the selected site is spoken", () => {

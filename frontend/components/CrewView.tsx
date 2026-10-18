@@ -11,12 +11,12 @@ import LightningApproachChip from "@/components/LightningApproachChip";
 import CrewReadings from "@/components/CrewReadings";
 import ReadAloudToggle from "@/components/ReadAloudToggle";
 import CrewBriefing from "@/components/CrewBriefing";
+import CrewSitePicker from "@/components/CrewSitePicker";
 import PushSettings from "@/components/PushSettings";
 import { DEMO_DATA, getSites } from "@/lib/api";
 import { chooseCrewSite, hasReading, rememberedSite, rememberSite } from "@/lib/crew";
 import { HAZARD_LABEL, liveHazardIndex, riskLevel } from "@/lib/risk";
 import { formatAlertTime, replayCleared, replayClearedLabel } from "@/lib/alerts";
-import { timeZoneName } from "@/lib/time";
 import { useCrewSiteData } from "@/lib/useCrewSiteData";
 import { usePolling } from "@/lib/usePolling";
 
@@ -116,12 +116,8 @@ function CrewModeView({ initialSites, demo }: { initialSites: Site[] | null; dem
     <header><h1 className="pc-title pc-title--sign">Crew view</h1><p className="mbs-1 font-semibold text-muted">Your site, at a glance.</p></header>
     {demo && <div role="status" className="rounded-card border-2 border-rule bg-surface p-4 font-semibold text-muted">Demo data · sample conditions, not live safety data. <button type="button" onClick={() => setDemo(false)} className="min-h-12 px-2 text-brand underline">Exit demo</button></div>}
     <div className="pc-panel p-4">
-      <label htmlFor="crew-site" className="pc-label block text-sm">Your site</label>
-      <select id="crew-site" value={selected?.id ?? ""} disabled={!sites?.length || !storageReady} onChange={(event) => setPreferred(event.target.value)} className="mbs-2 min-h-14 w-full min-w-0 rounded-card border-2 border-border-strong bg-surface px-3 text-lg font-semibold text-text focus-visible:outline-2 focus-visible:outline-brand">
-        {!selected && <option value="">{sites === null ? "Sites unavailable" : "Choose a site"}</option>}
-        {[...(sites ?? [])].sort((a, b) => a.name.localeCompare(b.name)).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
-      </select>
-      {selected && <p className="mbs-2 text-sm text-muted">{selected.county} County · {timeZoneName(selected.timezone)}</p>}
+      {/* Type to search, or "Use my location" (the nearest plant, worked out on this device). */}
+      <CrewSitePicker sites={sites} selectedId={selected?.id ?? null} onSelect={setPreferred} disabled={!storageReady} />
       {sitesFailed && sites !== null && <p role="status" className="mbs-2 font-medium text-muted">Site list not confirmed · showing the last loaded sites.</p>}
     </div>
     {selected ? <CrewSite key={selected.id} site={selected} /> : <section role="status" className="space-y-3 rounded-card border-2 border-rule bg-surface p-5 text-muted">

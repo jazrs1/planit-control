@@ -5,6 +5,7 @@ import type { FireDetection, HazardReport, LightningCell, LightningFlash, Site, 
 import { useAlertsState, useServerNow } from "@/components/AlertsProvider";
 import ReplayTimeline from "@/components/ReplayTimeline";
 import SiteCard from "@/components/SiteCard";
+import SiteListFinder from "@/components/SiteListFinder";
 import SiteScoreHistory from "@/components/SiteScoreHistory";
 import InfoButton from "@/components/InfoButton";
 import { useViewMode } from "@/components/ViewModeProvider";
@@ -31,8 +32,6 @@ const REPLAY_FLASH_AGE_MS = 3 * 60 * 60_000;
 /** FIRMS is polled every 30 min on the server and iNaturalist every 6 h: no need to ask more often. */
 const FIRES_MS = 5 * 60_000;
 const WILDLIFE_MS = 30 * 60_000;
-/** On a phone the list starts with the top sites; "Show all" reveals the rest. */
-const PHONE_SITES = 10;
 
 function timeOfDay(date: Date) {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -190,6 +189,9 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
     return map;
   }, [rowAlerts]);
   const realStops = useMemo(() => new Set(real.filter((a) => a.type === "lightning").map((a) => a.site_id)), [real]);
+  // The list's "Stop work" filter: the sites whose row shows a stop-work in this view (real in Live; the
+  // replay's in Replay, and every real one too, so live safety is never filtered away).
+  const viewStops = useMemo(() => new Set([...realStops, ...lightning.keys()]), [realStops, lightning]);
   // Real stop-work first, then replay stop-work, then the live index (without replay overrides).
   const sorted = useMemo(() => [...(viewSites ?? [])].sort((a, b) =>
     Number(realStops.has(b.id)) - Number(realStops.has(a.id)) || Number(lightning.has(b.id)) - Number(lightning.has(a.id))
@@ -207,22 +209,29 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
   usePolling(pollFires, demo || liveSites === null || !layers.fires ? null : FIRES_MS);
   usePolling(pollWildlife, demo || liveSites === null || !layers.wildlife ? null : WILDLIFE_MS);
   const map = useRef<HTMLElement>(null);
-  const [showAll, setShowAll] = useState(false);
   const replayTimeline = useReplayTimeline(replay?.window ?? null, !demo && replaying ? REPLAY_MS : null);
   const layersPanel = useRef<HTMLDetailsElement>(null);
   // Layers start open on a wide screen and collapsed on a phone.
   const [scrollTo, setScrollTo] = useState<string | null>(null);
+  // A row picked on the map may be inside the folded low-risk group: the list opens it, and the row is
+  // scrolled to as soon as it renders.
+  const pendingScroll = useRef<string | null>(null);
   const selectFromMap = useCallback((id: string) => {
-    // On a phone the row may be past the top 10: show them all, then scroll once it has rendered.
-    setShowAll(true);
     setSelectedId(id);
+    pendingScroll.current = id;
     setScrollTo(id);
   }, []);
   useEffect(() => {
     if (!scrollTo) return;
-    rows.current.get(scrollTo)?.scrollIntoView({ block: "nearest" });
+    const row = rows.current.get(scrollTo);
+    if (row) { row.scrollIntoView({ block: "nearest" }); pendingScroll.current = null; }
     setScrollTo(null);
-  }, [scrollTo, showAll]);
+  }, [scrollTo]);
+  const rowRef = useCallback((id: string, element: HTMLLIElement | null) => {
+    if (!element) { rows.current.delete(id); return; }
+    rows.current.set(id, element);
+    if (pendingScroll.current === id) { pendingScroll.current = null; element.scrollIntoView({ block: "nearest" }); }
+  }, []);
 
   const statusLine = demo
     ? <p role="status" className="flex flex-wrap items-center gap-2 text-sm font-semibold text-muted">
@@ -388,15 +397,14 @@ export default function SupervisorDashboard({ initialSites }: { initialSites: Si
               {alertsStale && <p role="status" className="text-xs font-semibold text-muted">? = last known before the connection was lost</p>}
 
             </div>
-            {/* relative: contains the cards' absolutely positioned screen-reader text, which otherwise escapes
-                the scrolling list and stretches the page (the desktop page scrolled into blank space). */}
-            <ul className="relative divide-y divide-border/70 lg:overflow-y-auto lg:overscroll-contain">
-              {sorted.map((site, index) => <li key={site.id} className={!showAll && index >= PHONE_SITES ? "max-lg:hidden" : ""} ref={(el) => { if (el) rows.current.set(site.id, el); else rows.current.delete(site.id); }}>
-                <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} realNowMs={replaying ? Date.now() : serverNow()} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
-                  onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />
-              </li>)}
-            </ul>
-            {!showAll && sorted.length > PHONE_SITES && <div className="p-4 lg:hidden"><button type="button" onClick={() => setShowAll(true)} className="pc-btn pc-btn--quiet w-full">Show all {sorted.length} sites</button></div>}
+            {/* Search, risk filters and the folded low-risk group replace the phone's "Show all" limit. The
+                list keeps this order and these rows; it only decides which rows show. Its relative list
+                contains the cards' absolutely positioned screen-reader text (otherwise the desktop page
+                scrolled into blank space). */}
+            {sites.length > 0 && <SiteListFinder sites={sorted} stops={viewStops} alertsState={!alertsKnown ? "unknown" : alertsStale ? "stale" : "known"} revealId={selectedId} itemRef={rowRef}
+              listClassName="lg:overflow-y-auto lg:overscroll-contain"
+              renderSite={(site) => <SiteCard site={site} alerts={alertsBySite.get(site.id) ?? []} realNowMs={replaying ? Date.now() : serverNow()} flood={floodConditions[site.id]} alertsUnconfirmed={alertsStale} approachUnconfirmed={!demo && (sitesFailed || offline || !alertsKnown || alertsStale)} nowMs={serverNow()} demo={demo} history={<SiteScoreHistory site={site} compact lazy unconfirmed={!demo && (sitesFailed || offline)} />} selected={selectedId === site.id} onSelect={() => setSelectedId((current) => current === site.id ? null : site.id)}
+                onShowOnMap={() => { setSelectedId(site.id); setFocusKey((key) => key + 1); if (!window.matchMedia("(min-width: 64rem)").matches) map.current?.scrollIntoView({ block: "start" }); }} />} />}
             {sites.length === 0 && <p className="p-4 text-sm text-muted">No sites available.</p>}
           </section>
         </>
