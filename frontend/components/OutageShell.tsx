@@ -37,7 +37,7 @@ export default function OutageShell({ children }: { children: ReactNode }) {
   return (
     <>
       {outage && (
-        <div ref={banner} role="alert" className="sticky inset-bs-0 z-40 border-be-2 border-risk-red bg-risk-red-solid px-4 py-3 text-on-risk-red">
+        <div ref={banner} role="alert" className="sticky inset-bs-[calc(var(--pc-nav-height)+env(safe-area-inset-top,0px))] z-40 border-be-2 border-risk-red bg-risk-red-solid px-4 py-3 text-on-risk-red">
           <div className="mx-auto max-w-5xl">
             <p className="text-lg font-bold">Status unknown. Don&apos;t treat any site as clear.</p>
             <p className="text-sm">

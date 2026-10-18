@@ -73,6 +73,8 @@
   :root {
     /* Lets height animate to auto (disclosures below). */
     interpolate-size: allow-keywords;
+    /* In-page links (#hazard-flooding) land below the sticky top bar. */
+    scroll-padding-block-start: calc(var(--pc-nav-height) + env(safe-area-inset-top, 0px) + 0.75rem);
     text-wrap: pretty;
     overflow-wrap: break-word;
     font-synthesis: none;
