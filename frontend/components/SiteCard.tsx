@@ -5,7 +5,7 @@ import AlertBanner from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
 import { replayCleared, replayClearedLabel } from "@/lib/alerts";
-import { hazardHref } from "@/lib/hazardHref";
+import { hazardHref } from "@/lib/hazardLinks";
 import { HAZARD_LABEL, liveHazardIndex, replayRaised, riskLevel } from "@/lib/risk";
 
 // Reference component: copy this structure for new cards.
