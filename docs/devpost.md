@@ -64,5 +64,6 @@ PlanIT Control watches **55 real Florida power plants** (EIA-860M), live at **st
   - Fire detection depends on a few satellite passes a day.
   - The index predicts hazardous weather, not injuries.
   - The forecast misses storms that form overhead.
+  - If the lightning feed stalls, the beacon switches to "unknown" after 2 minutes, but the website doesn't yet say lightning data is delayed.
   - PlanIT supports a supervisor's judgment; it doesn't replace it.
 - Pilot with a real crew.
