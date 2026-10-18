@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" className={`${overpass.variable} ${overpassMono.variable}`}>
-      <body className="min-h-svh pbs-[env(safe-area-inset-top,0px)] pe-[env(safe-area-inset-right,0px)] pbe-[env(safe-area-inset-bottom,0px)] ps-[env(safe-area-inset-left,0px)] antialiased">
+      <body className="min-h-svh pe-[env(safe-area-inset-right,0px)] pbe-[env(safe-area-inset-bottom,0px)] ps-[env(safe-area-inset-left,0px)] antialiased">
         <AlertsProvider initialAlerts={alerts}>
           <ViewModeProvider>
             <PushProvider>

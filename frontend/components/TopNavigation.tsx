@@ -58,7 +58,7 @@ export default function TopNavigation() {
   const linkStyle = (href: string) => `flex min-h-10 items-center px-2.5 text-[0.8125rem] font-bold tracking-[0.02em] focus-visible:outline-2 focus-visible:outline-offset-2 ${pathname === href ? "text-text shadow-[inset_0_-2px_0_currentColor]" : "text-muted hover:text-text"}`;
 
   return (
-    <nav ref={nav} aria-label="Main navigation" className="relative z-50 h-(--pc-nav-height) border-be border-border bg-surface text-text">
+    <nav ref={nav} aria-label="Main navigation" className="sticky inset-bs-0 z-50 h-[calc(var(--pc-nav-height)+env(safe-area-inset-top,0px))] border-be border-border bg-surface pbs-[env(safe-area-inset-top,0px)] text-text">
       <div className="flex h-full items-center gap-3 px-3 sm:px-4">
         <Link href="/" className="flex min-h-12 shrink-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="PlanIT Control dashboard">
           <img src="/icon.svg" width={30} height={30} alt="" className="shrink-0" />
