@@ -121,6 +121,9 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
   // Markers fade in once, after the first tiles; each real stop-work pulses once, when it begins.
   const markersEntered = useRef(false);
   const pulsedStops = useRef(new Set<string>());
+  // Tiles that never load nor fail (a hung tile server) must not hide the sites: show markers after 3 s.
+  const [tileWaitOver, setTileWaitOver] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setTileWaitOver(true), 3000); return () => window.clearTimeout(timer); }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -159,7 +162,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       // One stop-work per site, the real one when a site has both (a real stop-work never looks like a replay).
       const lightning = new Map<string, Alert>();
       for (const a of alerts) if (a.type === "lightning" && (!lightning.has(a.site_id) || !a.replay)) lightning.set(a.site_id, a);
-      const tilesDone = painted || error;
+      const tilesDone = painted || error || tileWaitOver;
       const realStops = new Set<string>();
       for (const site of sites) {
         const stop = lightning.get(site.id);
@@ -187,7 +190,7 @@ export default function SiteMap({ sites, alerts, flashes, cells, cellsUnconfirme
       pulsedStops.current = realStops;
     });
     return () => { disposed = true; };
-  }, [ready, sites, alerts, onSelect, selectedId, layers.sites, painted, error]);
+  }, [ready, sites, alerts, onSelect, selectedId, layers.sites, painted, error, tileWaitOver]);
 
   useEffect(() => {
     const instance = map.current;
