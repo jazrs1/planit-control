@@ -51,7 +51,7 @@ How the pieces work: [alert engine](docs/alert-engine.md), [lightning forecast](
 - The lightning forecast was tested on one storm, which we also tuned on. It misses storms that form overhead, and its arrival estimates run late, so the app never shows an arrival countdown.
 - Satellite lightning positions are accurate to about 8–14 km, and the 10-mile radius has no extra margin yet.
 - Rainfall is a model estimate. Fire detection depends on a few satellite passes a day and ignores anything within 1 km of a site or a Florida thermal plant, so a real fire there would be missed.
-- If the lightning feed stalls, the beacon switches to "unknown" after 2 minutes, but the website doesn't yet say lightning data is delayed.
+- If the lightning feed stalls (NOAA's newest file over 2 minutes old), a stop-work is held: the website shows "Waiting for lightning data", the beacon stays red, and no all-clear goes out until the data is back and the late files are checked. Sites with no stop-work show "unknown" on the beacon, but the website doesn't flag delayed data for them, and the first 2 minutes of a stall look like a quiet feed.
 - PlanIT supports a supervisor's judgment; it doesn't replace it.
 
 Numbers and details: [`docs/devpost.md`](docs/devpost.md) and [`docs/ml-model.md`](docs/ml-model.md).
