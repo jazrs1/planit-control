@@ -4,7 +4,11 @@ Rules (Sperry brief):
   - A flash within 10 miles of a site starts a stop-work alert for that site.
   - all_clear_at = time of the most recent qualifying strike + 30 minutes.
   - Every newer qualifying strike resets the countdown.
-  - Once `now` passes all_clear_at, the alert is cleared.
+  - Once `now` passes all_clear_at, the alert is cleared, but only while the live lightning feed is
+    current (lightning/health.py). While it isn't, a real alert whose countdown ran out is held: it stays
+    active, GET /alerts shows it with held_reason "lightning_data_delayed", and no all clear is pushed.
+    The first cycle after the feed recovers ingests the backlog (strikes extend or restart as usual) and
+    still holds; the next one clears what's still expired. Replay alerts are never held.
 
 Two principles make this correct with late files, out-of-order files, and replay:
   - Countdowns come from strike times, never from when the engine happened to see them.
@@ -27,6 +31,7 @@ log = logging.getLogger(__name__)
 STOP_WORK_RADIUS_MI = 10.0
 ALL_CLEAR_AFTER = timedelta(minutes=30)
 ALERT_TYPE = "lightning"
+HELD_DATA_DELAYED = "lightning_data_delayed"
 EARTH_RADIUS_MI = 3958.8
 
 
@@ -224,17 +229,30 @@ def load_active_alerts(conn: Connection, site_ids: list[str], replay: bool) -> d
     return {r["site_id"]: ActiveAlert(**r) for r in rows}
 
 
-def active_alerts(conn: Connection, now: datetime, replay: bool, site_id: str | None = None) -> list[dict]:
-    """Alerts in effect at `now` (any type), newest first. Also checks all_clear_at against
-    `now`, so an alert whose countdown ended between engine cycles is already hidden."""
+def feed_current(now: datetime) -> bool:
+    """The live lightning feed's last successful cycle is under 2 minutes old (the beacon's check)."""
+    from lightning import health
+
+    return health.is_current(now, replay=False)
+
+
+def active_alerts(conn: Connection, now: datetime, replay: bool, site_id: str | None = None,
+                  current: bool | None = None) -> list[dict]:
+    """Alerts in effect at `now` (any type), newest first, each with held_reason. Also checks
+    all_clear_at against `now`, so an alert whose countdown ended between engine cycles is already
+    hidden, except a real lightning alert while the feed isn't current (`current`, default
+    feed_current(now)): the engine is holding it, so it's returned with held_reason set."""
+    held = None if replay or (feed_current(now) if current is None else current) else HELD_DATA_DELAYED
     return conn.execute(
-        """SELECT id, site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay
+        """SELECT id, site_id, type, started_at, all_clear_at, last_strike_at, last_strike_distance_mi, replay,
+                  CASE WHEN type = %(type)s AND all_clear_at <= %(now)s THEN %(held)s::text END AS held_reason
            FROM alerts
            WHERE status = 'active' AND replay = %(replay)s
-             AND (all_clear_at IS NULL OR all_clear_at > %(now)s)
+             AND (all_clear_at IS NULL OR all_clear_at > %(now)s
+                  OR (type = %(type)s AND %(held)s::text IS NOT NULL))
              AND (%(site)s::text IS NULL OR site_id = %(site)s)
            ORDER BY started_at DESC""",
-        {"replay": replay, "now": now, "site": site_id},
+        {"replay": replay, "now": now, "site": site_id, "type": ALERT_TYPE, "held": held},
     ).fetchall()
 
 
@@ -251,8 +269,9 @@ def alerts_for_api(conn: Connection, real_now: datetime, replay_now: datetime | 
 # ---------- 6. One engine cycle ----------
 
 def process(conn: Connection, flashes: Iterable, now: datetime, sites: Iterable[Site],
-            replay: bool = False) -> CycleSummary:
+            replay: bool = False, hold_clears: bool = False) -> CycleSummary:
     """Apply one batch of flashes, then clear expired alerts, inside the caller's transaction.
+    hold_clears: the lightning feed isn't current, so expired alerts stay active (held) this cycle.
 
     Order matters: strikes are applied before clearing, so a late-arriving strike that keeps an
     alert alive extends it instead of letting it clear and immediately reopen.
@@ -280,16 +299,20 @@ def process(conn: Connection, flashes: Iterable, now: datetime, sites: Iterable[
                 summary.created.append(site_id)
             elif action == "keep" and site_strikes.earliest_at < alert.started_at:
                 backdate_alert(conn, alert, site_strikes)
-    summary.cleared += clear_expired(conn, now, replay)
+    if not hold_clears:
+        summary.cleared += clear_expired(conn, now, replay)
     return summary
 
 
-def run(flashes: list, now: datetime, *, replay: bool) -> CycleSummary:
-    """Entry point for the ingestion hook: one transaction per cycle."""
+def run(flashes: list, now: datetime, *, replay: bool, feed_ok: bool = True) -> CycleSummary:
+    """Entry point for the ingestion hook: one transaction per cycle. feed_ok: this live cycle's own
+    check passed (every file ingested, NOAA's newest file under 2 minutes old). Live alerts are cleared
+    only when that holds and the previous cycles were current too (lightning/health.py)."""
     from app.db import get_pool
 
+    hold = not replay and not (feed_ok and feed_current(now))
     with get_pool().connection() as conn:
-        summary = process(conn, flashes, now, load_sites(conn), replay=replay)
+        summary = process(conn, flashes, now, load_sites(conn), replay=replay, hold_clears=hold)
     if summary.changed:
         from app.cache import api_cache
 

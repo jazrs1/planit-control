@@ -138,7 +138,10 @@ Press **Replay storm** as you start talking (talk time = replay time), and tap *
   - After a connection drop, the last data stays greyed with "?" and countdowns say **Not confirmed**.
   - After 2 minutes, every page says **Status unknown** and not to treat any site as clear.
 - **Beacon:** it blinks yellow `NO DATA`, and it turns green only when the server says clear. If a countdown reaches 00:00 before the server confirms, it stays red.
-- **Stalled satellite feed:** that counts as unknown, not clear.
+- **Stalled satellite feed** (NOAA's newest lightning file over 2 minutes old, or cycles failing):
+  - A site with **no** stop-work shows unknown on the beacon, not clear.
+  - A site **in** stop-work stays in stop-work after its 30 minutes run out. The server doesn't clear it and pushes no all clear. `/alerts` and the site keep it, marked `held_reason: "lightning_data_delayed"`; the beacon stays red. The website shows "Waiting for lightning data" once the frontend reads that field.
+  - When data is back, the server first reads the files that arrived late. A strike in them restarts the countdown as usual. If there isn't one, the stop-work clears about 20 seconds later and the all clear is pushed then.
 
 **Is the briefing just an LLM?** No. The facts and the go / caution / no-go call come from code; Claude only words them, and every number and hazard word is checked against the data before it's shown.
 

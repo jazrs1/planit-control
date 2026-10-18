@@ -161,6 +161,8 @@ class Alert(BaseModel):
     all_clear_at: datetime | None
     last_strike_distance_mi: float | None
     replay: bool = False   # from a lightning replay (simulated time), not a real alert
+    # Real lightning only: the countdown ran out while lightning data is delayed, so the stop-work is held
+    held_reason: Literal["lightning_data_delayed"] | None = None
 
 
 

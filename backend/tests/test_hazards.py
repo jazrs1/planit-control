@@ -215,3 +215,13 @@ def test_model_rain_factor_label_follows_the_same_rule():
     assert labels[0] == "0.9-9.6 in of rain forecast (forecasts disagree)" and "Wind gusts to 35 mph" in labels
     inp.readings[("flood", "rain_today_nws_in")] = (7.0, NOW)
     assert predict(inp, {})["top_factors"][0]["label"] == "9.6 in of rain forecast"
+
+
+def test_held_stop_work_says_lightning_data_is_delayed_and_keeps_the_override():
+    alert = {"last_strike_distance_mi": 3.2, "last_strike_at": NOW - timedelta(minutes=40),
+             "all_clear_at": NOW - timedelta(minutes=10), "held_reason": "lightning_data_delayed"}
+    scored = predict(inputs({}, lightning_alert=alert, now=NOW), {})
+    assert scored["hazard_index_today"] >= 9.0
+    card = score_site(inputs({}, lightning_alert=alert, now=NOW), {})["cards"]["lightning"]
+    assert card["hazard_status"] == "danger"
+    assert card["reading"].startswith("Stop work held: lightning data is delayed") and "all clear at" not in card["reading"]

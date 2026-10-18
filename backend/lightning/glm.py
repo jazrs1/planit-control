@@ -107,7 +107,8 @@ def list_keys(prefix: str) -> list[str]:
 def newest_keys(now: datetime, lookback: timedelta) -> list[str]:
     """Keys of files that started within `lookback` of `now`, oldest first."""
     since = now - lookback
-    prefixes = sorted({hour_prefix(since), hour_prefix(now)})
+    hours = math.ceil((now - since) / timedelta(hours=1)) + 1
+    prefixes = sorted({hour_prefix(min(since + timedelta(hours=h), now)) for h in range(hours)})
     keys = [k for p in prefixes for k in list_keys(p)]
     return sorted((k for k in keys if since <= file_start(k) <= now), key=file_start)
 
@@ -242,12 +243,14 @@ Loader = Callable[[], bytes]
 
 
 def ingest_cycle(pool: ConnectionPool, files: Iterable[tuple[str, Loader]], now: datetime,
-                 replay: bool = False) -> CycleResult:
+                 replay: bool = False, fresh: bool = True) -> CycleResult:
     """Ingest a batch of files in order, then hand the new flashes to the alert hook (as replay
     alerts when `replay`, else live ones).
 
     `files` is (source_file name, function returning the file's bytes). A file that fails to
     load or parse is logged and skipped; it is not marked processed, so the next cycle retries it.
+    `fresh` (live): NOAA's newest file is under 2 minutes old. When it isn't, or a file failed, the
+    stop-work engine holds expired live alerts instead of clearing them (alerts/engine.py).
     """
     from lightning import alert_hook
 
@@ -267,22 +270,34 @@ def ingest_cycle(pool: ConnectionPool, files: Iterable[tuple[str, Loader]], now:
             result.new_flashes += flashes
 
     try:
-        alert_hook.on_new_flashes(result.new_flashes, now, replay=replay)
+        alert_hook.on_new_flashes(result.new_flashes, now, replay=replay,
+                                  feed_ok=fresh and result.files_failed == 0)
     except Exception:  # noqa: BLE001 - the alert engine must not break ingestion
         result.hook_failed = True
         log.exception("Alert hook failed")
     return result
 
 
+BACKLOG_MAX = timedelta(hours=2)   # how far back a cycle looks for files that arrived late after a stall
+
+
 def poll_latest(pool: ConnectionPool, now: datetime, lookback: timedelta = timedelta(minutes=3)) -> CycleResult:
     """One live cycle: ingest every recent GLM file not processed yet. Recorded as a success
-    (lightning/health.py) when it all worked and NOAA's newest file is less than 2 minutes old."""
+    (lightning/health.py) when it all worked and NOAA's newest file is less than 2 minutes old; a
+    newest file older than that marks the feed not current at once. After a stall the cycle looks back
+    to the last success (at most BACKLOG_MAX), so files NOAA published late are ingested too."""
     from lightning import health
 
+    last = health.last_success(replay=False)
+    if last is not None:
+        lookback = min(BACKLOG_MAX, max(lookback, now - last + timedelta(minutes=1)))
     keys = newest_keys(now, lookback)
+    fresh = bool(keys) and now - file_start(keys[-1]) <= health.STALE_AFTER
+    if not fresh:
+        health.reset(replay=False)   # stalled: the beacon and GET /alerts show it before the engine runs
     done = processed_files(pool, [k.rsplit("/", 1)[1] for k in keys])
     todo = [(k.rsplit("/", 1)[1], lambda k=k: download(k)) for k in keys if k.rsplit("/", 1)[1] not in done]
-    result = ingest_cycle(pool, todo, now, replay=False)
-    if result.ok and keys and now - file_start(keys[-1]) <= health.STALE_AFTER:
+    result = ingest_cycle(pool, todo, now, replay=False, fresh=fresh)
+    if result.ok and fresh:
         health.record_success(now, replay=False)
     return result

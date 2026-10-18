@@ -498,7 +498,7 @@ def test_live_poll_counts_as_success_only_when_complete_and_fresh(monkeypatch):
     def poll(keys, result):
         monkeypatch.setattr(health, "_last_success", {})
         monkeypatch.setattr(glm, "newest_keys", lambda now, lookback: keys)
-        monkeypatch.setattr(glm, "ingest_cycle", lambda pool, todo, now, replay: result)
+        monkeypatch.setattr(glm, "ingest_cycle", lambda pool, todo, now, replay, **_: result)
         glm.poll_latest(None, now)
         return health.is_current(now, replay=False)
 
@@ -610,3 +610,35 @@ def test_beacon_real_clear_shows_the_replay_stop_work(conn, monkeypatch):  # noq
     _stop(conn, sim, 28, replay=True)
     body = state()
     assert body["state"] == "stop" and body["replay"] is True and body["seconds_to_all_clear"] == 28 * 60
+
+
+def test_live_poll_tells_the_engine_when_the_feed_is_stale_and_reads_the_backlog(monkeypatch):
+    from lightning import glm
+    now = datetime(2026, 10, 17, 18, 0, tzinfo=timezone.utc)
+    name = lambda t: "GLM/" + t.strftime("OR_GLM-L2-LCFA_G19_s%Y%j%H%M") + "000_e0_c0.nc"   # noqa: E731
+    monkeypatch.setattr(glm, "processed_files", lambda pool, names: set(names))
+    seen = []
+
+    def poll(keys, last=None):
+        monkeypatch.setattr(health, "_last_success", {False: last} if last else {})
+        monkeypatch.setattr(glm, "newest_keys", lambda now, lookback: seen.append(lookback) or keys)
+        monkeypatch.setattr(glm, "ingest_cycle", lambda pool, todo, now, replay, fresh: seen.append(fresh) or glm.CycleResult())
+        glm.poll_latest(None, now)
+        return health.is_current(now, replay=False)
+
+    assert poll([name(now)]) is True and seen[-1] is True
+    # Stalled: the engine is told, and health goes not current at once (not 2 minutes after the last success).
+    assert poll([name(now - timedelta(minutes=3))], last=now - timedelta(seconds=20)) is False and seen[-1] is False
+    # After a 40-minute stall the cycle looks back to the last success, capped at BACKLOG_MAX.
+    poll([name(now)], last=now - timedelta(minutes=40))
+    assert seen[-2] == timedelta(minutes=41)
+    poll([name(now)], last=now - timedelta(hours=5))
+    assert seen[-2] == glm.BACKLOG_MAX
+
+
+def test_newest_keys_lists_every_hour_of_a_long_lookback(monkeypatch):
+    from lightning import glm
+    listed = []
+    monkeypatch.setattr(glm, "list_keys", lambda prefix: listed.append(prefix) or [])
+    glm.newest_keys(datetime(2026, 10, 17, 18, 10, tzinfo=timezone.utc), timedelta(hours=2))
+    assert [p.rsplit("/", 2)[-2] for p in listed] == ["16", "17", "18"]

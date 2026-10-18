@@ -216,7 +216,7 @@ def test_live_and_replay_cycles_pass_their_own_mode_to_the_engine(monkeypatch):
     from alerts import approach
     from lightning import alert_hook, glm
     seen = []
-    monkeypatch.setattr(engine, "run", lambda flashes, now, replay: seen.append(("engine", now, replay)))
+    monkeypatch.setattr(engine, "run", lambda flashes, now, replay, **_: seen.append(("engine", now, replay)))
     monkeypatch.setattr(approach, "run", lambda now, replay: seen.append(("approach", now, replay)))
     glm.ingest_cycle(None, [], T0, replay=True)
     alert_hook.wait_for_forecast()
@@ -237,7 +237,7 @@ def test_ingestion_never_waits_for_the_forecast_and_skips_one_still_running(monk
         runs.append(now)
         started.set()
         release.wait(5)
-    monkeypatch.setattr(engine, "run", lambda flashes, now, replay: None)
+    monkeypatch.setattr(engine, "run", lambda flashes, now, replay, **_: None)
     monkeypatch.setattr(approach, "run", slow_forecast)
     alert_hook.on_new_flashes([], T0, replay=True)
     assert started.wait(5)
@@ -257,7 +257,7 @@ def test_a_failing_forecast_frees_the_next_cycle(monkeypatch):
     def broken(now, replay):
         calls.append(now)
         raise RuntimeError("forecast bug")
-    monkeypatch.setattr(engine, "run", lambda flashes, now, replay: None)
+    monkeypatch.setattr(engine, "run", lambda flashes, now, replay, **_: None)
     monkeypatch.setattr(approach, "run", broken)
     for i in range(2):
         alert_hook.on_new_flashes([], T0 + i * MIN, replay=False)
@@ -268,3 +268,92 @@ def test_a_failing_forecast_frees_the_next_cycle(monkeypatch):
 def test_miles_between_one_degree_of_latitude():
     assert engine.miles_between(25.0, -84.0, 26.0, -84.0) == pytest.approx(69.09, abs=0.01)
     assert engine.miles_between(27.0, -82.0, 27.0, -82.0) == 0
+
+
+# ---------- a stalled lightning feed holds the all clear ----------
+# Strikes 5 mi south of A or north of B: 11 mi from the other site, so each hits one site only.
+
+def _held(conn, now):
+    return [(a["site_id"], a["held_reason"]) for a in engine.active_alerts(conn, now, replay=False)
+            if a["site_id"] in (SITE_A.id, SITE_B.id)]
+
+
+def test_stall_holds_the_all_clear_and_pushes_nothing(conn, monkeypatch):
+    from push import notify
+    pushed = []
+    monkeypatch.setattr(notify, "alerts_changed", lambda now, replay: pushed.append(now))
+    cycle(conn, [flash(SITE_A, 5.0, T0)], now=T0 + MIN)
+    monkeypatch.setattr(engine, "feed_current", lambda now: False)          # feed stalled
+
+    summary = engine.process(conn, [], T0 + 31 * MIN, SITES, hold_clears=True)
+    notify.stop_work_cycle(summary, T0 + 31 * MIN, replay=False)
+    assert summary.cleared == [] and pushed == []
+    [alert] = alerts_for(conn, SITE_A)
+    assert alert["status"] == "active" and events_for(conn, alert["id"]) == ["created"]
+    # GET /alerts and /sites (both use active_alerts) keep it, marked held; before the countdown ends it isn't held.
+    assert _held(conn, T0 + 31 * MIN) == [(SITE_A.id, engine.HELD_DATA_DELAYED)]
+    assert _held(conn, T0 + 10 * MIN) == [(SITE_A.id, None)]
+    assert _held(conn, T0 + 31 * MIN) == [(a["site_id"], a["held_reason"]) for a in
+                                          engine.alerts_for_api(conn, T0 + 31 * MIN, None) if a["site_id"] == SITE_A.id]
+
+
+def test_run_holds_when_this_cycle_or_the_last_ones_are_not_current(monkeypatch):
+    seen = []
+    monkeypatch.setattr(engine, "process", lambda *a, hold_clears, **k: seen.append(hold_clears) or engine.CycleSummary())
+
+    class Pool:
+        from contextlib import contextmanager
+
+        @contextmanager
+        def connection(self):
+            yield None
+    from app import db
+    monkeypatch.setattr(db, "get_pool", lambda: Pool())
+    monkeypatch.setattr(engine, "load_sites", lambda conn: [])
+    engine.run([], T0, replay=False)                    # current: clears as usual
+    engine.run([], T0, replay=False, feed_ok=False)     # this cycle stale or a file failed
+    monkeypatch.setattr(engine, "feed_current", lambda now: False)
+    engine.run([], T0, replay=False)                    # recovery cycle: earlier cycles weren't current
+    engine.run([], T0, replay=True, feed_ok=False)      # replay is never held
+    assert seen == [False, True, True, False]
+
+
+def test_recovery_without_new_strikes_clears_and_pushes_the_all_clear(conn, monkeypatch):
+    from push import notify
+    pushed = []
+    monkeypatch.setattr(notify, "alerts_changed", lambda now, replay: pushed.append(now))
+    cycle(conn, [flash(SITE_A, 5.0, T0)], now=T0 + MIN)
+    engine.process(conn, [], T0 + 31 * MIN, SITES, hold_clears=True)     # held
+    engine.process(conn, [], T0 + 45 * MIN, SITES, hold_clears=True)     # backlog cycle: nothing new, still held
+    summary = engine.process(conn, [], T0 + 46 * MIN, SITES)             # feed current again
+    notify.stop_work_cycle(summary, T0 + 46 * MIN, replay=False)
+    assert summary.cleared == [SITE_A.id] and pushed == [T0 + 46 * MIN]
+    [alert] = alerts_for(conn, SITE_A)
+    assert alert["status"] == "cleared" and events_for(conn, alert["id"]) == ["created", "cleared"]
+    recorded = conn.execute("SELECT recorded_at FROM alert_events WHERE alert_id = %s AND event = 'cleared'",
+                            (alert["id"],)).fetchone()["recorded_at"]
+    assert recorded == T0 + 46 * MIN          # push/notify picks events by recorded_at, so the all clear is sent now
+    assert _held(conn, T0 + 46 * MIN) == []
+
+
+def test_recovery_with_late_strikes_extends_or_restarts_as_usual(conn):
+    cycle(conn, [flash(SITE_A, 5.0, T0), flash(SITE_B, 5.0, T0, direction=1)], now=T0 + MIN)
+    engine.process(conn, [], T0 + 31 * MIN, SITES, hold_clears=True)     # both held
+    # The backlog: A had a strike during the stall before its countdown ended (extend), B one after it (restart).
+    late = [flash(SITE_A, 5.0, T0 + 20 * MIN), flash(SITE_B, 5.0, T0 + 35 * MIN, direction=1)]
+    summary = engine.process(conn, late, T0 + 40 * MIN, SITES, hold_clears=True)
+    assert summary.extended == [SITE_A.id] and summary.created == [SITE_B.id]
+    [a] = alerts_for(conn, SITE_A)
+    assert a["status"] == "active" and a["all_clear_at"] == T0 + 50 * MIN
+    old_b, new_b = alerts_for(conn, SITE_B)
+    assert old_b["status"] == "cleared" and new_b["status"] == "active" and new_b["all_clear_at"] == T0 + 65 * MIN
+    # Feed current again: both countdowns are still running, so nothing clears and nothing is held.
+    assert engine.process(conn, [], T0 + 41 * MIN, SITES).cleared == []
+    assert sorted(_held(conn, T0 + 41 * MIN)) == [(SITE_A.id, None), (SITE_B.id, None)]
+
+
+def test_replay_alerts_are_never_held(conn, monkeypatch):
+    monkeypatch.setattr(engine, "feed_current", lambda now: False)          # the live feed is stalled
+    cycle(conn, [flash(SITE_A, 5.0, T0)], now=T0 + MIN, replay=True)
+    assert engine.process(conn, [], T0 + 31 * MIN, SITES, replay=True).cleared == [SITE_A.id]
+    assert [a for a in engine.active_alerts(conn, T0 + 31 * MIN, replay=True) if a["site_id"] == SITE_A.id] == []
