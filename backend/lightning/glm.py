@@ -294,7 +294,7 @@ def poll_latest(pool: ConnectionPool, now: datetime, lookback: timedelta = timed
     keys = newest_keys(now, lookback)
     fresh = bool(keys) and now - file_start(keys[-1]) <= health.STALE_AFTER
     if not fresh:
-        health.reset(replay=False)   # stalled: the beacon and GET /alerts show it before the engine runs
+        health.mark_stalled(replay=False)   # the beacon and GET /alerts show it before the engine runs; keeps the last success for the backlog
     done = processed_files(pool, [k.rsplit("/", 1)[1] for k in keys])
     todo = [(k.rsplit("/", 1)[1], lambda k=k: download(k)) for k in keys if k.rsplit("/", 1)[1] not in done]
     result = ingest_cycle(pool, todo, now, replay=False, fresh=fresh)

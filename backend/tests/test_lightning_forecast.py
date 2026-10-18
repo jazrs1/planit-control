@@ -621,6 +621,7 @@ def test_live_poll_tells_the_engine_when_the_feed_is_stale_and_reads_the_backlog
 
     def poll(keys, last=None):
         monkeypatch.setattr(health, "_last_success", {False: last} if last else {})
+        monkeypatch.setattr(health, "_stalled", set())
         monkeypatch.setattr(glm, "newest_keys", lambda now, lookback: seen.append(lookback) or keys)
         monkeypatch.setattr(glm, "ingest_cycle", lambda pool, todo, now, replay, fresh: seen.append(fresh) or glm.CycleResult())
         glm.poll_latest(None, now)
@@ -634,6 +635,33 @@ def test_live_poll_tells_the_engine_when_the_feed_is_stale_and_reads_the_backlog
     assert seen[-2] == timedelta(minutes=41)
     poll([name(now)], last=now - timedelta(hours=5))
     assert seen[-2] == glm.BACKLOG_MAX
+
+
+def test_a_stall_keeps_the_last_success_so_recovery_reads_the_backlog(monkeypatch):
+    """The real sequence: a success, stalled cycles (not current at once), then recovery. The recovery
+    cycle must still look back to the last success, so strikes in files NOAA published late count."""
+    from lightning import glm
+    t0 = datetime(2026, 10, 17, 18, 0, tzinfo=timezone.utc)
+    name = lambda t: "GLM/" + t.strftime("OR_GLM-L2-LCFA_G19_s%Y%j%H%M") + "000_e0_c0.nc"   # noqa: E731
+    monkeypatch.setattr(health, "_last_success", {})
+    monkeypatch.setattr(health, "_stalled", set())
+    monkeypatch.setattr(glm, "processed_files", lambda pool, names: set(names))
+    monkeypatch.setattr(glm, "ingest_cycle", lambda pool, todo, now, replay, fresh: glm.CycleResult())
+    lookbacks = []
+
+    def poll(now, newest):
+        monkeypatch.setattr(glm, "newest_keys", lambda now, lookback: lookbacks.append(lookback) or [name(newest)])
+        glm.poll_latest(None, now)
+        return health.is_current(now, replay=False)
+
+    assert poll(t0, t0) is True
+    # NOAA stops publishing: every cycle for 30 minutes sees the same old newest file.
+    for minutes in (3, 5, 30):
+        assert poll(t0 + timedelta(minutes=minutes), t0) is False
+    # Files come back: the recovery cycle looks back to the last success (31 min), not just 3 minutes.
+    recovered = t0 + timedelta(minutes=30, seconds=20)
+    assert poll(recovered, recovered) is True
+    assert lookbacks[-1] >= timedelta(minutes=30)
 
 
 def test_newest_keys_lists_every_hour_of_a_long_lookback(monkeypatch):
