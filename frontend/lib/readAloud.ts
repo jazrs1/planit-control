@@ -1,5 +1,5 @@
 import type { Alert, LightningApproach, Site } from "@shared/types";
-import { formatStrikeDistance, replayCleared } from "@/lib/alerts";
+import { formatStrikeDistance, heldForLightningData, replayCleared } from "@/lib/alerts";
 import { HAZARD_LABEL } from "@/lib/risk";
 import type { ViewMode } from "@/lib/viewMode";
 
@@ -9,7 +9,8 @@ import type { ViewMode } from "@/lib/viewMode";
 //   real alerts are spoken in both, and switching views is not a change (nothing "ended");
 // - only a real stop-work ending says "All clear": a replay ending says "Replay ended" (stopped partway)
 //   or "Replay: Stop work ended" (its countdown ran out while the replay goes on);
-// - unknown is never "All clear": an alert can only end while the alert state is known.
+// - unknown is never "All clear": an alert can only end while the alert state is known;
+// - a real stop-work held for delayed lightning data says so once; the data coming back says nothing.
 
 /** The site's spoken state: unknown, or the set of active things, each with its own key. */
 export type ReadAloudState =
@@ -36,6 +37,7 @@ export function readAloudState(site: Pick<Site, "id" | "name">, alerts: Alert[] 
     if (alert.type === "lightning") {
       const distance = formatStrikeDistance(alert.last_strike_distance_mi);
       items.set(key, `${prefix}Stop work at ${site.name}. ${distance ? `Lightning ${miles(distance)} away.` : "Lightning within 10 miles."}`);
+      if (heldForLightningData(alert)) items.set("held:real", `Lightning data delayed at ${site.name}. Stop work stays in place.`);
     } else if (alert.type === "flood") {
       items.set(key, `${prefix}Flood risk at ${site.name}.`);
     } else {
@@ -53,7 +55,8 @@ export function readAloudState(site: Pick<Site, "id" | "name">, alerts: Alert[] 
  *  stop-work ending is "All clear"; a stopped replay is just "Replay ended". */
 function ended(key: string, siteName: string, replayRunning: boolean): string | null {
   const [type, kind] = key.split(":");
-  if (type === "approach") return null;
+  // An advisory ending is not an all clear; lightning data coming back isn't either (the stop-work goes on).
+  if (type === "approach" || type === "held") return null;
   if (kind === "replay") {
     if (!replayRunning) return `Replay ended at ${siteName}.`;
     return type === "lightning" ? `Replay: Stop work ended at ${siteName}.` : type === "flood" ? `Replay: Flood risk ended at ${siteName}.` : `Replay: Alert ended at ${siteName}.`;
@@ -69,7 +72,7 @@ export function readAloudChanges(siteName: string, previous: ReadAloudState, nex
   if (!next.known) return wasUnknown ? [] : [`Connection lost. Stop-work status at ${siteName} is unknown.`];
   const before = previous.known ? previous.items : new Map<string, string>();
   const lines: { order: number; text: string }[] = [];
-  const order = (key: string) => (key.endsWith(":replay") ? 10 : 0) + (key.startsWith("lightning") ? 0 : key.startsWith("approach") ? 1 : 2);
+  const order = (key: string) => (key.endsWith(":replay") ? 10 : 0) + (key.startsWith("lightning") ? 0 : key.startsWith("held") ? 0.5 : key.startsWith("approach") ? 1 : 2);
   for (const [key, text] of next.items) if (!before.has(key)) lines.push({ order: order(key), text });
   // Back to Live from Replay: the replay's alerts drop out of view, they didn't end.
   const leftReplay = previous.known && previous.view === "replay" && next.view === "live";

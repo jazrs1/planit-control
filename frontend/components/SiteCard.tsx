@@ -4,7 +4,7 @@ import type { Alert, FloodConditions, Site } from "@shared/types";
 import AlertBanner from "@/components/AlertBanner";
 import LightningApproachChip from "@/components/LightningApproachChip";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { replayCleared, replayClearedLabel } from "@/lib/alerts";
+import { heldForLightningData, replayCleared, replayClearedLabel } from "@/lib/alerts";
 import { hazardHref } from "@/lib/hazardLinks";
 import { HAZARD_LABEL, liveHazardIndex, replayRaised, riskLevel } from "@/lib/risk";
 
@@ -66,7 +66,7 @@ export default function SiteCard({ site, alerts = [], flood, alertsUnconfirmed, 
     ? <span className="flex items-center gap-1.5">
       <span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : "pc-chip--stop"}`}>Stop work</span>
       {lastKnown}
-      {!selected && <StopWorkCountdown all_clear_at={realLightning.all_clear_at} replay={false} inline />}
+      {!selected && <StopWorkCountdown all_clear_at={realLightning.all_clear_at} replay={false} inline held={heldForLightningData(realLightning)} />}
     </span>
     : realApproach ? <span className="flex items-center gap-1.5"><span className={`pc-chip ${approachUnconfirmed ? "pc-chip--unknown" : "pc-chip--approach"}`}>Lightning possible</span>{approachUnconfirmed && <span className="pc-label text-muted">Last known</span>}</span>
     : realFlood ? <span className="flex items-center gap-1.5"><span className={`pc-chip ${alertsUnconfirmed ? "pc-chip--unknown" : "pc-chip--flood"}`}>Flood risk</span>{lastKnown}</span>

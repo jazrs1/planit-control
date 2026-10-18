@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Alert } from "@shared/types";
 import { ReplayTag } from "@/components/AlertBanner";
 import StopWorkCountdown from "@/components/StopWorkCountdown";
-import { formatStrikeDistance, replayCleared } from "@/lib/alerts";
+import { formatStrikeDistance, heldForLightningData, replayCleared } from "@/lib/alerts";
 import { HAZARD_LABEL } from "@/lib/risk";
 
 // Alert cards for the site detail page and /alerts. A real stop-work gets the one hard edge on the page
@@ -35,11 +35,11 @@ export function StopWorkCard({ alert, siteName, lastKnown }: { alert: Alert; sit
           {siteName && <h2 className="break-words text-xl font-semibold">{siteName}</h2>}
           {/* Same rounding as every other page: down, so a strike inside 10 mi never reads 10.0. */}
           <p className={siteName ? "" : "text-xl font-semibold"}>{distance === null ? "Lightning within 10 mi." : `Last strike ${distance} away.`}</p>
-          <p className="text-muted">Each new strike restarts the 30-minute wait.</p>
+          <p className="text-muted">{heldForLightningData(alert) ? "Lightning data is delayed. Stop work stays in place until it’s back." : "Each new strike restarts the 30-minute wait."}</p>
         </div>
         {/* The shared countdown, without its box: the card is the frame. */}
         <div className="shrink-0 sm:min-w-48 [&>div]:border-0 [&>div]:bg-transparent [&>div]:p-0 [&_[role=timer]]:text-[2rem]">
-          <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} />
+          <StopWorkCountdown all_clear_at={alert.all_clear_at} replay={alert.replay} held={heldForLightningData(alert)} />
         </div>
       </div>
     </article>
