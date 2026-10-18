@@ -1,8 +1,8 @@
-# PlanIT Control
+# Fieldcast
 
-**Live: [stormsafecrews.us](https://stormsafecrews.us)** · API docs: [api.stormsafecrews.us/docs](https://api.stormsafecrews.us/docs) · Built for the Sperry Tech challenge at SwampHacks XII.
+**Live: [stormsafecrews.us](https://stormsafecrews.us)** · API docs: [api.stormsafecrews.us/docs](https://api.stormsafecrews.us/docs) · Built for Sperry Tech's PlanIT Control challenge at SwampHacks XII.
 
-Utility crews decide every morning whether a site is safe to work, but the data behind that call (lightning, heat, flood warnings, fires, alligator sightings) is scattered across agencies and apps. PlanIT Control puts it on one screen for **55 real Florida power plants** (EIA-860M): live hazard cards, a lightning stop-work countdown, a 0–10 hazard index for today and tomorrow, and a go / caution / no-go briefing every evening. When the data is missing, it says "unknown", never "all clear".
+Utility crews decide every morning whether a site is safe to work, but the data behind that call (lightning, heat, flood warnings, fires, alligator sightings) is scattered across agencies and apps. Fieldcast puts it on one screen for **55 real Florida power plants** (EIA-860M): live hazard cards, a lightning stop-work countdown, a 0–10 hazard index for today and tomorrow, and a go / caution / no-go briefing every evening. When the data is missing, it says "unknown", never "all clear".
 
 ## Features
 
@@ -52,7 +52,7 @@ How the pieces work: [alert engine](docs/alert-engine.md), [lightning forecast](
 - Satellite lightning positions are accurate to about 8–14 km, and the 10-mile radius has no extra margin yet.
 - Rainfall is a model estimate. Fire detection depends on a few satellite passes a day and ignores anything within 1 km of a site or a Florida thermal plant, so a real fire there would be missed.
 - If the lightning feed stalls (NOAA's newest file over 2 minutes old), a stop-work is held: the website shows "Waiting for lightning data", the beacon stays red, and no all-clear goes out until the data is back and the late files are checked. Sites with no stop-work show "unknown" on the beacon, but the website doesn't flag delayed data for them, and the first 2 minutes of a stall look like a quiet feed.
-- PlanIT supports a supervisor's judgment; it doesn't replace it.
+- Fieldcast supports a supervisor's judgment; it doesn't replace it.
 
 Numbers and details: [`docs/devpost.md`](docs/devpost.md) and [`docs/ml-model.md`](docs/ml-model.md).
 

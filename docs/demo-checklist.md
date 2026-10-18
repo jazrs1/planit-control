@@ -51,7 +51,7 @@ Press **Replay storm** about **5 seconds in**; after that the replay runs on its
 | 3:07 | 3:02 | Replay ends; the app is back on live data |
 
 **0:00–0:30. The problem, and start the replay.**
-- **Say:** "Crews decide every day whether it's safe to work. The data exists: lightning, heat, floods, fires, gators. But it's scattered. PlanIT puts it on one screen for 55 Florida power plants."
+- **Say:** "Crews decide every day whether it's safe to work. The data exists: lightning, heat, floods, fires, gators. But it's scattered. Fieldcast puts it on one screen for 55 Florida power plants."
 - **Click** (about 0:05): **Replay storm**. Enter the demo code if asked. The laptop switches to the replay by itself.
 - **Phone, right after:** tap **Watch replay** on the crew view's **REPLAY** banner ("A storm replay is running"). The view is per device: until this tap, the phone stays in Live view, where its card and read-aloud show only real states.
 - **Say:** "This is a real storm, August 4, 2025, replayed through our live system at 30 times speed."
@@ -92,14 +92,14 @@ Press **Replay storm** about **5 seconds in**; after that the replay runs on its
 
 **3:30–4:00. Florida first, and the close.**
 - **Say:** "We started with Florida. The lightning satellite covers the Americas, so a new region needs its sites and a retrained model."
-- **Say:** "And PlanIT never says all clear without data. When it doesn't know, it says unknown. Thank you."
+- **Say:** "And Fieldcast never says all clear without data. When it doesn't know, it says unknown. Thank you."
 - The replay ended at about 3:07 on its own; the app is back on live data.
 - **After judging:** tap **Back to live** on the phone. The view is remembered, so otherwise it stays in Replay view.
 
 ### The 60-second version
 
 Press **Replay storm** as you start talking (talk time = replay time), and tap **Watch replay** on the phone right after.
-- **0:00.** "PlanIT puts lightning, heat, flood, fire and wildlife risk on one screen, for 55 Florida power plants. This is a real storm, replayed at 30 times speed."
+- **0:00.** "Fieldcast puts lightning, heat, flood, fire and wildlife risk on one screen, for 55 Florida power plants. This is a real storm, replayed at 30 times speed."
 - **0:10.** "A strike within 10 miles stops work. All clear is 30 minutes after the last strike, and every strike resets it: Okeechobee here reset 177 times."
 - **≈ 0:21:** the beacon turns yellow. "And the beacon just turned yellow: our forecast saw this storm heading for Osceola 16 minutes ahead."
 - **0:35.** Show the phone. "The crew sees it on a phone, can hear it read aloud, and can report a hazard with a photo."
