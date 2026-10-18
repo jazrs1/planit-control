@@ -42,7 +42,7 @@ export default function AlertsList({ sites }: { sites: Site[] }) {
       {/* One sentence for the counts, one for the order and refresh: no chain of middle dots. */}
       <p role="status" className="text-xs text-muted">
         {real.length > 0 && <>{real.length}{lastKnown ? "?" : ""} {real.length === 1 ? "alert" : "alerts"}{lastKnown ? " (last known)" : ""}: {counts.lightning} stop work, {counts.flood} flood risk{replayCount > 0 ? `, plus ${replayCount} from the storm replay` : ""}. Newest first. </>}
-        {real.length === 0 && replayCount > 0 && <>{replayCount} from the storm replay. </>}
+        {real.length === 0 && replayCount > 0 && <>No real alerts{lastKnown ? " (last known)" : ""}, plus {replayCount} from the storm replay. </>}
         {status !== "demo" && (replay?.running ? "Updates every 3 seconds during the replay." : "Updates every 30 seconds.")}
       </p>
       {alerts.length === 0 ? (
