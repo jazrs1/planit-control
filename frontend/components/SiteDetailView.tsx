@@ -172,7 +172,15 @@ export default function SiteDetailView({ siteId, initialDetail }: { siteId: stri
   useEffect(() => {
     if (!target || jump === 0) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const align = (behavior: ScrollBehavior) => document.getElementById(target.elementId)?.scrollIntoView({ block: "start", behavior });
+    // Scroll the card to just below the sticky top bar (and the outage banner when shown). Measured, not
+    // scrollIntoView: iOS Safari ignores scroll-padding there and puts the heading under the bar.
+    const align = (behavior: ScrollBehavior) => {
+      const card = document.getElementById(target.elementId);
+      if (!card) return;
+      const nav = document.querySelector('nav[aria-label="Main navigation"]')?.getBoundingClientRect().height ?? 0;
+      const banner = [...document.querySelectorAll<HTMLElement>('[role="alert"]')].find((el) => getComputedStyle(el).position === "sticky")?.getBoundingClientRect().height ?? 0;
+      window.scrollTo({ top: Math.max(0, window.scrollY + card.getBoundingClientRect().top - nav - banner - 12), behavior });
+    };
     // After the details open, once the page has laid out.
     const frame = window.requestAnimationFrame(() => align(reduce ? "auto" : "smooth"));
     // The history chart and the briefing load after the cards and push them down: keep the card in place
