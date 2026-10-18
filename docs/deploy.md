@@ -251,6 +251,66 @@ Running `--rollback` twice goes back to the newer commit, since the rollback its
 - `update.sh` reinstalls the systemd unit if it changed.
 - For a changed `Caddyfile` or package list, rerun `setup.sh` (safe; it leaves the checkout alone).
 
+## Frontend on this server (standby for Vercel)
+
+If Vercel has trouble, the server can serve the frontend at the same address. The site runs here all the
+time, but nothing reaches it until DNS points here and its Caddy block is turned on.
+
+- **What runs:** `next start` as the `planit-web` systemd service on `127.0.0.1:3000` (restarts on failure,
+  capped at 1 GB of memory). The build has `NEXT_PUBLIC_API_URL=https://api.stormsafecrews.us` baked in,
+  the same as on Vercel.
+- **Same origin, so nothing else changes:** CORS already allows `https://stormsafecrews.us` and `www`.
+  Push subscriptions and the saved demo code belong to the origin, so they keep working after a switch.
+- **Separate from the API:** the source is exported from the API checkout's repository with `git archive`,
+  so the API's checked-out commit never moves. The `planit-web` user can't read `/opt/planit` or `.env`.
+- **Setup (once, done):** `deploy/setup-web.sh` installs Node 24 LTS in `/opt/node` (checksum-verified),
+  the user, the service, and the Caddy block `/etc/caddy/web.caddy` (not imported), then builds `main`.
+
+**Update the standby build** (build first; the running site keeps serving until the build passes):
+
+```bash
+/opt/planit/app/deploy/deploy-web.sh               # latest main
+/opt/planit/app/deploy/deploy-web.sh some-branch   # a branch, tag or commit
+/opt/planit/app/deploy/deploy-web.sh --rollback    # the build that ran before the last deploy
+cat /opt/planit-web/deploys.log; journalctl -u planit-web -f
+curl -s --resolve stormsafecrews.us:3000:127.0.0.1 http://stormsafecrews.us:3000/ | head -c 300   # answers?
+```
+
+### Switch stormsafecrews.us to this server
+
+1. **Build the latest main:** `/opt/planit/app/deploy/deploy-web.sh`. Merges since the last build aren't in
+   the standby until you do.
+2. **Porkbun** → Domain Management → `stormsafecrews.us` → DNS. Change exactly these two records and
+   leave `api` alone:
+
+   | | Type | Host | Answer | TTL |
+   |---|---|---|---|---|
+   | Edit | A | *(blank, the apex)* | `216.198.79.1` → `64.177.49.194` | 600 |
+   | Delete | CNAME | `www` | `f6bc85d7c1c84eef.vercel-dns-017.com` | |
+   | Add | A | `www` | `64.177.49.194` | 600 |
+   | Keep | A | `api` | `64.177.49.194` | 600 |
+
+   A name can't have both a CNAME and an A record, so delete the `www` CNAME before adding the A record.
+3. **Wait for Porkbun to answer with the new address** (Let's Encrypt asks Porkbun's servers directly, so
+   this is all the certificate needs):
+   ```bash
+   dig +short stormsafecrews.us @maceio.ns.porkbun.com; dig +short www.stormsafecrews.us @maceio.ns.porkbun.com
+   ```
+4. **Turn on the Caddy block** (validates first; Caddy gets both certificates within a minute or so):
+   ```bash
+   /opt/planit/app/deploy/deploy-web.sh --caddy-on
+   curl -sI https://stormsafecrews.us | head -1; curl -sI https://www.stormsafecrews.us | head -1
+   ```
+5. **Visitors move over as their cached answers expire** (up to 10 minutes at TTL 600). Until then they
+   still reach Vercel, which keeps working, so there's no gap.
+
+**Switch back to Vercel:** put the records back (A apex `216.198.79.1`; delete A `www`; CNAME `www`
+`f6bc85d7c1c84eef.vercel-dns-017.com`, or whatever Vercel shows under *Project → Settings → Domains*),
+wait about 10 minutes for caches to expire, then `deploy-web.sh --caddy-off`.
+
+**After a rerun of `setup.sh`**, which rewrites `/etc/caddy/Caddyfile`, run `deploy-web.sh --caddy-on`
+again if the site is being served from here.
+
 ## Every `.env` variable
 
 `backend/app/config.py` reads all of these. "Server" is what the server's `backend/.env` needs; "Laptop" is what yours should say after the cutover.

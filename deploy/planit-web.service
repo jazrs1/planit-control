@@ -1,0 +1,35 @@
+# PlanIT Control frontend (next start), the standby for the Vercel site. Installed by deploy/setup-web.sh
+# to /etc/systemd/system/planit-web.service. Serves the build in /opt/planit-web/current on 127.0.0.1:3000;
+# Caddy proxies stormsafecrews.us to it once that block is turned on (docs/deploy.md, "Frontend on this server").
+#   systemctl status planit-web · systemctl restart planit-web · journalctl -u planit-web -f
+[Unit]
+Description=PlanIT Control web (next start, standby for Vercel)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=planit-web
+Group=planit-web
+# A symlink to the release that deploy/deploy-web.sh built last; it restarts the service after switching it.
+WorkingDirectory=/opt/planit-web/current/frontend
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_API_URL is baked into the build by deploy-web.sh, not read here.
+ExecStart=/opt/node/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+# The API shares this box: a runaway web process is killed (and restarted) before it can starve it.
+MemoryMax=1G
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=planit-web
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
